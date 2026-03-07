@@ -1,0 +1,1580 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>NEXARB — Крипто Арбитраж</title>
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@300;400;500;600;700;800&family=Fira+Code:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#020408;--bg1:#060d18;--bg2:#0a1525;--bg3:#0f1e35;
+  --card:#081222;--border:#132035;--border2:#1a2e4a;
+  --gold:#f5a623;--gold2:#ffc966;--gold3:#fff1cc;
+  --cyan:#00cfff;--cyan2:#7ee8fa;
+  --green:#00e87a;--green2:#b2f5d4;
+  --red:#ff3e5e;--red2:#ffb3bf;
+  --purple:#a855f7;--blue:#3b82f6;
+  --text:#cde0f5;--text2:#8fb3d4;--muted:#3d6080;
+  --font:'Oxanium',sans-serif;--mono:'Fira Code',monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overscroll-behavior:none}
+body{background:var(--bg);color:var(--text);font-family:var(--font);overflow:hidden}
+
+/* STARS BG */
+.stars{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.star{position:absolute;border-radius:50%;background:#fff;animation:twinkle var(--d,3s) ease-in-out infinite var(--delay,0s)}
+@keyframes twinkle{0%,100%{opacity:var(--op,.3);transform:scale(1)}50%{opacity:1;transform:scale(1.5)}}
+.scanline{position:fixed;inset:0;z-index:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,207,255,0.012) 2px,rgba(0,207,255,0.012) 4px);pointer-events:none}
+
+/* APP SHELL */
+.app{position:relative;z-index:1;width:100%;max-width:480px;height:100vh;margin:0 auto;display:flex;flex-direction:column;overflow:visible}
+
+/* FILTER ZONE */
+#filterZone{flex-shrink:0;background:rgba(6,13,24,0.97);border-bottom:1px solid var(--border)}
+.frow{position:relative}
+.frow-inner{
+  display:flex;flex-direction:row;flex-wrap:nowrap;
+  overflow-x:scroll;overflow-y:hidden;
+  -webkit-overflow-scrolling:touch;
+  scroll-behavior:smooth;
+  gap:6px;padding:7px 12px;
+  cursor:grab;
+}
+.frow-inner:active{cursor:grabbing}
+.frow-inner::-webkit-scrollbar{height:0;display:none}
+.frow-fade{position:absolute;top:0;right:0;bottom:0;width:32px;background:linear-gradient(to right,transparent,rgba(6,13,24,1));pointer-events:none;z-index:2}
+.nch{
+  display:inline-flex;align-items:center;gap:4px;
+  flex:none;white-space:nowrap;
+  padding:5px 10px;border-radius:10px;
+  border:1px solid var(--border2);background:var(--bg2);
+  color:var(--text2);font-size:10px;font-weight:600;
+  cursor:pointer;transition:border-color .15s,color .15s,background .15s;
+  user-select:none;-webkit-user-select:none;
+}
+.nch.on{border-color:var(--cyan);color:var(--cyan);background:rgba(0,207,255,0.1)}
+.nch-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;display:inline-block}
+.ch{
+  display:inline-flex;align-items:center;
+  flex:none;white-space:nowrap;
+  padding:5px 12px;border-radius:16px;
+  border:1px solid var(--border2);background:var(--bg2);
+  color:var(--text2);font-size:10px;font-weight:600;
+  cursor:pointer;transition:border-color .15s,color .15s,background .15s;
+  user-select:none;-webkit-user-select:none;
+}
+.ch.on{border-color:var(--cyan);color:var(--cyan);background:rgba(0,207,255,0.1)}
+
+
+/* HEADER */
+.hdr{
+  flex-shrink:0;padding:12px 16px 10px;
+  background:linear-gradient(180deg,rgba(6,13,24,0.98),rgba(6,13,24,0.92));
+  backdrop-filter:blur(24px);border-bottom:1px solid var(--border);
+  position:relative;
+}
+.hdr::after{content:'';position:absolute;bottom:-1px;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--cyan),transparent);opacity:0.4}
+.hdr-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.brand{display:flex;align-items:center;gap:8px}
+.brand-cube{
+  width:34px;height:34px;border-radius:8px;
+  background:linear-gradient(135deg,var(--cyan),var(--purple));
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-weight:700;font-size:15px;color:#000;
+  box-shadow:0 0 18px rgba(0,207,255,0.35);
+  animation:pulse-cube 4s ease-in-out infinite;
+}
+@keyframes pulse-cube{0%,100%{box-shadow:0 0 18px rgba(0,207,255,0.35)}50%{box-shadow:0 0 30px rgba(0,207,255,0.6)}}
+.brand-name{font-size:19px;font-weight:800;letter-spacing:1px;color:var(--text)}
+.brand-name em{color:var(--cyan);font-style:normal}
+.brand-ver{font-size:9px;color:var(--muted);font-family:var(--mono);letter-spacing:1px}
+.tier-btn{
+  padding:5px 12px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:0.8px;cursor:pointer;transition:all .2s;border:none;
+}
+.tier-free{background:rgba(61,96,128,0.2);border:1px solid rgba(61,96,128,0.4);color:var(--text2)}
+.tier-free:hover{border-color:var(--gold);color:var(--gold)}
+.tier-vip{background:linear-gradient(135deg,rgba(245,166,35,0.2),rgba(168,85,247,0.15));border:1px solid rgba(245,166,35,0.5);color:var(--gold);animation:glow-gold 3s ease infinite}
+@keyframes glow-gold{0%,100%{box-shadow:0 0 8px rgba(245,166,35,0.2)}50%{box-shadow:0 0 16px rgba(245,166,35,0.4)}}
+
+.hdr-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.hdr-stat{background:var(--bg2);border-radius:7px;padding:6px 10px;border:1px solid var(--border)}
+.hdr-stat-lbl{font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:2px}
+.hdr-stat-val{font-family:var(--mono);font-size:13px;font-weight:600}
+.c{color:var(--cyan)}.g{color:var(--green)}.go{color:var(--gold)}
+
+/* TICKER */
+.ticker{
+  flex-shrink:0;height:28px;overflow:hidden;
+  background:var(--bg1);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;
+}
+.ticker-inner{display:flex;gap:0;white-space:nowrap;animation:tick 40s linear infinite}
+@keyframes tick{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.tick-item{display:inline-flex;align-items:center;gap:7px;padding:0 16px;font-family:var(--mono);font-size:10px;border-right:1px solid var(--border)}
+.tick-sym{color:var(--text2);font-weight:600}
+.tick-p{color:var(--text)}
+.tick-up{color:var(--green)}
+.tick-dn{color:var(--red)}
+
+/* SCROLL AREA */
+.scroll{flex:1;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.scroll::-webkit-scrollbar{width:3px}
+.scroll::-webkit-scrollbar-track{background:transparent}
+.scroll::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.pg{display:none;padding:12px 12px 80px;animation:fadeUp .25s ease}
+.pg.on{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* BOTTOM NAV */
+.bnav{
+  flex-shrink:0;display:grid;grid-template-columns:repeat(5,1fr);
+  background:rgba(6,13,24,0.97);backdrop-filter:blur(20px);
+  border-top:1px solid var(--border);
+  padding:6px 2px calc(6px + env(safe-area-inset-bottom,0px));
+}
+.nb{display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:none;cursor:pointer;padding:4px 2px;border-radius:8px;transition:all .2s}
+.nb .ni{font-size:19px;line-height:1;transition:transform .2s}
+.nb .nl{font-size:8px;font-family:var(--font);font-weight:600;letter-spacing:.5px;color:var(--muted);text-transform:uppercase;transition:color .2s}
+.nb.on .ni{transform:scale(1.15);filter:drop-shadow(0 0 5px var(--cyan))}
+.nb.on .nl{color:var(--cyan)}
+
+/* SECTION LABEL */
+.slbl{display:flex;align-items:center;gap:6px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.slbl-txt{font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--text2);font-weight:600}
+.slbl-dot{width:5px;height:5px;border-radius:50%;background:var(--cyan);animation:blink 1.5s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.slbl-r{margin-left:auto;font-family:var(--mono);font-size:9px;color:var(--muted)}
+
+/* ARB CARD */
+.ac{
+  background:var(--card);border:1px solid var(--border);border-radius:12px;
+  margin-bottom:9px;overflow:hidden;position:relative;cursor:pointer;
+  transition:border-color .2s,transform .15s;
+}
+.ac:hover{transform:translateX(2px)}
+.ac.hot{border-color:rgba(0,232,122,.35)}
+.ac.hot::before{content:'🔥HOT';position:absolute;top:9px;right:10px;font-size:8px;font-weight:800;padding:2px 6px;border-radius:3px;background:rgba(0,232,122,.12);color:var(--green);border:1px solid rgba(0,232,122,.25);letter-spacing:.5px;z-index:1}
+.ac.locked{border-color:rgba(245,166,35,.2);cursor:default}
+.ac.locked::before{content:'👑VIP';position:absolute;top:9px;right:10px;font-size:8px;font-weight:800;padding:2px 6px;border-radius:3px;background:rgba(245,166,35,.12);color:var(--gold);border:1px solid rgba(245,166,35,.25);letter-spacing:.5px;z-index:1}
+
+.ac-top{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 9px}
+.ac-pair{display:flex;align-items:center;gap:9px}
+.ac-icons{display:flex}
+.ci{width:28px;height:28px;border-radius:50%;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid var(--bg);flex-shrink:0}
+.ci:last-child{margin-left:-8px}
+.ac-pname{font-size:14px;font-weight:700;letter-spacing:-.2px}
+.ac-ptype{font-size:9px;color:var(--text2);margin-top:1px;letter-spacing:.3px;text-transform:uppercase}
+.ac-profit{text-align:right}
+.pct{font-family:var(--mono);font-size:22px;font-weight:700;line-height:1;color:var(--green)}
+.pct.warn{color:var(--gold)}
+.pct.blurred{filter:blur(5px);color:var(--muted)}
+.pct-sub{font-size:9px;color:var(--text2);margin-top:2px;font-family:var(--mono)}
+
+.ac-route{padding:0 14px 9px;display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.rs{display:flex;align-items:center;gap:4px;background:var(--bg2);border-radius:5px;padding:4px 8px;border:1px solid var(--border);font-size:10px}
+.rs-ex{font-weight:700;color:var(--cyan)}
+.rs-pr{color:var(--text2);font-family:var(--mono)}
+.rarr{color:var(--muted);font-size:12px}
+
+.ac-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;padding:0 14px 9px}
+.mi{background:var(--bg2);border-radius:6px;padding:6px;text-align:center;border:1px solid var(--border)}
+.mi-k{font-size:7px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:2px}
+.mi-v{font-family:var(--mono);font-size:11px;font-weight:600}
+.mi-v.g{color:var(--green)}.mi-v.r{color:var(--red)}.mi-v.go{color:var(--gold)}.mi-v.c{color:var(--cyan)}
+
+.ac-foot{padding:8px 14px 12px;display:flex;gap:7px}
+.btn-ex{
+  flex:1;padding:10px 8px;border-radius:8px;border:none;
+  background:linear-gradient(135deg,var(--cyan),var(--purple));
+  color:#000;font-family:var(--font);font-size:12px;font-weight:700;letter-spacing:.3px;
+  cursor:pointer;transition:all .2s;
+}
+.btn-ex:hover{box-shadow:0 3px 15px rgba(0,207,255,.3);transform:translateY(-1px)}
+.btn-ex:disabled{background:var(--bg3);color:var(--muted);cursor:not-allowed;transform:none;box-shadow:none}
+.btn-wl{width:36px;height:36px;border-radius:8px;border:1px solid var(--border2);background:var(--bg2);color:var(--muted);font-size:14px;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.btn-wl:hover,.btn-wl.on{border-color:var(--gold);color:var(--gold);background:rgba(245,166,35,.08)}
+
+/* SCANNER TABLE */
+.stbl{width:100%;border-collapse:collapse;font-size:11px}
+.stbl th{font-size:8px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);padding:7px 8px;text-align:left;border-bottom:1px solid var(--border2);white-space:nowrap}
+.stbl td{padding:9px 8px;border-bottom:1px solid rgba(19,32,53,.7);vertical-align:middle}
+.stbl tr:last-child td{border-bottom:none}
+.stbl tr:hover td{background:rgba(0,207,255,.02)}
+.sbar-wrap{width:50px;height:4px;background:var(--bg3);border-radius:2px;display:inline-block;vertical-align:middle;margin-left:4px;overflow:hidden}
+.sbar{height:100%;border-radius:2px}
+.sbar.hi{background:linear-gradient(90deg,var(--green),var(--cyan))}
+.sbar.mid{background:var(--gold)}
+.sbar.lo{background:var(--text2)}
+.btn-t{padding:4px 9px;border-radius:5px;border:1px solid rgba(0,207,255,.25);background:rgba(0,207,255,.06);color:var(--cyan);font-size:9px;font-weight:700;cursor:pointer;font-family:var(--font);transition:all .15s}
+.btn-t:hover{background:rgba(0,207,255,.14)}
+
+/* EXCHANGES */
+.exc-item{
+  background:var(--card);border:1px solid var(--border);border-radius:11px;
+  padding:12px 14px;margin-bottom:8px;transition:border-color .2s;
+}
+.exc-item.conn{border-color:rgba(0,232,122,.3)}
+.exc-head{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.exc-logo{width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.exc-name{font-size:13px;font-weight:700}
+.exc-info{font-size:10px;color:var(--text2);margin-top:1px}
+.exc-badge{margin-left:auto;font-size:9px;padding:3px 7px;border-radius:4px;font-weight:700;letter-spacing:.4px}
+.badge-on{background:rgba(0,232,122,.1);color:var(--green);border:1px solid rgba(0,232,122,.2)}
+.badge-off{background:rgba(61,96,128,.1);color:var(--muted);border:1px solid var(--border)}
+.exc-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:8px}
+.exc-stat{background:var(--bg2);border-radius:6px;padding:5px 6px;text-align:center}
+.exc-sk{font-size:7px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+.exc-sv{font-family:var(--mono);font-size:10px;font-weight:600;margin-top:1px}
+.exc-coins{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:8px}
+.coin-tag{font-size:8px;padding:2px 5px;border-radius:3px;background:var(--bg3);color:var(--text2);border:1px solid var(--border);font-family:var(--mono)}
+.coin-tag.more{color:var(--cyan);border-color:rgba(0,207,255,.2)}
+.exc-actions{display:flex;gap:6px}
+.btn-conn{flex:1;padding:8px;border-radius:7px;border:1px solid var(--cyan);background:rgba(0,207,255,.07);color:var(--cyan);font-family:var(--font);font-size:11px;font-weight:700;cursor:pointer;transition:all .15s}
+.btn-conn:hover{background:rgba(0,207,255,.14)}
+.btn-dconn{flex:1;padding:8px;border-radius:7px;border:1px solid rgba(255,62,94,.25);background:rgba(255,62,94,.05);color:var(--red);font-family:var(--font);font-size:11px;font-weight:700;cursor:pointer;transition:all .15s}
+.btn-dconn:hover{background:rgba(255,62,94,.1)}
+.btn-vip-ex{flex:1;padding:8px;border-radius:7px;border:1px solid rgba(245,166,35,.3);background:rgba(245,166,35,.06);color:var(--gold);font-family:var(--font);font-size:11px;font-weight:700;cursor:pointer;transition:all .15s}
+
+/* HISTORY */
+.hist-item{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:7px}
+.hist-ico{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.hist-ico.ok{background:rgba(0,232,122,.1)}
+.hist-ico.fail{background:rgba(255,62,94,.1)}
+.hist-body{flex:1;min-width:0}
+.hist-pair{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hist-detail{font-size:9px;color:var(--text2);margin-top:2px}
+.hist-right{text-align:right;flex-shrink:0}
+.hist-profit{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--green)}
+.hist-profit.neg{color:var(--red)}
+.hist-time{font-size:9px;color:var(--muted);margin-top:2px}
+.hist-summary{background:var(--card);border:1px solid var(--border);border-radius:11px;padding:12px;margin-bottom:12px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
+.hs-lbl{font-size:8px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted2);margin-bottom:3px}
+.hs-val{font-family:var(--mono);font-size:17px;font-weight:700}
+
+/* VIP PAGE */
+.vip-hero{
+  background:linear-gradient(135deg,rgba(245,166,35,.07),rgba(168,85,247,.06));
+  border:1px solid rgba(245,166,35,.2);border-radius:14px;
+  padding:20px 16px;text-align:center;margin-bottom:14px;position:relative;overflow:hidden;
+}
+.vip-hero::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent)}
+.crown{font-size:44px;display:block;margin-bottom:6px;animation:float 3s ease-in-out infinite;filter:drop-shadow(0 0 18px rgba(245,166,35,.7))}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+.vip-title{font-size:22px;font-weight:800;color:var(--gold);letter-spacing:.5px}
+.vip-sub{font-size:11px;color:var(--text2);margin-top:5px;line-height:1.5}
+.owner-info{background:rgba(245,166,35,.06);border:1px dashed rgba(245,166,35,.25);border-radius:8px;padding:9px 12px;margin-top:10px;font-size:10px;color:var(--gold);text-align:left}
+.owner-info strong{display:block;margin-bottom:3px;font-size:11px}
+
+.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:14px}
+.plan{background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:12px 8px;text-align:center;cursor:pointer;transition:all .2s;position:relative}
+.plan:hover{border-color:var(--border2)}
+.plan.sel{border-color:rgba(245,166,35,.6);background:rgba(245,166,35,.05)}
+.plan-badge{position:absolute;top:-8px;left:50%;transform:translateX(-50%);background:var(--gold);color:#000;font-size:7px;font-weight:800;padding:2px 7px;border-radius:3px;white-space:nowrap;letter-spacing:.5px}
+.plan-nm{font-size:11px;font-weight:600;margin-bottom:4px}
+.plan-pr{font-family:var(--mono);font-size:19px;font-weight:700;color:var(--gold)}
+.plan-per{font-size:9px;color:var(--muted);margin-top:1px}
+.plan-save{font-size:8px;color:var(--green);font-weight:700;margin-top:3px}
+
+.feat-tbl{background:var(--card);border:1px solid var(--border);border-radius:11px;overflow:hidden;margin-bottom:14px}
+.ft-hdr{display:grid;grid-template-columns:1fr 56px 56px;gap:0;padding:8px 12px;border-bottom:1px solid var(--border2);background:var(--bg2)}
+.ft-hdr span{font-size:8px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);text-align:center}
+.ft-hdr span:first-child{text-align:left}
+.ft-row{display:grid;grid-template-columns:1fr 56px 56px;gap:0;padding:8px 12px;border-bottom:1px solid rgba(19,32,53,.5);align-items:center}
+.ft-row:last-child{border-bottom:none}
+.ft-name{font-size:11px;display:flex;align-items:center;gap:6px}
+.ft-ico{font-size:13px}
+.ft-free,.ft-vip{text-align:center;font-size:10px;font-weight:600}
+.ft-free{color:var(--muted)}
+.ft-vip{color:var(--green)}
+
+.btn-buy{
+  width:100%;padding:15px;border-radius:11px;border:none;
+  background:linear-gradient(135deg,var(--gold),#e8920a,var(--purple));
+  color:#000;font-family:var(--font);font-size:14px;font-weight:800;letter-spacing:.5px;
+  cursor:pointer;transition:all .25s;
+  box-shadow:0 4px 25px rgba(245,166,35,.25);
+}
+.btn-buy:hover{box-shadow:0 6px 35px rgba(245,166,35,.45);transform:translateY(-2px)}
+.btn-buy:active{transform:translateY(0)}
+
+/* MODAL */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:300;display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s}
+.overlay.on{opacity:1;pointer-events:all}
+.mdl{
+  width:100%;max-width:480px;background:var(--bg1);
+  border-radius:18px 18px 0 0;border-top:1px solid var(--border2);
+  padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));
+  transform:translateY(100%);transition:transform .3s cubic-bezier(.32,.72,0,1);
+  max-height:88vh;overflow-y:auto;
+}
+.overlay.on .mdl{transform:translateY(0)}
+.mdl-drag{width:36px;height:3px;border-radius:2px;background:var(--border2);margin:0 auto 14px}
+.mdl-title{font-size:17px;font-weight:800;margin-bottom:3px}
+.mdl-sub{font-size:11px;color:var(--text2);margin-bottom:16px;line-height:1.5}
+.inp-grp{margin-bottom:11px}
+.inp-grp label{display:block;font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;font-weight:600}
+.inp-grp input{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:10px 13px;color:var(--text);font-family:var(--mono);font-size:13px;outline:none;transition:border-color .2s}
+.inp-grp input:focus{border-color:var(--cyan);box-shadow:0 0 0 2px rgba(0,207,255,.1)}
+.warning-box{background:rgba(0,207,255,.05);border:1px solid rgba(0,207,255,.15);border-radius:7px;padding:9px 11px;font-size:10px;color:var(--text2);line-height:1.5;margin-bottom:12px}
+.warning-box strong{color:var(--cyan)}
+.btn-ok{width:100%;padding:13px;border-radius:9px;border:none;background:linear-gradient(135deg,var(--cyan),var(--purple));color:#000;font-family:var(--font);font-size:13px;font-weight:800;cursor:pointer;transition:all .2s;letter-spacing:.3px}
+.btn-ok:hover{box-shadow:0 3px 15px rgba(0,207,255,.3)}
+.btn-cancel{width:100%;padding:11px;background:none;border:none;color:var(--muted);font-family:var(--font);font-size:12px;cursor:pointer;margin-top:4px}
+
+/* TRADE MODAL */
+.amt-wrap{position:relative;margin-bottom:12px}
+.amt-wrap label{display:block;font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;font-weight:600}
+.amt-wrap input{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:12px 70px 12px 13px;color:var(--text);font-family:var(--mono);font-size:16px;font-weight:600;outline:none;transition:border-color .2s}
+.amt-wrap input:focus{border-color:var(--cyan)}
+.amt-max{position:absolute;right:10px;top:50%;transform:translateY(32%);background:rgba(0,207,255,.1);border:1px solid rgba(0,207,255,.25);border-radius:4px;padding:2px 7px;font-size:9px;font-weight:700;color:var(--cyan);cursor:pointer}
+.trade-calc{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:11px}
+.tc-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(19,32,53,.6)}
+.tc-row:last-child{border-bottom:none;padding-top:8px}
+.tc-k{font-size:11px;color:var(--text2)}
+.tc-v{font-family:var(--mono);font-size:12px;font-weight:600}
+.tc-v.g{color:var(--green)}.tc-v.r{color:var(--red)}.tc-v.go{color:var(--gold)}
+.tc-v.BIG{font-size:17px}
+.comm-info{background:rgba(245,166,35,.07);border:1px solid rgba(245,166,35,.2);border-radius:8px;padding:9px 11px;margin-bottom:11px;font-size:10px;color:var(--gold);line-height:1.5}
+
+/* TOAST */
+.toast-zone{position:fixed;top:100px;left:50%;transform:translateX(-50%);z-index:400;display:flex;flex-direction:column;gap:5px;width:90%;max-width:360px;pointer-events:none}
+.tz{background:var(--bg2);border:1px solid var(--border2);border-radius:9px;padding:9px 14px;font-size:12px;display:flex;align-items:center;gap:8px;box-shadow:0 8px 28px rgba(0,0,0,.6);animation:tz-in .3s ease,tz-out .3s ease 2.8s forwards;pointer-events:all}
+@keyframes tz-in{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes tz-out{from{opacity:1}to{opacity:0}}
+.tz.ok{border-color:rgba(0,232,122,.3)}.tz.warn{border-color:rgba(245,166,35,.3)}.tz.err{border-color:rgba(255,62,94,.3)}
+
+/* MISC */
+.empty{text-align:center;padding:36px 16px;color:var(--muted)}
+.empty .ei{font-size:36px;margin-bottom:10px}
+.empty .et{font-size:13px;font-weight:600;margin-bottom:5px;color:var(--text2)}
+.empty .es{font-size:11px;line-height:1.5}
+</style>
+</head>
+<body>
+
+<div class="stars" id="stars"></div>
+<div class="scanline"></div>
+
+<div class="app">
+
+  <!-- HEADER -->
+  <div class="hdr">
+    <div class="hdr-top">
+      <div class="brand">
+        <div class="brand-cube">N∞</div>
+        <div>
+          <div class="brand-name">NEX<em>ARB</em></div>
+          <div class="brand-ver">v3.0 · CRYPTO ARBITRAGE</div>
+        </div>
+      </div>
+      <button class="tier-btn tier-free" id="tierBtn" onclick="showPg('vip')">⚡ FREE → VIP</button>
+    </div>
+    <div class="hdr-stats">
+      <div class="hdr-stat">
+        <div class="hdr-stat-lbl">Баланс</div>
+        <div class="hdr-stat-val c" id="hBalancе">$3,240</div>
+      </div>
+      <div class="hdr-stat">
+        <div class="hdr-stat-lbl">Профит / сегодня</div>
+        <div class="hdr-stat-val g" id="hProfit">+$0.00</div>
+      </div>
+      <div class="hdr-stat">
+        <div class="hdr-stat-lbl">Комиссия платформы</div>
+        <div class="hdr-stat-val go" id="hFee">0.8%</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TICKER -->
+  <div class="ticker"><div class="ticker-inner" id="tickerInner"></div></div>
+
+  <!-- FILTER ZONE -->
+  <div id="filterZone" style="flex-shrink:0;background:rgba(6,13,24,0.97);border-bottom:1px solid var(--border)">
+    <!-- Row 1: Networks -->
+    <div style="position:relative;height:36px;overflow:hidden">
+      <div id="netChips" style="position:absolute;top:0;left:0;display:flex;align-items:center;gap:6px;padding:6px 12px;height:36px;will-change:transform;cursor:grab;user-select:none;-webkit-user-select:none">
+        <div class="nch on" data-net="all"><span class="nch-dot" style="background:#aaa"></span>Все сети</div>
+        <div class="nch" data-net="evm"><span class="nch-dot" style="background:#6270ea"></span>EVM</div>
+        <div class="nch" data-net="eth"><span class="nch-dot" style="background:#627eea"></span>Ethereum</div>
+        <div class="nch" data-net="bsc"><span class="nch-dot" style="background:#F0B90B"></span>BSC</div>
+        <div class="nch" data-net="sol"><span class="nch-dot" style="background:#9945ff"></span>Solana</div>
+        <div class="nch" data-net="arb"><span class="nch-dot" style="background:#28a0f0"></span>Arbitrum</div>
+        <div class="nch" data-net="op"><span class="nch-dot" style="background:#ff0420"></span>Optimism</div>
+        <div class="nch" data-net="poly"><span class="nch-dot" style="background:#8247e5"></span>Polygon</div>
+        <div class="nch" data-net="ton"><span class="nch-dot" style="background:#0088cc"></span>TON</div>
+        <div class="nch" data-net="tron"><span class="nch-dot" style="background:#ef0027"></span>TRON</div>
+        <div class="nch" data-net="avax"><span class="nch-dot" style="background:#e84142"></span>Avalanche</div>
+        <div class="nch" data-net="near"><span class="nch-dot" style="background:#00ec97"></span>NEAR</div>
+        <div class="nch" data-net="apt"><span class="nch-dot" style="background:#2dd8a3"></span>Aptos</div>
+        <div class="nch" data-net="sui"><span class="nch-dot" style="background:#4da2ff"></span>Sui</div>
+      </div>
+      <div style="position:absolute;top:0;right:0;bottom:0;width:36px;background:linear-gradient(to right,transparent,rgba(6,13,24,.98));pointer-events:none;z-index:2"></div>
+      <div style="position:absolute;top:0;left:0;bottom:0;width:12px;background:linear-gradient(to left,transparent,rgba(6,13,24,.98));pointer-events:none;z-index:2"></div>
+    </div>
+    <!-- Row 2: Type filters -->
+    <div style="position:relative;height:34px;overflow:hidden;border-top:1px solid var(--border)">
+      <div id="sigChips" style="position:absolute;top:0;left:0;display:flex;align-items:center;gap:6px;padding:5px 12px;height:34px;will-change:transform;cursor:grab;user-select:none;-webkit-user-select:none">
+        <div class="ch on" data-flt="all">Все</div>
+        <div class="ch" data-flt="cex">CEX▸CEX</div>
+        <div class="ch" data-flt="dex">DEX</div>
+        <div class="ch" data-flt="tri">Треугольный</div>
+        <div class="ch" data-flt="fund">Фандинг</div>
+        <div class="ch" data-flt="hot">🔥 Горячие</div>
+        <div class="ch" data-flt="viponly">👑 VIP</div>
+      </div>
+      <div style="position:absolute;top:0;right:0;bottom:0;width:36px;background:linear-gradient(to right,transparent,rgba(6,13,24,.98));pointer-events:none;z-index:2"></div>
+    </div>
+  </div>
+
+  <!-- PAGES -->
+  <div class="scroll">
+
+    <!-- PAGE: SIGNALS -->
+    <div class="pg on" id="pg-signals">
+      <div class="slbl">
+        <div class="slbl-dot"></div>
+        <div class="slbl-txt">Арбитражные сигналы</div>
+        <div class="slbl-r" id="sigCount">—</div>
+      </div>
+
+      <!-- AUTO-TRADE PANEL (VIP only) -->
+      <div id="autoPanelWrap"></div>
+
+      <div id="sigList"></div>
+    </div>
+    <div class="pg" id="pg-scanner">
+      <div class="slbl">
+        <div class="slbl-dot"></div>
+        <div class="slbl-txt">Live сканер спредов</div>
+        <div class="slbl-r" id="scanTime">--:--:--</div>
+      </div>
+      <div class="hdr-stat" style="margin-bottom:10px;display:flex;align-items:center;gap:10px;padding:8px 12px">
+        <span style="font-size:10px;color:var(--text2);white-space:nowrap">Мин. спред:</span>
+        <input type="range" id="spreadSlider" min="0.1" max="5" step="0.1" value="0.3" style="flex:1;accent-color:var(--cyan)" oninput="updScanner()">
+        <span class="mono g" style="font-size:11px;min-width:34px" id="spreadLbl">0.3%</span>
+      </div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:11px;overflow:hidden">
+        <div style="overflow-x:auto">
+          <table class="stbl">
+            <thead><tr>
+              <th>Монета</th><th>Купить</th><th>Продать</th><th>Спред</th><th>Действие</th>
+            </tr></thead>
+            <tbody id="scanBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE: EXCHANGES -->
+    <div class="pg" id="pg-exchanges">
+      <div class="slbl">
+        <div class="slbl-dot" style="background:var(--green)"></div>
+        <div class="slbl-txt">Биржи</div>
+        <div class="slbl-r" id="connCount">0 / 15 подключено</div>
+      </div>
+      <div id="exchList"></div>
+    </div>
+
+    <!-- PAGE: HISTORY -->
+    <div class="pg" id="pg-history">
+      <div class="slbl">
+        <div class="slbl-dot" style="background:var(--purple)"></div>
+        <div class="slbl-txt">История сделок</div>
+      </div>
+      <div class="hist-summary" id="histSum"></div>
+      <div id="histList"></div>
+    </div>
+
+    <!-- PAGE: VIP -->
+    <div class="pg" id="pg-vip">
+      <div class="vip-hero">
+        <span class="crown">👑</span>
+        <div class="vip-title">NEXARB VIP</div>
+        <div class="vip-sub">Максимальная прибыль · Все биржи · Безлимит сделок<br>Самые быстрые сигналы на рынке</div>
+        <div class="owner-info">
+          <strong>💰 Система комиссий владельца</strong>
+          FREE пользователи: 0.8% с каждой сделки → на ваш USDT кошелёк<br>
+          VIP пользователи: 0.3% с каждой сделки → на ваш USDT кошелёк
+        </div>
+      </div>
+      <div class="plans" id="plansList"></div>
+      <div class="slbl"><div class="slbl-txt">Что включает VIP</div></div>
+      <div class="feat-tbl">
+        <div class="ft-hdr"><span>Функция</span><span>FREE</span><span>VIP</span></div>
+        <div id="featList"></div>
+      </div>
+      <button class="btn-buy" id="buyBtn" onclick="doBuy()">👑 Активировать VIP — $29/мес</button>
+      <div style="text-align:center;font-size:9px;color:var(--muted);margin-top:8px">Оплата: USDT · TON · BTC · Карта · Отмена в любой момент</div>
+
+      <!-- AUTO-TRADE SETTINGS ON VIP PAGE -->
+      <div style="height:16px"></div>
+      <div class="slbl"><div class="slbl-txt">⚙️ Настройки авто-торговли</div></div>
+      <div id="vipAutoSettings"></div>
+    </div>
+
+  </div><!-- /scroll -->
+
+  <!-- BOTTOM NAV -->
+  <nav class="bnav">
+    <button class="nb on" id="nb-signals" onclick="showPg('signals')"><span class="ni">⚡</span><span class="nl">Сигналы</span></button>
+    <button class="nb" id="nb-scanner" onclick="showPg('scanner')"><span class="ni">📡</span><span class="nl">Сканер</span></button>
+    <button class="nb" id="nb-exchanges" onclick="showPg('exchanges')"><span class="ni">🔗</span><span class="nl">Биржи</span></button>
+    <button class="nb" id="nb-history" onclick="showPg('history')"><span class="ni">📜</span><span class="nl">История</span></button>
+    <button class="nb" id="nb-vip" onclick="showPg('vip')"><span class="ni">👑</span><span class="nl">VIP</span></button>
+  </nav>
+</div>
+
+<!-- CONNECT MODAL -->
+<div class="overlay" id="connModal">
+  <div class="mdl">
+    <div class="mdl-drag"></div>
+    <div style="font-size:30px;margin-bottom:6px" id="mLogo"></div>
+    <div class="mdl-title" id="mTitle">Подключить биржу</div>
+    <div class="mdl-sub" id="mSub"></div>
+    <div class="inp-grp"><label>API Key</label><input id="apiKey" placeholder="Введите API Key..."></div>
+    <div class="inp-grp"><label>API Secret</label><input id="apiSecret" type="password" placeholder="Введите Secret..."></div>
+    <div class="inp-grp" id="passphraseWrap" style="display:none"><label>Passphrase (если требуется)</label><input id="apiPass" placeholder="Passphrase..."></div>
+    <div class="warning-box">🔒 Используйте только <strong>Read + Trade</strong> права.<br>❌ Никогда не давайте права на <strong>вывод средств</strong>.<br>✅ Ключи шифруются локально на вашем устройстве.</div>
+    <button class="btn-ok" onclick="doConnect()">✅ Подключить</button>
+    <button class="btn-cancel" onclick="closeModal('connModal')">Отмена</button>
+  </div>
+</div>
+
+<!-- TRADE MODAL -->
+<div class="overlay" id="tradeModal">
+  <div class="mdl">
+    <div class="mdl-drag"></div>
+    <div class="mdl-title" id="tTitle">Арбитраж</div>
+    <div class="mdl-sub" id="tSub"></div>
+    <div class="amt-wrap">
+      <label>Сумма (USDT)</label>
+      <input type="number" id="tAmt" value="200" oninput="calcTrade()">
+      <div class="amt-max" onclick="document.getElementById('tAmt').value=Math.floor(S.balance);calcTrade()">MAX</div>
+    </div>
+    <div class="trade-calc" id="tCalc"></div>
+    <div class="comm-info" id="tCommInfo"></div>
+    <button class="btn-ok" id="tExecBtn" onclick="execTrade()">⚡ Исполнить арбитраж</button>
+    <button class="btn-cancel" onclick="closeModal('tradeModal')">Отмена</button>
+  </div>
+</div>
+
+<div class="toast-zone" id="tzWrap"></div>
+
+<script>
+// ========================================================
+// STATE
+// ========================================================
+const S = {
+  vip: false, plan: 'year',
+  connected: new Set(['binance','okx']),
+  trades: 0, maxFree: 5,
+  balance: 3240, profit: 0,
+  freeFee: 0.008, vipFee: 0.003,
+  ownerEarned: 0,
+  history: [],
+  currentSig: null,
+  sigFilter: 'all',
+  netFilter: 'all',
+  // Auto-trade
+  autoEnabled: false,
+  autoSettings: {
+    amount: 100,
+    minSpread: 0.5,
+    maxRisk: 'med',
+    stopLoss: 1.0,
+    maxPerDay: 20,
+    networks: new Set(['all']),
+  },
+  autoTimer: null,
+  autoTradesLeft: 0,
+};
+
+// ========================================================
+// 15 EXCHANGES
+// ========================================================
+const EXCHS = [
+  {id:'binance',name:'Binance',logo:'🟡',color:'#F0B90B',vol:'$24.1B',maker:'0.1%',taker:'0.1%',pairs:1400,
+   coins:['BTC','ETH','BNB','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC','LINK','UNI','LTC','BCH','ETC','ATOM','FIL','ICP','APT','ARB','OP','PEPE','SHIB','WLD','SUI'],
+   passphrase:false},
+  {id:'okx',name:'OKX',logo:'⚫',color:'#eee',vol:'$8.3B',maker:'0.08%',taker:'0.1%',pairs:920,
+   coins:['BTC','ETH','OKB','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC','LINK','UNI','LTC','TON','APT','SUI','ARB','OP','TRX','NEAR'],
+   passphrase:true},
+  {id:'bybit',name:'Bybit',logo:'🔵',color:'#2B6BF3',vol:'$6.4B',maker:'0.1%',taker:'0.1%',pairs:720,
+   coins:['BTC','ETH','SOL','XRP','DOGE','BNB','ADA','AVAX','DOT','MATIC','LINK','LTC','NEAR','APT','SUI','OP','ARB','TON','PEPE'],
+   passphrase:false},
+  {id:'kucoin',name:'KuCoin',logo:'🟢',color:'#23AF91',vol:'$3.6B',maker:'0.1%',taker:'0.1%',pairs:820,
+   coins:['BTC','ETH','KCS','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC','LINK','UNI','LTC','NEAR','APT','ICP','ALGO','VET','EGLD','ROSE'],
+   passphrase:true},
+  {id:'gate',name:'Gate.io',logo:'🔴',color:'#E40C5B',vol:'$2.2B',maker:'0.2%',taker:'0.2%',pairs:1600,
+   coins:['BTC','ETH','SOL','XRP','DOGE','BNB','ADA','AVAX','DOT','MATIC','LINK','UNI','LTC','NEAR','ARB','OP','SUI','APT','PEPE','WLD'],
+   passphrase:false},
+  {id:'mexc',name:'MEXC',logo:'🟣',color:'#7B2D8B',vol:'$1.9B',maker:'0%',taker:'0.05%',pairs:2100,
+   coins:['BTC','ETH','SOL','XRP','DOGE','BNB','ADA','AVAX','DOT','MATIC','PEPE','FLOKI','BONK','WIF','BOME','MEME','ORDI','SATS','RATS','CATS'],
+   passphrase:false},
+  {id:'htx',name:'HTX (Huobi)',logo:'🔷',color:'#2263CF',vol:'$1.5B',maker:'0.2%',taker:'0.2%',pairs:620,
+   coins:['BTC','ETH','HT','SOL','XRP','DOGE','BNB','ADA','AVAX','DOT','MATIC','LTC','LINK','TRX','NEAR'],
+   passphrase:false},
+  {id:'coinbase',name:'Coinbase Pro',logo:'🔵',color:'#1652F0',vol:'$4.1B',maker:'0.4%',taker:'0.6%',pairs:410,
+   coins:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC','LINK','UNI','LTC','ATOM','ALGO','CRV','AAVE'],
+   passphrase:false},
+  {id:'kraken',name:'Kraken',logo:'🦑',color:'#5741D9',vol:'$1.8B',maker:'0.16%',taker:'0.26%',pairs:340,
+   coins:['BTC','ETH','SOL','XRP','ADA','DOT','MATIC','LINK','LTC','ATOM','ALGO','DASH','XMR','ETC','ZEC'],
+   passphrase:false},
+  {id:'bitget',name:'Bitget',logo:'💎',color:'#00B8A9',vol:'$2.8B',maker:'0.1%',taker:'0.1%',pairs:780,
+   coins:['BTC','ETH','BGB','SOL','XRP','DOGE','BNB','ADA','AVAX','DOT','MATIC','LINK','LTC','APT','SUI','ARB','OP','TON','NEAR','PEPE'],
+   passphrase:true},
+  {id:'bitmart',name:'BitMart',logo:'⭐',color:'#00C5E3',vol:'$980M',maker:'0.25%',taker:'0.25%',pairs:1100,
+   coins:['BTC','ETH','SOL','XRP','DOGE','BNB','ADA','AVAX','MATIC','LINK','LTC','SHIB','PEPE','FLOKI','BONK','WIF'],
+   passphrase:false},
+  {id:'phemex',name:'Phemex',logo:'🌐',color:'#1DBA7B',vol:'$820M',maker:'0.01%',taker:'0.06%',pairs:290,
+   coins:['BTC','ETH','SOL','XRP','DOGE','BNB','ADA','AVAX','DOT','MATIC','LINK','LTC','APT','ARB','OP'],
+   passphrase:false},
+  {id:'cryptocom',name:'Crypto.com',logo:'💳',color:'#002D74',vol:'$1.1B',maker:'0.075%',taker:'0.075%',pairs:520,
+   coins:['BTC','ETH','CRO','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC','LINK','LTC','UNI','ATOM','NEAR'],
+   passphrase:false},
+  {id:'bingx',name:'BingX',logo:'🌀',color:'#1F5EFF',vol:'$1.4B',maker:'0.1%',taker:'0.1%',pairs:640,
+   coins:['BTC','ETH','SOL','XRP','DOGE','BNB','ADA','AVAX','MATIC','LINK','LTC','ARB','OP','SUI','APT','NEAR','PEPE'],
+   passphrase:false},
+  {id:'lbank',name:'LBank',logo:'🏦',color:'#FF8A00',vol:'$650M',maker:'0.1%',taker:'0.1%',pairs:900,
+   coins:['BTC','ETH','SOL','XRP','DOGE','BNB','ADA','MATIC','LINK','LTC','SHIB','PEPE','FLOKI','BONK','WIF','MEME'],
+   passphrase:false},
+];
+
+// ========================================================
+// 80+ COINS MASTER LIST
+// ========================================================
+const COINS = [
+  {sym:'BTC',ico:'₿',name:'Bitcoin'},
+  {sym:'ETH',ico:'Ξ',name:'Ethereum'},
+  {sym:'BNB',ico:'◈',name:'BNB'},
+  {sym:'SOL',ico:'◎',name:'Solana'},
+  {sym:'XRP',ico:'✕',name:'XRP'},
+  {sym:'DOGE',ico:'Ð',name:'Dogecoin'},
+  {sym:'ADA',ico:'₳',name:'Cardano'},
+  {sym:'AVAX',ico:'▲',name:'Avalanche'},
+  {sym:'DOT',ico:'●',name:'Polkadot'},
+  {sym:'MATIC',ico:'⬡',name:'Polygon'},
+  {sym:'LINK',ico:'⬡',name:'Chainlink'},
+  {sym:'UNI',ico:'🦄',name:'Uniswap'},
+  {sym:'LTC',ico:'Ł',name:'Litecoin'},
+  {sym:'BCH',ico:'Ƀ',name:'Bitcoin Cash'},
+  {sym:'ETC',ico:'Ξ',name:'Ethereum Classic'},
+  {sym:'ATOM',ico:'⚛',name:'Cosmos'},
+  {sym:'FIL',ico:'⬡',name:'Filecoin'},
+  {sym:'ICP',ico:'∞',name:'Internet Computer'},
+  {sym:'APT',ico:'◉',name:'Aptos'},
+  {sym:'ARB',ico:'◈',name:'Arbitrum'},
+  {sym:'OP',ico:'🔴',name:'Optimism'},
+  {sym:'NEAR',ico:'◎',name:'NEAR'},
+  {sym:'SUI',ico:'💧',name:'Sui'},
+  {sym:'TON',ico:'💎',name:'TON'},
+  {sym:'TRX',ico:'⬡',name:'TRON'},
+  {sym:'PEPE',ico:'🐸',name:'Pepe'},
+  {sym:'SHIB',ico:'🐕',name:'Shiba Inu'},
+  {sym:'FLOKI',ico:'⚡',name:'Floki'},
+  {sym:'BONK',ico:'🐕',name:'Bonk'},
+  {sym:'WIF',ico:'🐩',name:'dogwifhat'},
+  {sym:'BOME',ico:'📚',name:'Book of Meme'},
+  {sym:'MEME',ico:'😂',name:'Memecoin'},
+  {sym:'ORDI',ico:'◈',name:'Ordinals'},
+  {sym:'SATS',ico:'₿',name:'SATS'},
+  {sym:'WLD',ico:'🌍',name:'Worldcoin'},
+  {sym:'ALGO',ico:'◈',name:'Algorand'},
+  {sym:'VET',ico:'✓',name:'VeChain'},
+  {sym:'EGLD',ico:'⬡',name:'MultiversX'},
+  {sym:'ROSE',ico:'🌹',name:'Oasis'},
+  {sym:'XMR',ico:'⬡',name:'Monero'},
+  {sym:'ZEC',ico:'Ƶ',name:'Zcash'},
+  {sym:'DASH',ico:'◈',name:'Dash'},
+  {sym:'AAVE',ico:'👻',name:'Aave'},
+  {sym:'CRV',ico:'⬡',name:'Curve'},
+  {sym:'MKR',ico:'◈',name:'Maker'},
+  {sym:'COMP',ico:'◈',name:'Compound'},
+  {sym:'SNX',ico:'◈',name:'Synthetix'},
+  {sym:'GRT',ico:'◈',name:'The Graph'},
+  {sym:'LDO',ico:'◈',name:'Lido DAO'},
+  {sym:'RPL',ico:'◈',name:'Rocket Pool'},
+  {sym:'SAND',ico:'⬡',name:'The Sandbox'},
+  {sym:'MANA',ico:'◈',name:'Decentraland'},
+  {sym:'AXS',ico:'⚔',name:'Axie Infinity'},
+  {sym:'ENJ',ico:'◈',name:'Enjin Coin'},
+  {sym:'GALA',ico:'⬡',name:'Gala'},
+  {sym:'IMX',ico:'◈',name:'Immutable X'},
+  {sym:'FLOW',ico:'◈',name:'Flow'},
+  {sym:'XTZ',ico:'Ꜩ',name:'Tezos'},
+  {sym:'EOS',ico:'⬡',name:'EOS'},
+  {sym:'THETA',ico:'Θ',name:'Theta'},
+  {sym:'HBAR',ico:'ℏ',name:'Hedera'},
+  {sym:'INJ',ico:'◈',name:'Injective'},
+  {sym:'SEI',ico:'◈',name:'Sei'},
+  {sym:'TIA',ico:'◈',name:'Celestia'},
+  {sym:'JTO',ico:'◈',name:'Jito'},
+  {sym:'PYTH',ico:'🐍',name:'Pyth Network'},
+  {sym:'JUP',ico:'♃',name:'Jupiter'},
+  {sym:'STRK',ico:'◈',name:'Starknet'},
+  {sym:'EIGEN',ico:'⬡',name:'EigenLayer'},
+  {sym:'ENA',ico:'◈',name:'Ethena'},
+  {sym:'W',ico:'◈',name:'Wormhole'},
+  {sym:'ONDO',ico:'◈',name:'Ondo Finance'},
+  {sym:'RENDER',ico:'◈',name:'Render'},
+  {sym:'FET',ico:'◈',name:'Fetch.ai'},
+  {sym:'AGIX',ico:'◈',name:'SingularityNET'},
+  {sym:'TAO',ico:'◈',name:'Bittensor'},
+  {sym:'PRIME',ico:'◈',name:'Parallel'},
+  {sym:'BLUR',ico:'◈',name:'Blur'},
+  {sym:'NFT',ico:'◈',name:'APENFT'},
+  {sym:'RATS',ico:'🐀',name:'Rats'},
+  {sym:'CATS',ico:'🐱',name:'Cats'},
+];
+
+// ========================================================
+// GENERATE SIGNALS
+// ========================================================
+const EXCNAMES = EXCHS.map(e=>e.id);
+const EXCMAP = Object.fromEntries(EXCHS.map(e=>[e.id,e]));
+
+function mkPrice(base, spread) {
+  return base * (1 + (Math.random()-0.45)*0.005);
+}
+
+function genSignals() {
+  const all = [
+    // CEX▸CEX majors
+    {id:'s01',type:'cex',sym:'BTC',bx:'binance',sx:'okx',bprice:67842,sprice:68214,spread:0.55,vol:'$4.2M',time:'~8с',risk:'low',vip:false,hot:true},
+    {id:'s02',type:'cex',sym:'ETH',bx:'bybit',sx:'binance',bprice:3541,sprice:3558,spread:0.48,vol:'$2.1M',time:'~6с',risk:'low',vip:false,hot:true},
+    {id:'s03',type:'cex',sym:'SOL',bx:'kucoin',sx:'gate',bprice:147.82,sprice:149.24,spread:0.96,vol:'$1.4M',time:'~10с',risk:'low',vip:false,hot:false},
+    {id:'s04',type:'cex',sym:'XRP',bx:'mexc',sx:'bybit',bprice:0.5021,sprice:0.5098,spread:1.53,vol:'$3.8M',time:'~12с',risk:'med',vip:false,hot:true},
+    {id:'s05',type:'cex',sym:'BNB',bx:'htx',sx:'binance',bprice:578.10,sprice:581.90,spread:0.66,vol:'$890K',time:'~9с',risk:'low',vip:false,hot:false},
+    {id:'s06',type:'cex',sym:'DOGE',bx:'gate',sx:'coinbase',bprice:0.1621,sprice:0.1652,spread:1.91,vol:'$2.9M',time:'~14с',risk:'med',vip:false,hot:false},
+    {id:'s07',type:'cex',sym:'ADA',bx:'kucoin',sx:'bitget',bprice:0.4412,sprice:0.4461,spread:1.11,vol:'$1.2M',time:'~11с',risk:'low',vip:false,hot:false},
+    {id:'s08',type:'cex',sym:'AVAX',bx:'bybit',sx:'kraken',bprice:34.12,sprice:34.52,spread:1.17,vol:'$780K',time:'~13с',risk:'med',vip:false,hot:false},
+    {id:'s09',type:'cex',sym:'NEAR',bx:'kucoin',sx:'mexc',bprice:6.841,sprice:6.921,spread:1.17,vol:'$430K',time:'~10с',risk:'med',vip:false,hot:false},
+    {id:'s10',type:'cex',sym:'ARB',bx:'binance',sx:'bitget',bprice:1.021,sprice:1.039,spread:1.76,vol:'$670K',time:'~8с',risk:'med',vip:false,hot:true},
+    // Meme coins
+    {id:'s11',type:'cex',sym:'PEPE',bx:'mexc',sx:'binance',bprice:0.00001211,sprice:0.00001259,spread:3.96,vol:'$8.1M',time:'~18с',risk:'high',vip:false,hot:true},
+    {id:'s12',type:'cex',sym:'SHIB',bx:'lbank',sx:'gate',bprice:0.00002481,sprice:0.00002534,spread:2.14,vol:'$5.4M',time:'~20с',risk:'high',vip:false,hot:false},
+    {id:'s13',type:'cex',sym:'BONK',bx:'mexc',sx:'bybit',bprice:0.000032,sprice:0.0000331,spread:3.44,vol:'$3.1M',time:'~15с',risk:'high',vip:false,hot:true},
+    {id:'s14',type:'cex',sym:'WIF',bx:'bitmart',sx:'binance',bprice:2.841,sprice:2.912,spread:2.50,vol:'$2.1M',time:'~16с',risk:'high',vip:false,hot:false},
+    {id:'s15',type:'cex',sym:'FLOKI',bx:'lbank',sx:'mexc',bprice:0.000182,sprice:0.000189,spread:3.85,vol:'$1.8M',time:'~18с',risk:'high',vip:false,hot:false},
+    // DeFi / L1
+    {id:'s16',type:'cex',sym:'LINK',bx:'kraken',sx:'binance',bprice:14.82,sprice:15.01,spread:1.28,vol:'$920K',time:'~12с',risk:'med',vip:false,hot:false},
+    {id:'s17',type:'cex',sym:'DOT',bx:'htx',sx:'kucoin',bprice:7.812,sprice:7.921,spread:1.39,vol:'$540K',time:'~11с',risk:'med',vip:false,hot:false},
+    {id:'s18',type:'cex',sym:'TON',bx:'okx',sx:'bybit',bprice:5.421,sprice:5.511,spread:1.66,vol:'$1.1M',time:'~9с',risk:'low',vip:false,hot:true},
+    {id:'s19',type:'cex',sym:'SUI',bx:'bybit',sx:'mexc',bprice:3.214,sprice:3.281,spread:2.08,vol:'$780K',time:'~10с',risk:'med',vip:false,hot:false},
+    {id:'s20',type:'cex',sym:'APT',bx:'binance',sx:'kucoin',bprice:9.812,sprice:9.941,spread:1.31,vol:'$620K',time:'~8с',risk:'low',vip:false,hot:false},
+    // Triangular (VIP)
+    {id:'s21',type:'tri',sym:'BNB→ETH→BTC',bx:'binance',sx:'binance',bprice:null,sprice:null,spread:1.24,vol:'$320K',time:'~3с',risk:'med',vip:true,hot:false},
+    {id:'s22',type:'tri',sym:'SOL→USDT→BTC',bx:'bybit',sx:'bybit',bprice:null,sprice:null,spread:0.92,vol:'$280K',time:'~4с',risk:'med',vip:true,hot:false},
+    {id:'s23',type:'tri',sym:'ETH→BNB→SOL',bx:'binance',sx:'binance',bprice:null,sprice:null,spread:1.58,vol:'$410K',time:'~3с',risk:'med',vip:true,hot:true},
+    // DEX (VIP)
+    {id:'s24',type:'dex',sym:'ETH',bx:'Uniswap',sx:'Curve',bprice:3537,sprice:3562,spread:0.71,vol:'$1.2M',time:'~15с',risk:'med',vip:true,hot:false},
+    {id:'s25',type:'dex',sym:'SOL',bx:'Raydium',sx:'Jupiter',bprice:146.91,sprice:148.44,spread:1.04,vol:'$780K',time:'~8с',risk:'med',vip:true,hot:true},
+    // Funding arb (VIP)
+    {id:'s26',type:'fund',sym:'BTC/USDT Perp',bx:'binance',sx:'bybit',bprice:null,sprice:null,spread:0.038,vol:'$12M',time:'8ч',risk:'low',vip:true,hot:false},
+    {id:'s27',type:'fund',sym:'ETH/USDT Perp',bx:'okx',sx:'binance',bprice:null,sprice:null,spread:0.021,vol:'$8M',time:'8ч',risk:'low',vip:true,hot:false},
+    // New AI coins (VIP)
+    {id:'s28',type:'cex',sym:'TAO',bx:'bybit',sx:'gate',bprice:481.2,sprice:492.4,spread:2.33,vol:'$320K',time:'~20с',risk:'high',vip:true,hot:true},
+    {id:'s29',type:'cex',sym:'RENDER',bx:'mexc',sx:'binance',bprice:8.211,sprice:8.392,spread:2.20,vol:'$240K',time:'~14с',risk:'high',vip:true,hot:false},
+    {id:'s30',type:'cex',sym:'INJ',bx:'kucoin',sx:'bybit',bprice:28.41,sprice:29.12,spread:2.50,vol:'$410K',time:'~12с',risk:'high',vip:true,hot:true},
+  ];
+  return all.map(s=>({...s, spread:+(s.spread+(Math.random()-.5)*.2).toFixed(2)}));
+}
+
+let SIGS = genSignals();
+const COIN_MAP = Object.fromEntries(COINS.map(c=>[c.sym,c]));
+
+function getCoinIco(sym) {
+  const base = sym.split('/')[0].split('→')[0].split(' ')[0];
+  return (COIN_MAP[base]||{ico:'◈'}).ico;
+}
+
+// ========================================================
+// NETWORK → COINS MAP
+// ========================================================
+const NET_COINS = {
+  all: null,
+  evm: ['ETH','BNB','MATIC','LINK','UNI','AAVE','CRV','MKR','SNX','GRT','LDO','RPL','ARB','OP','IMX'],
+  eth: ['ETH','LINK','UNI','AAVE','CRV','MKR','SNX','GRT','LDO','RPL','SHIB','PEPE','BLUR'],
+  bsc: ['BNB','CAKE','BUSD','ADA','XRP','DOGE','FLOKI','BONK'],
+  sol: ['SOL','BONK','WIF','BOME','JTO','PYTH','JUP','RENDER'],
+  arb: ['ARB','ETH','GMX','RDNT','MAGIC','GNS'],
+  op: ['OP','ETH','VELO','PERP','SNX'],
+  poly: ['MATIC','ETH','AAVE','CRV','SAND','MANA'],
+  ton: ['TON','NOT','DOGS','HMSTR','CATI'],
+  tron: ['TRX','BTT','SUN','JST','WIN'],
+  avax: ['AVAX','JOE','QI','XAVA','GMX'],
+  near: ['NEAR','AURORA','REF'],
+  apt: ['APT','CAKE'],
+  sui: ['SUI','CETUS','TURBOS'],
+};
+
+function setNet(net) {
+  S.netFilter = net;
+  renderSigs();
+}
+
+// ========================================================
+// AUTO-TRADE PANEL RENDER
+// ========================================================
+function renderAutoPanel() {
+  const wrap = document.getElementById('autoPanelWrap');
+  if (!wrap) return;
+  if (!S.vip) {
+    wrap.innerHTML = `<div class="auto-panel-locked" onclick="showPg('vip')">
+      <div style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--gold)">
+        🤖 Авто-торговля
+        <span style="margin-left:auto;font-size:9px;background:rgba(245,166,35,.15);border:1px solid rgba(245,166,35,.3);padding:2px 8px;border-radius:4px">👑 VIP</span>
+      </div>
+      <div style="font-size:10px;color:var(--text2);margin-top:5px">Бот сам исполняет арбитраж 24/7 пока вы спите. Доступно в VIP →</div>
+    </div>`;
+    return;
+  }
+  const as = S.autoSettings;
+  const isRun = S.autoEnabled;
+  wrap.innerHTML = `
+    <div class="auto-panel">
+      <div class="auto-hdr">
+        <div class="auto-title">🤖 Авто-торговля <span style="font-size:9px;color:var(--green);background:rgba(0,232,122,.1);padding:2px 7px;border-radius:4px;font-weight:700">VIP</span></div>
+        <div class="toggle-wrap">
+          <span style="font-size:10px;color:var(--text2)">${isRun?'<span style="color:var(--green)">ВКЛ</span>':'ВЫКЛ'}</span>
+          <label class="toggle">
+            <input type="checkbox" id="autoToggle" ${isRun?'checked':''} onchange="toggleAuto(this.checked)">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+      <div class="auto-row">
+        <span class="auto-key">Сумма на сделку (USDT)</span>
+        <input class="auto-inp" type="number" value="${as.amount}" id="ai-amt" oninput="S.autoSettings.amount=+this.value" min="10">
+      </div>
+      <div class="auto-row">
+        <span class="auto-key">Мин. спред для входа</span>
+        <input class="auto-inp" type="number" value="${as.minSpread}" id="ai-spread" step="0.1" oninput="S.autoSettings.minSpread=+this.value">
+      </div>
+      <div class="auto-row">
+        <span class="auto-key">Макс. риск</span>
+        <select class="auto-sel" id="ai-risk" onchange="S.autoSettings.maxRisk=this.value">
+          <option value="low" ${as.maxRisk==='low'?'selected':''}>Низкий</option>
+          <option value="med" ${as.maxRisk==='med'?'selected':''}>Средний</option>
+          <option value="high" ${as.maxRisk==='high'?'selected':''}>Высокий</option>
+        </select>
+      </div>
+      <div class="auto-row">
+        <span class="auto-key">Макс. сделок в день</span>
+        <input class="auto-inp" type="number" value="${as.maxPerDay}" id="ai-max" oninput="S.autoSettings.maxPerDay=+this.value" min="1" max="500">
+      </div>
+      <div class="auto-row">
+        <span class="auto-key">Стоп-лосс (%)</span>
+        <input class="auto-inp" type="number" value="${as.stopLoss}" id="ai-sl" step="0.1" oninput="S.autoSettings.stopLoss=+this.value">
+      </div>
+      <div class="auto-status ${isRun?'run':'stop'}">
+        <div class="auto-status-dot"></div>
+        ${isRun
+          ? `Бот активен · Исполнено сегодня: <strong style="margin-left:4px">${S.history.filter(x=>{const d=new Date();return x.time.includes(d.toLocaleTimeString('ru').slice(0,2))}).length}</strong> сделок`
+          : 'Бот остановлен · Включи переключатель для старта'
+        }
+      </div>
+    </div>`;
+}
+
+function renderVipAutoSettings() {
+  const el = document.getElementById('vipAutoSettings');
+  if (!el) return;
+  if (!S.vip) {
+    el.innerHTML = `<div class="auto-panel-locked">
+      <div style="font-size:12px;font-weight:700;color:var(--gold);margin-bottom:5px">🔒 Активируй VIP выше чтобы настроить авто-торговлю</div>
+      <div style="font-size:10px;color:var(--text2)">Бот будет сам находить и исполнять арбитражные сделки 24/7</div>
+    </div>`;
+    return;
+  }
+  // Reuse the same panel HTML
+  const as = S.autoSettings;
+  const isRun = S.autoEnabled;
+  el.innerHTML = `
+    <div class="auto-panel">
+      <div class="auto-hdr">
+        <div class="auto-title">🤖 Авто-торговля</div>
+        <div class="toggle-wrap">
+          <span style="font-size:10px;color:var(--text2)">${isRun?'<span style="color:var(--green)">РАБОТАЕТ</span>':'ВЫКЛЮЧЕН'}</span>
+          <label class="toggle">
+            <input type="checkbox" id="autoToggle2" ${isRun?'checked':''} onchange="toggleAuto(this.checked)">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+      <div class="auto-row"><span class="auto-key">Сумма на 1 сделку (USDT)</span><input class="auto-inp" type="number" value="${as.amount}" oninput="S.autoSettings.amount=+this.value" min="10"></div>
+      <div class="auto-row"><span class="auto-key">Мин. спред для входа (%)</span><input class="auto-inp" type="number" value="${as.minSpread}" step="0.1" oninput="S.autoSettings.minSpread=+this.value"></div>
+      <div class="auto-row"><span class="auto-key">Максимальный уровень риска</span>
+        <select class="auto-sel" onchange="S.autoSettings.maxRisk=this.value">
+          <option value="low" ${as.maxRisk==='low'?'selected':''}>Только низкий</option>
+          <option value="med" ${as.maxRisk==='med'?'selected':''}>Низкий + Средний</option>
+          <option value="high" ${as.maxRisk==='high'?'selected':''}>Все сделки</option>
+        </select>
+      </div>
+      <div class="auto-row"><span class="auto-key">Макс. сделок в день</span><input class="auto-inp" type="number" value="${as.maxPerDay}" oninput="S.autoSettings.maxPerDay=+this.value" min="1" max="500"></div>
+      <div class="auto-row"><span class="auto-key">Стоп-лосс на сделку (%)</span><input class="auto-inp" type="number" value="${as.stopLoss}" step="0.1" oninput="S.autoSettings.stopLoss=+this.value"></div>
+      <div class="auto-row"><span class="auto-key">Только выбранные сети</span>
+        <select class="auto-sel" onchange="S.autoSettings.networks=new Set([this.value])">
+          <option value="all">Все сети</option>
+          <option value="eth">Ethereum</option>
+          <option value="bsc">BSC</option>
+          <option value="sol">Solana</option>
+          <option value="arb">Arbitrum</option>
+          <option value="ton">TON</option>
+        </select>
+      </div>
+      <div class="auto-status ${isRun?'run':'stop'}">
+        <div class="auto-status-dot"></div>
+        ${isRun ? `✅ Бот активен · Сегодня исполнено: ${S.history.length} сделок · Профит: +$${S.profit.toFixed(2)}` : '⏸ Бот остановлен'}
+      </div>
+    </div>
+    <div style="background:rgba(0,207,255,.04);border:1px solid rgba(0,207,255,.15);border-radius:9px;padding:11px 13px;font-size:10px;color:var(--text2);line-height:1.7;margin-bottom:12px">
+      <strong style="color:var(--cyan);display:block;margin-bottom:4px">⚙️ Как работает авто-торговля</strong>
+      Бот каждые <strong>30 секунд</strong> сканирует спреды между твоими подключёнными биржами.<br>
+      При нахождении спреда выше <strong>${as.minSpread}%</strong> и уровне риска ≤ выбранного — автоматически исполняет сделку.<br>
+      Комиссия платформы списывается с каждой авто-сделки аналогично ручной торговле.
+    </div>`;
+}
+
+function toggleAuto(checked) {
+  if (!S.vip) { toastMsg('👑 Авто-торговля только для VIP','warn'); return; }
+  S.autoEnabled = checked;
+  if (checked) {
+    toastMsg('🤖 Авто-торговля запущена!','ok');
+    startAutoBot();
+  } else {
+    toastMsg('⏸ Авто-торговля остановлена','warn');
+    if (S.autoTimer) { clearInterval(S.autoTimer); S.autoTimer = null; }
+  }
+  renderAutoPanel();
+  renderVipAutoSettings();
+}
+
+function startAutoBot() {
+  if (S.autoTimer) clearInterval(S.autoTimer);
+  S.autoTimer = setInterval(() => {
+    if (!S.autoEnabled || !S.vip) return;
+    const as = S.autoSettings;
+    // Find eligible signals
+    const eligible = SIGS.filter(sig =>
+      !sig.vip &&
+      sig.spread >= as.minSpread &&
+      (as.maxRisk==='high' || (as.maxRisk==='med' && sig.risk!=='high') || (as.maxRisk==='low' && sig.risk==='low')) &&
+      (S.connected.has(sig.bx.toLowerCase()) || sig.type==='tri') &&
+      (S.connected.has(sig.sx.toLowerCase()) || sig.type==='tri')
+    );
+    if (!eligible.length) return;
+    // Pick best spread
+    const sig = eligible.sort((a,b)=>b.spread-a.spread)[0];
+    const amt = as.amount;
+    const feeR = S.vipFee;
+    const exchFee = amt * 0.002;
+    const platFee = +(amt * feeR).toFixed(4);
+    const gross = amt * sig.spread / 100;
+    const net = +(gross - exchFee - platFee).toFixed(4);
+    const ok = Math.random() > 0.08;
+    S.trades++; S.ownerEarned += platFee;
+    if (ok) { S.balance = +(S.balance + net).toFixed(2); S.profit = +(S.profit + net).toFixed(4); }
+    S.history.push({sym:sig.sym,bx:sig.bx,sx:sig.sx,amount:amt,fee:platFee,profit:ok?net:-(exchFee*2),spread:sig.spread,time:new Date().toLocaleTimeString('ru'),auto:true});
+    document.getElementById('hBalancе').textContent='$'+S.balance.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
+    document.getElementById('hProfit').textContent=(S.profit>=0?'+':'')+`$${S.profit.toFixed(2)}`;
+    if (document.getElementById('pg-history').classList.contains('on')) renderHistory();
+    if (document.getElementById('pg-vip').classList.contains('on')) renderVipAutoSettings();
+    toastMsg(`🤖 Авто: ${sig.sym} ${ok?`+$${net.toFixed(3)}`:'сорвалась'}`, ok?'ok':'err');
+  }, 12000); // every 12s in demo (30s in prod)
+}
+
+// ========================================================
+// RENDER TICKER
+const TDATA = [
+  {sym:'BTC',p:'$67,842',c:'+1.24%',up:true},{sym:'ETH',p:'$3,541',c:'-0.41%',up:false},
+  {sym:'BNB',p:'$578',c:'+2.10%',up:true},{sym:'SOL',p:'$148',c:'+3.42%',up:true},
+  {sym:'XRP',p:'$0.506',c:'-0.82%',up:false},{sym:'DOGE',p:'$0.163',c:'+5.21%',up:true},
+  {sym:'ADA',p:'$0.441',c:'-1.12%',up:false},{sym:'AVAX',p:'$34.5',c:'+1.90%',up:true},
+  {sym:'TON',p:'$5.42',c:'+4.30%',up:true},{sym:'DOT',p:'$7.84',c:'-0.55%',up:false},
+  {sym:'PEPE',p:'$0.0000124',c:'+8.41%',up:true},{sym:'BONK',p:'$0.0000330',c:'+6.12%',up:true},
+  {sym:'WIF',p:'$2.89',c:'+11.2%',up:true},{sym:'TAO',p:'$488',c:'+3.80%',up:true},
+  {sym:'SUI',p:'$3.22',c:'+4.90%',up:true},{sym:'INJ',p:'$28.8',c:'+5.70%',up:true},
+];
+
+function renderTicker() {
+  const html = [...TDATA,...TDATA].map(t=>`
+    <div class="tick-item">
+      <span class="tick-sym">${t.sym}</span>
+      <span class="tick-p">${t.p}</span>
+      <span class="${t.up?'tick-up':'tick-dn'}">${t.c}</span>
+    </div>
+  `).join('');
+  document.getElementById('tickerInner').innerHTML = html;
+}
+
+// ========================================================
+// SIGNALS RENDER
+// ========================================================
+function flt(f) {
+  S.sigFilter = f;
+  renderSigs();
+}
+
+function renderSigs() {
+  const f = S.sigFilter;
+  const net = S.netFilter;
+  const allowedCoins = NET_COINS[net];
+  let list = SIGS;
+  if(f==='cex') list = list.filter(s=>s.type==='cex');
+  else if(f==='dex') list = list.filter(s=>s.type==='dex');
+  else if(f==='tri') list = list.filter(s=>s.type==='tri');
+  else if(f==='fund') list = list.filter(s=>s.type==='fund');
+  else if(f==='hot') list = list.filter(s=>s.hot);
+  else if(f==='viponly') list = list.filter(s=>s.vip);
+  // Apply network filter
+  if (allowedCoins) {
+    list = list.filter(s => {
+      const base = s.sym.split('/')[0].split('→')[0].split(' ')[0];
+      return allowedCoins.includes(base);
+    });
+  }
+
+  document.getElementById('sigCount').textContent = list.length + ' сигналов';
+
+  const feeR = S.vip ? S.vipFee : S.freeFee;
+  const conn = S.connected;
+  document.getElementById('sigList').innerHTML = list.map(sig => {
+    const locked = sig.vip && !S.vip;
+    const bConn = conn.has(sig.bx.toLowerCase()) || sig.type==='tri'||sig.type==='dex'||sig.type==='fund';
+    const sConn = conn.has(sig.sx.toLowerCase()) || sig.type==='tri'||sig.type==='dex'||sig.type==='fund';
+    const canTrade = bConn && sConn;
+    const limitHit = !S.vip && S.trades >= S.maxFree;
+    // Чистый профит = спред − комиссия биржи (0.2% × 2 стороны) − комиссия платформы
+    const exchFeePct = 0.2; // ~0.1% buy + 0.1% sell
+    const platFeePct = feeR * 100;
+    const netPct = +(sig.spread - exchFeePct - platFeePct).toFixed(2);
+    // Скрываем сигналы где профит <= 0
+    if (!locked && netPct <= 0) return '';
+    const typeLabel = {cex:'CEX▸CEX',dex:'DEX',tri:'Треугольный',fund:'Фандинг'}[sig.type];
+    const ico = getCoinIco(sig.sym);
+
+    return `<div class="ac ${sig.hot&&!locked?'hot':''} ${locked?'locked':''}" onclick="${locked?`showPg('vip')`:`openTrade('${sig.id}')`}">
+      <div class="ac-top">
+        <div class="ac-pair">
+          <div class="ac-icons">
+            <div class="ci">${ico}</div>
+            <div class="ci">💵</div>
+          </div>
+          <div>
+            <div class="ac-pname">${sig.sym}${locked?' 🔒':''}</div>
+            <div class="ac-ptype">${typeLabel}</div>
+          </div>
+        </div>
+        <div class="ac-profit">
+          <div class="pct ${netPct<0.3?'warn':''} ${locked?'blurred':''}">${locked?'??.?':'+'+netPct.toFixed(2)}%</div>
+          <div class="pct-sub">${locked?'VIP Only':'после всех комиссий'}</div>
+        </div>
+      </div>
+      ${locked ? `<div style="text-align:center;padding:10px 14px 12px;color:var(--text2);font-size:11px">
+        👑 Доступно в VIP · <button onclick="event.stopPropagation();showPg('vip')" style="background:none;border:1px solid rgba(245,166,35,.4);border-radius:5px;padding:3px 9px;color:var(--gold);font-size:10px;font-weight:700;cursor:pointer;font-family:var(--font)">Получить VIP →</button>
+      </div>` : `
+      <div class="ac-route">
+        <div class="rs"><span class="rs-ex">${sig.bx}</span>${sig.bprice?`<span class="rs-pr">$${fmtP(sig.bprice)}</span>`:''}</div>
+        <div class="rarr">→</div>
+        <div class="rs"><span class="rs-ex">${sig.sx}</span>${sig.sprice?`<span class="rs-pr">$${fmtP(sig.sprice)}</span>`:''}</div>
+      </div>
+      <div class="ac-meta">
+        <div class="mi"><div class="mi-k">Спред (gross)</div><div class="mi-v g">+${sig.spread}%</div></div>
+        <div class="mi"><div class="mi-k">Биржа ~0.2%</div><div class="mi-v r">−${exchFeePct}%</div></div>
+        <div class="mi"><div class="mi-k">Платформа</div><div class="mi-v r">−${platFeePct.toFixed(1)}%</div></div>
+        <div class="mi"><div class="mi-k">Риск</div><div class="mi-v go">${{low:'Низкий',med:'Средний',high:'Высокий'}[sig.risk]}</div></div>
+      </div>
+      <div class="ac-foot">
+        <button class="btn-ex" ${(!canTrade||limitHit)?'disabled':''} onclick="event.stopPropagation();openTrade('${sig.id}')">
+          ${limitHit?'⚠️ Лимит FREE 5/д':!canTrade?`🔗 Подключи ${sig.bx}/${sig.sx}`:'⚡ Исполнить 1 кнопкой'}
+        </button>
+        <div class="btn-wl" onclick="event.stopPropagation();toggleWL(this)">⭐</div>
+      </div>
+      `}
+    </div>`;
+  }).join('') || `<div class="empty"><div class="ei">📭</div><div class="et">Нет сигналов</div><div class="es">Попробуй другой фильтр или подключи биржи</div></div>`;
+}
+
+function fmtP(p) {
+  if(!p) return '';
+  if(p<0.0001) return p.toFixed(8);
+  if(p<0.01) return p.toFixed(6);
+  if(p<1) return p.toFixed(4);
+  if(p<100) return p.toFixed(2);
+  return p.toLocaleString('en',{maximumFractionDigits:2});
+}
+
+// ========================================================
+// SCANNER
+// ========================================================
+const SCAN_PAIRS = [
+  {sym:'BTC',b:'Binance',s:'OKX',bp:67842,sp:68214,spread:0.55},
+  {sym:'ETH',b:'Bybit',s:'Binance',bp:3541.2,sp:3558.9,spread:0.50},
+  {sym:'SOL',b:'KuCoin',s:'Gate.io',bp:147.82,sp:149.24,spread:0.96},
+  {sym:'BNB',b:'HTX',s:'Binance',bp:578.1,sp:580.9,spread:0.48},
+  {sym:'XRP',b:'MEXC',s:'Bybit',bp:0.5021,sp:0.5098,spread:1.53},
+  {sym:'DOGE',b:'Gate.io',s:'Coinbase',bp:0.1621,sp:0.1652,spread:1.91},
+  {sym:'ADA',b:'KuCoin',s:'OKX',bp:0.4412,sp:0.4461,spread:1.11},
+  {sym:'AVAX',b:'Gate.io',s:'Binance',bp:34.12,sp:34.52,spread:1.17},
+  {sym:'NEAR',b:'KuCoin',s:'MEXC',bp:6.841,sp:6.921,spread:1.17},
+  {sym:'ARB',b:'Binance',s:'Bitget',bp:1.021,sp:1.039,spread:1.76},
+  {sym:'PEPE',b:'MEXC',s:'Binance',bp:0.00001211,sp:0.00001259,spread:3.96},
+  {sym:'SHIB',b:'LBank',s:'Gate.io',bp:0.00002481,sp:0.00002534,spread:2.14},
+  {sym:'TON',b:'OKX',s:'Bybit',bp:5.421,sp:5.511,spread:1.66},
+  {sym:'SUI',b:'Bybit',s:'MEXC',bp:3.214,sp:3.281,spread:2.08},
+  {sym:'BONK',b:'MEXC',s:'Bybit',bp:0.0000320,sp:0.0000331,spread:3.44},
+  {sym:'WIF',b:'BitMart',s:'Binance',bp:2.841,sp:2.912,spread:2.50},
+  {sym:'INJ',b:'KuCoin',s:'Bybit',bp:28.41,sp:29.12,spread:2.50},
+  {sym:'TAO',b:'Bybit',s:'Gate.io',bp:481.2,sp:492.4,spread:2.33},
+  {sym:'DOT',b:'HTX',s:'KuCoin',bp:7.812,sp:7.921,spread:1.39},
+  {sym:'LINK',b:'Kraken',s:'Binance',bp:14.82,sp:15.01,spread:1.28},
+  {sym:'APT',b:'Binance',s:'KuCoin',bp:9.812,sp:9.941,spread:1.31},
+  {sym:'MATIC',b:'OKX',s:'MEXC',bp:0.8812,sp:0.8964,spread:1.72},
+  {sym:'RENDER',b:'MEXC',s:'Binance',bp:8.211,sp:8.392,spread:2.20},
+  {sym:'FLOKI',b:'LBank',s:'MEXC',bp:0.000182,sp:0.000189,spread:3.85},
+];
+
+function updScanner() {
+  const thr = parseFloat(document.getElementById('spreadSlider').value);
+  document.getElementById('spreadLbl').textContent = thr.toFixed(1)+'%';
+  renderScanner(thr);
+}
+
+function renderScanner(thr=0.3) {
+  const now = new Date();
+  document.getElementById('scanTime').textContent = now.toLocaleTimeString('ru');
+  const rows = SCAN_PAIRS
+    .map(r=>({...r,spread:+(r.spread+(Math.random()-.5)*.1).toFixed(2)}))
+    .filter(r=>r.spread>=thr)
+    .sort((a,b)=>b.spread-a.spread);
+  const ico = sym => getCoinIco(sym);
+  document.getElementById('scanBody').innerHTML = rows.map(r=>{
+    const pct = Math.min(100,(r.spread/5)*100);
+    const cls = r.spread>=2?'hi':r.spread>=1?'mid':'lo';
+    return `<tr>
+      <td><span style="font-size:14px">${ico(r.sym)}</span> <strong>${r.sym}</strong></td>
+      <td class="mono c">${fmtP(r.bp)}<br><span style="font-size:8px;color:var(--muted)">${r.b}</span></td>
+      <td class="mono g">${fmtP(r.sp)}<br><span style="font-size:8px;color:var(--muted)">${r.s}</span></td>
+      <td class="mono ${r.spread>=1?'g':'go'}">+${r.spread}%
+        <div class="sbar-wrap"><div class="sbar ${cls}" style="width:${pct}%"></div></div>
+      </td>
+      <td><button class="btn-t" onclick="openScanTrade('${r.sym}','${r.b}','${r.s}',${r.spread})">Торговать</button></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">Нет пар с таким спредом</td></tr>';
+}
+
+// ========================================================
+// EXCHANGES RENDER
+// ========================================================
+function renderExchanges() {
+  const count = S.connected.size;
+  document.getElementById('connCount').textContent = `${count} / ${EXCHS.length} подключено`;
+  document.getElementById('exchList').innerHTML = EXCHS.map(e=>{
+    const conn = S.connected.has(e.id);
+    const freeMax = !S.vip && S.connected.size>=2 && !conn;
+    const topCoins = e.coins.slice(0,8);
+    const rest = e.coins.length - 8;
+    return `<div class="exc-item ${conn?'conn':''}">
+      <div class="exc-head">
+        <div class="exc-logo" style="background:${e.color}18">${e.logo}</div>
+        <div style="flex:1">
+          <div class="exc-name">${e.name}</div>
+          <div class="exc-info">Maker: ${e.maker} · Taker: ${e.taker} · ${e.pairs}+ пар</div>
+        </div>
+        <div class="exc-badge ${conn?'badge-on':'badge-off'}">${conn?'● ACTIVE':'OFFLINE'}</div>
+      </div>
+      <div class="exc-stats">
+        <div class="exc-stat"><div class="exc-sk">Объём 24ч</div><div class="exc-sv c">${e.vol}</div></div>
+        <div class="exc-stat"><div class="exc-sk">Maker fee</div><div class="exc-sv">${e.maker}</div></div>
+        <div class="exc-stat"><div class="exc-sk">Taker fee</div><div class="exc-sv">${e.taker}</div></div>
+        <div class="exc-stat"><div class="exc-sk">Торг. пары</div><div class="exc-sv">${e.pairs}+</div></div>
+      </div>
+      <div class="exc-coins">
+        ${topCoins.map(c=>`<span class="coin-tag">${c}</span>`).join('')}
+        ${rest>0?`<span class="coin-tag more">+${rest} ещё</span>`:''}
+      </div>
+      <div class="exc-actions">
+        ${conn
+          ? `<button class="btn-dconn" onclick="doDisconnect('${e.id}')">Отключить</button>
+             <button class="btn-conn" style="border-color:var(--border2);color:var(--text2)" onclick="toastMsg('✅ ${e.name} уже подключена','ok')">Настройки</button>`
+          : freeMax
+            ? `<button class="btn-vip-ex" onclick="showPg('vip')">👑 VIP для 3+ бирж</button>`
+            : `<button class="btn-conn" onclick="openConn('${e.id}')">+ Подключить API</button>`
+        }
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ========================================================
+// HISTORY RENDER
+// ========================================================
+function renderHistory() {
+  const h = S.history;
+  const wins = h.filter(x=>x.profit>0).length;
+  const total = h.reduce((a,x)=>a+x.profit,0);
+  document.getElementById('histSum').innerHTML = `
+    <div><div class="hs-lbl">Сделок</div><div class="hs-val">${h.length}</div></div>
+    <div><div class="hs-lbl">Общий профит</div><div class="hs-val g" style="color:${total>=0?'var(--green)':'var(--red)'}">${total>=0?'+':''}$${total.toFixed(2)}</div></div>
+    <div><div class="hs-lbl">Win Rate</div><div class="hs-val go">${h.length?Math.round(wins/h.length*100):0}%</div></div>
+  `;
+  document.getElementById('histList').innerHTML = h.length
+    ? [...h].reverse().map(x=>`
+        <div class="hist-item">
+          <div class="hist-ico ${x.profit>0?'ok':'fail'}">${x.profit>0?'✅':'❌'}</div>
+          <div class="hist-body">
+            <div class="hist-pair">${x.sym} · ${x.bx}→${x.sx}</div>
+            <div class="hist-detail">$${x.amount} · Комиссия платф.: $${x.fee.toFixed(3)} · Спред: +${x.spread}%</div>
+          </div>
+          <div class="hist-right">
+            <div class="hist-profit ${x.profit<=0?'neg':''}">${x.profit>0?'+':''}$${x.profit.toFixed(3)}</div>
+            <div class="hist-time">${x.time}</div>
+          </div>
+        </div>
+      `).join('')
+    : '<div class="empty"><div class="ei">📭</div><div class="et">История пуста</div><div class="es">Исполни первый арбитраж!</div></div>';
+}
+
+// ========================================================
+// VIP PAGE
+// ========================================================
+const PLANS=[
+  {id:'week',name:'1 Неделя',price:'$9',per:'/неделю',save:'',badge:''},
+  {id:'month',name:'1 Месяц',price:'$29',per:'/месяц',save:'',badge:'POPULAR'},
+  {id:'year',name:'1 Год',price:'$149',per:'/год',save:'ЭКОНОМИЯ 57%',badge:'ЛУЧШАЯ ЦЕНА'},
+];
+const FEATS=[
+  {ico:'📡',name:'Сигналов в день',free:'10',vip:'∞'},
+  {ico:'⚡',name:'Скорость сигналов',free:'+8 сек',vip:'Realtime'},
+  {ico:'💱',name:'Сделок в день',free:'5',vip:'∞'},
+  {ico:'🏦',name:'Подключённых бирж',free:'2',vip:'∞ (15)'},
+  {ico:'🤖',name:'Авто-торговля',free:'❌',vip:'✅'},
+  {ico:'📐',name:'Треугольный арбитраж',free:'❌',vip:'✅'},
+  {ico:'🔀',name:'DEX арбитраж',free:'❌',vip:'✅'},
+  {ico:'💹',name:'Фандинг арбитраж',free:'❌',vip:'✅'},
+  {ico:'⏰',name:'TG алерты',free:'❌',vip:'✅'},
+  {ico:'🎯',name:'Комиссия платформы',free:'0.8%',vip:'0.3%'},
+  {ico:'📊',name:'Расширенная аналитика',free:'❌',vip:'✅'},
+  {ico:'🛡',name:'Приоритетная поддержка',free:'❌',vip:'✅'},
+];
+
+function renderVip() {
+  document.getElementById('plansList').innerHTML = PLANS.map(p=>`
+    <div class="plan ${S.plan===p.id?'sel':''}" onclick="selPlan('${p.id}',this)">
+      ${p.badge?`<div class="plan-badge">${p.badge}</div>`:''}
+      <div class="plan-nm">${p.name}</div>
+      <div class="plan-pr">${p.price}</div>
+      <div class="plan-per">${p.per}</div>
+      ${p.save?`<div class="plan-save">${p.save}</div>`:''}
+    </div>
+  `).join('');
+  document.getElementById('featList').innerHTML = FEATS.map(f=>`
+    <div class="ft-row">
+      <div class="ft-name"><span class="ft-ico">${f.ico}</span>${f.name}</div>
+      <div class="ft-free">${f.free}</div>
+      <div class="ft-vip">${f.vip}</div>
+    </div>
+  `).join('');
+}
+
+function selPlan(id, el) {
+  S.plan = id;
+  document.querySelectorAll('.plan').forEach(p=>p.classList.remove('sel'));
+  el.classList.add('sel');
+  const p = PLANS.find(x=>x.id===id);
+  document.getElementById('buyBtn').textContent = `👑 Активировать VIP — ${p.price}${p.per}`;
+}
+
+function doBuy() {
+  toastMsg('💳 Переход к оплате...','ok');
+  setTimeout(()=>{
+    S.vip=true;
+    document.getElementById('tierBtn').className='tier-btn tier-vip';
+    document.getElementById('tierBtn').textContent='👑 VIP ACTIVE';
+    document.getElementById('hFee').textContent='0.3%';
+    renderSigs(); renderExchanges(); renderVip();
+    renderAutoPanel(); renderVipAutoSettings();
+    toastMsg('🎉 VIP активирован! Настрой авто-торговлю 🤖','ok');
+    showPg('signals');
+  },1400);
+}
+
+// ========================================================
+// CONNECT MODAL
+// ========================================================
+let pendingEx = null;
+function openConn(id) {
+  const e = EXCMAP[id]; if(!e)return;
+  pendingEx=id;
+  document.getElementById('mLogo').textContent=e.logo;
+  document.getElementById('mTitle').textContent=`Подключить ${e.name}`;
+  document.getElementById('mSub').textContent=`Введите API ключи ${e.name}. Нужны права: Read + Trade. Без вывода!`;
+  document.getElementById('apiKey').value='';
+  document.getElementById('apiSecret').value='';
+  document.getElementById('apiPass').value='';
+  document.getElementById('passphraseWrap').style.display=e.passphrase?'block':'none';
+  openModal('connModal');
+}
+function doConnect() {
+  if(!document.getElementById('apiKey').value.trim()||!document.getElementById('apiSecret').value.trim()){toastMsg('⚠️ Заполни оба поля','warn');return;}
+  S.connected.add(pendingEx);
+  closeModal('connModal');
+  renderExchanges(); renderSigs();
+  const e=EXCMAP[pendingEx];
+  toastMsg(`✅ ${e.name} подключена!`,'ok');
+}
+function doDisconnect(id) {
+  S.connected.delete(id);
+  renderExchanges(); renderSigs();
+  toastMsg(`🔌 ${EXCMAP[id].name} отключена`,'warn');
+}
+
+// ========================================================
+// TRADE MODAL
+// ========================================================
+function openTrade(id) {
+  const sig=SIGS.find(s=>s.id===id); if(!sig)return;
+  S.currentSig=sig;
+  document.getElementById('tTitle').textContent=`Арбитраж ${sig.sym}`;
+  document.getElementById('tSub').textContent=`${sig.bx} → ${sig.sx} · Спред: +${sig.spread}%`;
+  document.getElementById('tAmt').value=200;
+  calcTrade();
+  openModal('tradeModal');
+}
+function openScanTrade(sym,b,s,spread) {
+  S.currentSig={id:'scan',sym,bx:b,sx:s,spread:+spread,vol:'—',time:'—',risk:'med',type:'cex'};
+  document.getElementById('tTitle').textContent=`Арбитраж ${sym}`;
+  document.getElementById('tSub').textContent=`${b} → ${s} · Спред: +${spread}%`;
+  document.getElementById('tAmt').value=200;
+  calcTrade();
+  openModal('tradeModal');
+}
+function calcTrade() {
+  const sig=S.currentSig; if(!sig)return;
+  const amt=parseFloat(document.getElementById('tAmt').value)||0;
+  const feeR=S.vip?S.vipFee:S.freeFee;
+  const exchFee=amt*0.002;
+  const platFee=amt*feeR;
+  const gross=amt*sig.spread/100;
+  const net=+(gross-exchFee-platFee).toFixed(4);
+  const roi=amt>0?(net/amt*100).toFixed(3):0;
+  document.getElementById('tCalc').innerHTML=`
+    <div class="tc-row"><span class="tc-k">Сумма</span><span class="tc-v">$${amt.toFixed(2)}</span></div>
+    <div class="tc-row"><span class="tc-k">Валовой спред (+${sig.spread}%)</span><span class="tc-v g">+$${gross.toFixed(4)}</span></div>
+    <div class="tc-row"><span class="tc-k">Комиссия биржи (~0.2%)</span><span class="tc-v r">-$${exchFee.toFixed(4)}</span></div>
+    <div class="tc-row"><span class="tc-k">Комиссия платформы (${(feeR*100).toFixed(1)}%)</span><span class="tc-v go">-$${platFee.toFixed(4)}</span></div>
+    <div class="tc-row"><span class="tc-k" style="font-weight:700;font-size:13px">ЧИСТЫЙ ПРОФИТ</span><span class="tc-v ${net>=0?'g':'r'} BIG">${net>=0?'+':''}$${net.toFixed(4)}</span></div>
+    <div class="tc-row"><span class="tc-k">ROI сделки</span><span class="tc-v ${net>=0?'g':'r'}">${net>=0?'+':''}${roi}%</span></div>
+  `;
+  document.getElementById('tCommInfo').innerHTML=`
+    💰 <strong>$${platFee.toFixed(4)}</strong> (${(feeR*100).toFixed(1)}%) уйдёт на кошелёк владельца платформы.<br>
+    ${S.vip?'✅ VIP тариф: скидка на комиссию 62.5%':'⚡ FREE тариф: обновись до VIP для комиссии 0.3%'}
+  `;
+}
+function execTrade() {
+  const sig=S.currentSig; if(!sig)return;
+  if(!S.vip&&S.trades>=S.maxFree){toastMsg('❌ Лимит 5 сделок/день FREE. Upgrade VIP!','err');closeModal('tradeModal');setTimeout(()=>showPg('vip'),400);return;}
+  const amt=parseFloat(document.getElementById('tAmt').value)||0;
+  const feeR=S.vip?S.vipFee:S.freeFee;
+  const exchFee=amt*0.002;
+  const platFee=+(amt*feeR).toFixed(4);
+  const gross=amt*sig.spread/100;
+  const net=+(gross-exchFee-platFee).toFixed(4);
+  closeModal('tradeModal');
+  setTimeout(()=>{
+    const ok=Math.random()>.08;
+    S.trades++; S.ownerEarned+=platFee;
+    if(ok){S.balance=+(S.balance+net).toFixed(2);S.profit=+(S.profit+net).toFixed(4);}
+    document.getElementById('hBalancе').textContent='$'+S.balance.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
+    document.getElementById('hProfit').textContent=(S.profit>=0?'+':'')+`$${S.profit.toFixed(2)}`;
+    S.history.push({sym:sig.sym,bx:sig.bx,sx:sig.sx,amount:amt,fee:platFee,profit:ok?net:-(exchFee*2),spread:sig.spread,time:new Date().toLocaleTimeString('ru')});
+    if(document.getElementById('pg-history').classList.contains('on'))renderHistory();
+    renderSigs();
+    toastMsg(ok?`✅ Профит: +$${net.toFixed(4)}`:'❌ Сделка сорвалась: слиппаж',ok?'ok':'err');
+  },1600);
+}
+
+// ========================================================
+// MODAL HELPERS
+// ========================================================
+function openModal(id){document.getElementById(id).classList.add('on')}
+function closeModal(id){document.getElementById(id).classList.remove('on')}
+document.addEventListener('click',e=>{
+  ['connModal','tradeModal'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(e.target===el)el.classList.remove('on');
+  });
+});
+
+// ========================================================
+// NAV
+// ========================================================
+function showPg(name) {
+  document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.nb').forEach(b=>b.classList.remove('on'));
+  document.getElementById('pg-'+name).classList.add('on');
+  const nb=document.getElementById('nb-'+name);
+  if(nb)nb.classList.add('on');
+  // Show filter zone only on signals page
+  const fz=document.getElementById('filterZone');
+  if(fz)fz.style.display=name==='signals'?'block':'none';
+  if(name==='scanner')renderScanner(parseFloat(document.getElementById('spreadSlider').value));
+  if(name==='history')renderHistory();
+  if(name==='exchanges')renderExchanges();
+  if(name==='signals'){renderAutoPanel();}
+  if(name==='vip'){renderVip();renderVipAutoSettings();}
+  document.querySelector('.scroll').scrollTop=0;
+}
+function toggleWL(btn){btn.classList.toggle('on');toastMsg(btn.classList.contains('on')?'⭐ Добавлен в вотчлист':'☆ Убран из вотчлиста',btn.classList.contains('on')?'ok':'')}
+
+// ========================================================
+// TOAST
+// ========================================================
+function toastMsg(msg,type=''){
+  const w=document.getElementById('tzWrap');
+  const t=document.createElement('div');
+  t.className=`tz ${type}`;
+  t.innerHTML=`<span>${msg}</span>`;
+  w.appendChild(t);
+  setTimeout(()=>t.remove(),3200);
+}
+
+// ========================================================
+// LIVE UPDATES
+// ========================================================
+function liveUpdate(){
+  SIGS=SIGS.map(s=>({...s,spread:Math.max(.1,+(s.spread+(Math.random()-.5)*.25).toFixed(2))}));
+  if(document.getElementById('pg-signals').classList.contains('on'))renderSigs();
+  if(document.getElementById('pg-scanner').classList.contains('on'))renderScanner(parseFloat(document.getElementById('spreadSlider').value));
+}
+
+// ========================================================
+// DRAG-SCROLL ENGINE FOR CHIP ROWS
+// ========================================================
+function initDragScroll(el) {
+  if (!el) return;
+  let startX = 0, startLeft = 0, dragging = false, moved = false;
+  let offset = 0, velX = 0, lastX = 0, raf = null;
+
+  function getMaxOffset() {
+    const parent = el.parentElement;
+    return Math.max(0, el.scrollWidth - parent.offsetWidth);
+  }
+  function applyOffset(x) {
+    offset = Math.max(-getMaxOffset(), Math.min(0, x));
+    el.style.transform = `translateX(${offset}px)`;
+  }
+  function momentum() {
+    velX *= 0.92;
+    if (Math.abs(velX) < 0.5) return;
+    applyOffset(offset + velX);
+    raf = requestAnimationFrame(momentum);
+  }
+
+  // TOUCH
+  el.addEventListener('touchstart', e => {
+    if (raf) cancelAnimationFrame(raf);
+    startX = e.touches[0].clientX;
+    startLeft = offset;
+    dragging = true; moved = false;
+    velX = 0; lastX = startX;
+  }, {passive: true});
+
+  el.addEventListener('touchmove', e => {
+    if (!dragging) return;
+    const dx = e.touches[0].clientX - startX;
+    velX = e.touches[0].clientX - lastX;
+    lastX = e.touches[0].clientX;
+    if (Math.abs(dx) > 4) { moved = true; e.stopPropagation(); }
+    applyOffset(startLeft + dx);
+  }, {passive: true});
+
+  el.addEventListener('touchend', e => {
+    dragging = false;
+    if (moved) { raf = requestAnimationFrame(momentum); }
+  }, {passive: true});
+
+  // MOUSE
+  el.addEventListener('mousedown', e => {
+    if (raf) cancelAnimationFrame(raf);
+    startX = e.clientX; startLeft = offset;
+    dragging = true; moved = false; velX = 0; lastX = e.clientX;
+    el.style.cursor = 'grabbing';
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const dx = e.clientX - startX;
+    velX = e.clientX - lastX; lastX = e.clientX;
+    if (Math.abs(dx) > 4) moved = true;
+    applyOffset(startLeft + dx);
+  });
+  window.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    el.style.cursor = 'grab';
+    if (moved) raf = requestAnimationFrame(momentum);
+  });
+
+  // Block click on children if dragged
+  el.addEventListener('click', e => { if (moved) e.stopImmediatePropagation(); }, true);
+}
+
+function initChipClicks() {
+  // Networks
+  document.querySelectorAll('#netChips .nch').forEach(el => {
+    el.addEventListener('click', () => {
+      document.querySelectorAll('#netChips .nch').forEach(x => x.classList.remove('on'));
+      el.classList.add('on');
+      setNet(el.dataset.net);
+    });
+  });
+  // Filters
+  document.querySelectorAll('#sigChips .ch').forEach(el => {
+    el.addEventListener('click', () => {
+      document.querySelectorAll('#sigChips .ch').forEach(x => x.classList.remove('on'));
+      el.classList.add('on');
+      flt(el.dataset.flt);
+    });
+  });
+}
+
+// ========================================================
+// STARS
+// ========================================================
+function mkStars(){
+  const c=document.getElementById('stars');
+  for(let i=0;i<80;i++){
+    const s=document.createElement('div');
+    s.className='star';
+    const sz=Math.random()*2+.5;
+    s.style.cssText=`width:${sz}px;height:${sz}px;top:${Math.random()*100}%;left:${Math.random()*100}%;--d:${2+Math.random()*4}s;--delay:-${Math.random()*4}s;--op:${.1+Math.random()*.4}`;
+    c.appendChild(s);
+  }
+}
+
+// ========================================================
+// INIT
+// ========================================================
+document.addEventListener('DOMContentLoaded',()=>{
+  mkStars();
+  initDragScroll(document.getElementById('netChips'));
+  initDragScroll(document.getElementById('sigChips'));
+  initChipClicks();
+  renderTicker();
+  renderSigs();
+  renderAutoPanel();
+  renderScanner();
+  renderExchanges();
+  renderHistory();
+  renderVip();
+  renderVipAutoSettings();
+  setInterval(liveUpdate,3500);
+  setTimeout(()=>toastMsg('🔥 BTC/USDT: новый арбитраж +0.55% на Binance→OKX','ok'),2000);
+  setTimeout(()=>toastMsg('📡 Сканер обновлён: 24 активных спреда','ok'),6000);
+});
+</script>
+</body>
+</html>

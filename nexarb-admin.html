@@ -1,0 +1,1381 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXARB Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:     #080c12;
+  --bg2:    #0d1420;
+  --bg3:    #111c2e;
+  --panel:  #0f1928;
+  --border: rgba(0,200,255,.12);
+  --border2:rgba(0,200,255,.22);
+  --cyan:   #00c8ff;
+  --cyan2:  #00e5ff;
+  --green:  #00e676;
+  --red:    #ff4444;
+  --gold:   #ffb300;
+  --purple: #b06eff;
+  --text:   #e8f4ff;
+  --text2:  #7a9bb5;
+  --muted:  #3d5a72;
+  --mono:   'JetBrains Mono', monospace;
+  --sans:   'Syne', sans-serif;
+  --r:      8px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── GRID LAYOUT ── */
+.layout { display:flex; min-height:100vh; }
+.sidebar {
+  width: 220px; min-height:100vh;
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  position: fixed; top:0; left:0; z-index:100;
+}
+.main {
+  margin-left: 220px;
+  flex: 1;
+  min-height: 100vh;
+  display: flex; flex-direction: column;
+}
+.topbar {
+  height: 56px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center;
+  padding: 0 24px;
+  gap: 16px;
+  position: sticky; top:0; z-index:90;
+}
+.content { padding: 24px; flex:1; }
+
+/* ── SIDEBAR ── */
+.logo-wrap {
+  padding: 20px 16px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.logo {
+  font-size: 18px; font-weight: 800; letter-spacing: -0.5px;
+  background: linear-gradient(135deg, var(--cyan), var(--purple));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.logo-sub { font-size: 10px; color: var(--red); font-family: var(--mono); margin-top:2px; letter-spacing:1px; }
+.nav { padding: 12px 0; flex:1; }
+.nav-item {
+  display: flex; align-items: center; gap:10px;
+  padding: 10px 16px;
+  font-size: 13px; font-weight: 600;
+  color: var(--text2);
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: all .15s;
+  user-select: none;
+}
+.nav-item:hover { color: var(--text); background: rgba(0,200,255,.06); }
+.nav-item.active {
+  color: var(--cyan); background: rgba(0,200,255,.08);
+  border-left-color: var(--cyan);
+}
+.nav-item .ico { font-size:16px; width:20px; text-align:center; }
+.nav-sep { height:1px; background: var(--border); margin: 8px 0; }
+.sidebar-bottom {
+  padding: 16px;
+  border-top: 1px solid var(--border);
+  font-size: 11px; color: var(--muted);
+  font-family: var(--mono);
+}
+.mode-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px; font-weight: 700; letter-spacing: 1px;
+  margin-bottom: 6px;
+}
+.mode-demo { background: rgba(255,179,0,.15); color: var(--gold); border: 1px solid rgba(255,179,0,.3); }
+.mode-prod { background: rgba(0,230,118,.12); color: var(--green); border: 1px solid rgba(0,230,118,.3); }
+
+/* ── TOPBAR ── */
+.tb-title { font-size:15px; font-weight:700; color: var(--text); flex:1; }
+.tb-input {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 6px 12px;
+  color: var(--text); font-family: var(--mono);
+  font-size: 12px; width: 260px;
+  outline: none; transition: border .15s;
+}
+.tb-input:focus { border-color: var(--cyan); }
+.tb-input::placeholder { color: var(--muted); }
+.conn-status {
+  font-family: var(--mono); font-size: 11px;
+  display: flex; align-items: center; gap: 6px;
+}
+.dot { width:8px; height:8px; border-radius:50%; background:var(--muted); }
+.dot.ok { background:var(--green); box-shadow: 0 0 6px var(--green); }
+.dot.err { background:var(--red); }
+
+/* ── PAGES ── */
+.page { display:none; }
+.page.active { display:block; }
+
+/* ── STAT CARDS ── */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px; margin-bottom: 24px;
+}
+.stat-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  position: relative; overflow: hidden;
+}
+.stat-card::before {
+  content:''; position:absolute; inset:0;
+  background: linear-gradient(135deg, var(--accent,.transparent) 0%, transparent 60%);
+  opacity:.06;
+}
+.stat-card .sk { font-size:10px; color:var(--text2); font-weight:600; letter-spacing:.8px; text-transform:uppercase; margin-bottom:6px; }
+.stat-card .sv { font-size:26px; font-weight:800; font-family:var(--mono); color:var(--sv-color,var(--text)); }
+.stat-card .sd { font-size:11px; color:var(--text2); margin-top:4px; font-family:var(--mono); }
+
+/* ── TABLE ── */
+.table-wrap {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.table-header {
+  display: flex; align-items: center;
+  padding: 14px 20px; gap: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.table-header h3 { font-size:14px; font-weight:700; flex:1; }
+table {
+  width:100%; border-collapse: collapse;
+  font-size: 12px; font-family: var(--mono);
+}
+thead th {
+  text-align:left; padding: 10px 16px;
+  font-size:10px; font-weight:700; letter-spacing:.8px;
+  text-transform:uppercase; color: var(--text2);
+  background: var(--bg3);
+  border-bottom: 1px solid var(--border);
+}
+tbody tr {
+  border-bottom: 1px solid rgba(0,200,255,.05);
+  transition: background .1s;
+}
+tbody tr:hover { background: rgba(0,200,255,.04); }
+tbody tr:last-child { border-bottom:none; }
+td { padding: 10px 16px; vertical-align: middle; }
+.td-name { font-weight:600; color:var(--text); font-family:var(--sans); font-size:13px; }
+.td-id { color:var(--muted); font-size:10px; }
+.badge {
+  display:inline-block; padding:2px 8px; border-radius:4px;
+  font-size:10px; font-weight:700; letter-spacing:.5px;
+}
+.badge-vip { background:rgba(255,179,0,.15); color:var(--gold); border:1px solid rgba(255,179,0,.3); }
+.badge-free { background:rgba(122,155,181,.1); color:var(--text2); border:1px solid var(--border); }
+.badge-ok { background:rgba(0,230,118,.12); color:var(--green); border:1px solid rgba(0,230,118,.3); }
+.badge-err { background:rgba(255,68,68,.12); color:var(--red); border:1px solid rgba(255,68,68,.3); }
+.act-btn {
+  background: transparent; border: 1px solid var(--border);
+  border-radius: 6px; padding: 4px 10px;
+  color: var(--text2); font-size:11px;
+  cursor:pointer; font-family:var(--mono);
+  transition: all .15s;
+}
+.act-btn:hover { border-color:var(--cyan); color:var(--cyan); }
+.act-btn.danger:hover { border-color:var(--red); color:var(--red); }
+.act-btn.success:hover { border-color:var(--green); color:var(--green); }
+
+/* ── FORMS / PANELS ── */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px; padding: 20px;
+  margin-bottom: 20px;
+}
+.panel-title { font-size:13px; font-weight:700; margin-bottom:16px; color:var(--text); }
+.form-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px; }
+.form-row { display:flex; flex-direction:column; gap:5px; }
+.form-row label { font-size:10px; color:var(--text2); font-weight:700; letter-spacing:.6px; text-transform:uppercase; }
+.inp {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 8px 12px;
+  color: var(--text); font-family: var(--mono); font-size:12px;
+  outline: none; transition: border .15s; width:100%;
+}
+.inp:focus { border-color:var(--cyan); }
+.inp::placeholder { color:var(--muted); }
+select.inp { cursor:pointer; }
+.btn {
+  padding: 9px 20px; border-radius: var(--r);
+  font-family: var(--sans); font-size:13px; font-weight:700;
+  cursor:pointer; border:none; transition: all .15s;
+}
+.btn-primary { background: var(--cyan); color:#001a24; }
+.btn-primary:hover { background: var(--cyan2); transform:translateY(-1px); }
+.btn-warn { background: rgba(255,179,0,.2); color:var(--gold); border:1px solid rgba(255,179,0,.4); }
+.btn-warn:hover { background: rgba(255,179,0,.3); }
+.btn-danger { background: rgba(255,68,68,.15); color:var(--red); border:1px solid rgba(255,68,68,.35); }
+.btn-danger:hover { background: rgba(255,68,68,.25); }
+.btn-ghost { background: transparent; color:var(--text2); border:1px solid var(--border); }
+.btn-ghost:hover { border-color:var(--cyan2); color:var(--text); }
+
+/* ── FEE EDITOR ── */
+.fee-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap:10px;
+}
+.fee-item {
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 10px 12px;
+  display:flex; flex-direction:column; gap:4px;
+}
+.fee-item label { font-size:10px; color:var(--text2); font-weight:700; letter-spacing:.5px; }
+.fee-item input {
+  background: transparent; border:none; border-bottom:1px solid var(--border2);
+  color: var(--cyan); font-family:var(--mono); font-size:13px; font-weight:700;
+  outline:none; padding:2px 0; width:100%;
+  transition: border-color .15s;
+}
+.fee-item input:focus { border-color:var(--cyan); }
+
+/* ── ALERTS / TOASTS ── */
+#toast {
+  position:fixed; bottom:24px; right:24px; z-index:999;
+  background:var(--bg3); border:1px solid var(--border2);
+  border-radius:10px; padding:12px 18px;
+  font-size:13px; font-weight:600; max-width:340px;
+  transform: translateY(20px); opacity:0;
+  transition: all .3s; pointer-events:none;
+}
+#toast.show { transform:translateY(0); opacity:1; }
+#toast.ok { border-color:var(--green); color:var(--green); }
+#toast.err { border-color:var(--red); color:var(--red); }
+#toast.warn { border-color:var(--gold); color:var(--gold); }
+
+/* ── PAGINATION ── */
+.pagination { display:flex; gap:6px; align-items:center; padding:12px 16px; }
+.pg-btn {
+  background:var(--bg3); border:1px solid var(--border);
+  border-radius:6px; padding:4px 10px; font-family:var(--mono);
+  font-size:11px; color:var(--text2); cursor:pointer;
+}
+.pg-btn:hover, .pg-btn.active { border-color:var(--cyan); color:var(--cyan); }
+.pg-info { font-size:11px; color:var(--muted); font-family:var(--mono); margin-left:auto; }
+
+/* ── MODAL ── */
+.modal-bg {
+  position:fixed; inset:0; background:rgba(0,0,0,.7);
+  display:flex; align-items:center; justify-content:center;
+  z-index:500; opacity:0; pointer-events:none; transition:opacity .2s;
+}
+.modal-bg.open { opacity:1; pointer-events:all; }
+.modal {
+  background:var(--bg2); border:1px solid var(--border2);
+  border-radius:12px; padding:24px; width:460px; max-width:95vw;
+  max-height:90vh; overflow-y:auto;
+}
+.modal h3 { font-size:16px; font-weight:800; margin-bottom:18px; }
+.modal-foot { display:flex; gap:10px; justify-content:flex-end; margin-top:18px; }
+
+/* ── USER DETAIL ── */
+.user-detail { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.ud-label { font-size:10px; color:var(--text2); font-weight:700; letter-spacing:.6px; text-transform:uppercase; margin-bottom:4px; }
+.ud-val { font-family:var(--mono); font-size:13px; font-weight:600; }
+
+/* ── SECTION TITLE ── */
+.section-title {
+  font-size:11px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase;
+  color:var(--muted); margin: 0 0 12px; display:flex; align-items:center; gap:8px;
+}
+.section-title::after { content:''; flex:1; height:1px; background:var(--border); }
+
+/* ── BROADCAST ── */
+.broadcast-box {
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius:var(--r); padding:12px; width:100%;
+  color:var(--text); font-family:var(--sans); font-size:13px;
+  min-height:80px; resize:vertical; outline:none;
+  transition: border .15s;
+}
+.broadcast-box:focus { border-color:var(--cyan); }
+
+/* ── LOADING ── */
+.spinner {
+  width:20px; height:20px; border:2px solid var(--border2);
+  border-top-color: var(--cyan); border-radius:50%;
+  animation: spin .6s linear infinite; display:inline-block;
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+.loading-row td { text-align:center; color:var(--muted); padding:32px; }
+
+/* ── MISC ── */
+.g { color:var(--green); }
+.r { color:var(--red); }
+.c { color:var(--cyan); }
+.gold { color:var(--gold); }
+.pu { color:var(--purple); }
+.mono { font-family:var(--mono); }
+.empty-state { text-align:center; padding:48px; color:var(--muted); }
+.empty-state .ei { font-size:32px; margin-bottom:8px; }
+
+/* ── CONFIG SECTION ── */
+.config-tabs { display:flex; gap:4px; margin-bottom:16px; flex-wrap:wrap; }
+.cfg-tab {
+  padding:6px 14px; border-radius:var(--r);
+  font-size:12px; font-weight:700;
+  background:var(--bg3); border:1px solid var(--border);
+  color:var(--text2); cursor:pointer; transition:all .15s;
+}
+.cfg-tab.active { background:rgba(0,200,255,.12); border-color:var(--cyan); color:var(--cyan); }
+
+/* ── CHANGELOG / ADMIN LOG ── */
+.log-entry {
+  padding:8px 12px; border-left:2px solid var(--border2);
+  margin-bottom:6px; font-family:var(--mono); font-size:11px;
+  background:var(--bg3); border-radius:0 6px 6px 0;
+}
+.log-entry .lt { color:var(--muted); font-size:10px; }
+.log-entry .la { color:var(--cyan); font-weight:700; }
+.log-entry .ld { color:var(--text2); }
+</style>
+</head>
+<body>
+<div class="layout">
+
+<!-- ══ SIDEBAR ═══════════════════════════════════════════════ -->
+<aside class="sidebar">
+  <div class="logo-wrap">
+    <div class="logo">NEXARB</div>
+    <div class="logo-sub">ADMIN PANEL</div>
+  </div>
+  <nav class="nav">
+    <div class="nav-item active" onclick="showPage('dashboard')">
+      <span class="ico">📊</span> Дашборд
+    </div>
+    <div class="nav-item" onclick="showPage('users')">
+      <span class="ico">👥</span> Пользователи
+    </div>
+    <div class="nav-item" onclick="showPage('trades')">
+      <span class="ico">⚡</span> Сделки
+    </div>
+    <div class="nav-sep"></div>
+    <div class="nav-item" onclick="showPage('vip')">
+      <span class="ico">👑</span> VIP управление
+    </div>
+    <div class="nav-item" onclick="showPage('balance')">
+      <span class="ico">💰</span> Балансы
+    </div>
+    <div class="nav-sep"></div>
+    <div class="nav-item" onclick="showPage('config')">
+      <span class="ico">⚙️</span> Конфиг / Комиссии
+    </div>
+    <div class="nav-item" onclick="showPage('broadcast')">
+      <span class="ico">📣</span> Рассылка
+    </div>
+  </nav>
+  <div class="sidebar-bottom">
+    <div id="modeLabel" class="mode-badge mode-demo">DEMO</div>
+    <div id="apiUrl" style="margin-top:4px; word-break:break-all"></div>
+  </div>
+</aside>
+
+<!-- ══ MAIN ═══════════════════════════════════════════════════ -->
+<div class="main">
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="tb-title" id="pageTitle">Дашборд</div>
+    <input class="tb-input" id="adminTokenInput"
+           type="password" placeholder="X-Admin-Token..."
+           onchange="saveToken(this.value)">
+    <div class="conn-status">
+      <div class="dot" id="connDot"></div>
+      <span id="connText" style="color:var(--muted)">не подключено</span>
+    </div>
+    <button class="btn btn-ghost" onclick="connectApi()" style="padding:6px 14px;font-size:12px">
+      Подключить
+    </button>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content">
+
+    <!-- ═══ DASHBOARD ═══════════════════════════════════════ -->
+    <div class="page active" id="page-dashboard">
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card"><div class="sk">Загрузка...</div><div class="sv"><span class="spinner"></span></div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div class="panel">
+          <div class="panel-title">🏆 Топ символы</div>
+          <table>
+            <thead><tr><th>Символ</th><th>Сделок</th><th>Профит</th></tr></thead>
+            <tbody id="topSymbols"><tr class="loading-row"><td colspan="3"><span class="spinner"></span></td></tr></tbody>
+          </table>
+        </div>
+        <div class="panel">
+          <div class="panel-title">🏦 Топ биржи</div>
+          <table>
+            <thead><tr><th>Биржа</th><th>Сделок</th></tr></thead>
+            <tbody id="topExchanges"><tr class="loading-row"><td colspan="2"><span class="spinner"></span></td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ USERS ════════════════════════════════════════════ -->
+    <div class="page" id="page-users">
+      <div class="table-wrap">
+        <div class="table-header">
+          <h3>👥 Пользователи</h3>
+          <input class="tb-input" id="userSearch" placeholder="Поиск по имени / tg_id..."
+                 oninput="debounce(loadUsers, 400)()" style="width:220px">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2);cursor:pointer">
+            <input type="checkbox" id="vipOnly" onchange="loadUsers()"> VIP only
+          </label>
+          <button class="btn btn-ghost" onclick="loadUsers()" style="padding:6px 14px;font-size:12px">🔄</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Пользователь</th>
+              <th>Telegram</th>
+              <th>Демо-баланс</th>
+              <th>Сделок</th>
+              <th>Статус</th>
+              <th>Регистрация</th>
+              <th>Действия</th>
+            </tr>
+          </thead>
+          <tbody id="usersTable">
+            <tr class="loading-row"><td colspan="7"><span class="spinner"></span></td></tr>
+          </tbody>
+        </table>
+        <div class="pagination" id="usersPagination"></div>
+      </div>
+    </div>
+
+    <!-- ═══ TRADES ════════════════════════════════════════════ -->
+    <div class="page" id="page-trades">
+      <div class="table-wrap">
+        <div class="table-header">
+          <h3>⚡ Сделки</h3>
+          <input class="tb-input" id="tradesUserFilter" placeholder="User ID (опционально)..."
+                 style="width:260px" oninput="debounce(loadTrades, 400)()">
+          <button class="btn btn-ghost" onclick="loadTrades()" style="padding:6px 14px;font-size:12px">🔄</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Пользователь</th>
+              <th>Символ</th>
+              <th>Биржи</th>
+              <th>Сумма</th>
+              <th>Net Profit</th>
+              <th>Комиссия</th>
+              <th>Дата</th>
+            </tr>
+          </thead>
+          <tbody id="tradesTable">
+            <tr class="loading-row"><td colspan="8"><span class="spinner"></span></td></tr>
+          </tbody>
+        </table>
+        <div class="pagination" id="tradesPagination"></div>
+      </div>
+    </div>
+
+    <!-- ═══ VIP MANAGEMENT ═══════════════════════════════════ -->
+    <div class="page" id="page-vip">
+      <div class="panel">
+        <div class="panel-title">👑 Выдать VIP вручную</div>
+        <div class="form-grid">
+          <div class="form-row">
+            <label>User ID или Telegram ID</label>
+            <input class="inp" id="vipUserId" placeholder="uuid или числовой tg_id">
+          </div>
+          <div class="form-row">
+            <label>Тариф</label>
+            <select class="inp" id="vipPlan">
+              <option value="week">Неделя (7 дней)</option>
+              <option value="month" selected>Месяц (30 дней)</option>
+              <option value="year">Год (365 дней)</option>
+              <option value="lifetime">Lifetime (100 лет)</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label>Кастомных дней (0 = авто)</label>
+            <input class="inp" id="vipDays" type="number" value="0" min="0" max="36500">
+          </div>
+        </div>
+        <div style="margin-top:14px;display:flex;gap:10px">
+          <button class="btn btn-primary" onclick="grantVip()">👑 Выдать VIP</button>
+          <button class="btn btn-danger" onclick="revokeVip()">❌ Отозвать VIP</button>
+        </div>
+      </div>
+
+      <!-- VIP быстрый поиск -->
+      <div class="panel">
+        <div class="panel-title">🔍 Быстрая проверка пользователя</div>
+        <div style="display:flex;gap:10px">
+          <input class="inp" id="quickUserId" placeholder="User ID / Telegram ID..." style="flex:1">
+          <button class="btn btn-ghost" onclick="quickLookup()">Найти</button>
+        </div>
+        <div id="quickResult" style="margin-top:14px"></div>
+      </div>
+
+      <!-- Список VIP пользователей -->
+      <div class="table-wrap">
+        <div class="table-header">
+          <h3>👑 Активные VIP</h3>
+          <button class="btn btn-ghost" onclick="loadVipUsers()" style="padding:6px 14px;font-size:12px">🔄</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Пользователь</th>
+              <th>Тариф</th>
+              <th>Осталось дней</th>
+              <th>Источник</th>
+              <th>Действия</th>
+            </tr>
+          </thead>
+          <tbody id="vipTable">
+            <tr class="loading-row"><td colspan="5"><span class="spinner"></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ═══ BALANCE MANAGEMENT ═══════════════════════════════ -->
+    <div class="page" id="page-balance">
+      <div class="panel">
+        <div class="panel-title">💰 Установить баланс</div>
+        <div class="form-grid">
+          <div class="form-row">
+            <label>User ID или Telegram ID</label>
+            <input class="inp" id="balUserId" placeholder="uuid или числовой tg_id">
+          </div>
+          <div class="form-row">
+            <label>Сумма (USD)</label>
+            <input class="inp" id="balAmount" type="number" value="3000" min="0" step="100">
+          </div>
+          <div class="form-row">
+            <label>Тип баланса</label>
+            <select class="inp" id="balType">
+              <option value="demo" selected>Демо-баланс</option>
+              <option value="real">Реальный баланс (PROD)</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-top:14px">
+          <button class="btn btn-primary" onclick="setBalance()">💾 Установить баланс</button>
+        </div>
+        <div style="margin-top:10px;font-size:11px;color:var(--muted)">
+          ⚠️ Изменение реального баланса работает только в PRODUCTION режиме.
+          В DEMO_MODE используется демо-баланс.
+        </div>
+      </div>
+
+      <!-- Быстрые пресеты -->
+      <div class="panel">
+        <div class="panel-title">⚡ Быстрые пресеты</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-ghost" onclick="presetBalance(1000)">$1,000</button>
+          <button class="btn btn-ghost" onclick="presetBalance(3000)">$3,000</button>
+          <button class="btn btn-ghost" onclick="presetBalance(10000)">$10,000</button>
+          <button class="btn btn-ghost" onclick="presetBalance(50000)">$50,000</button>
+          <button class="btn btn-ghost" onclick="presetBalance(100000)">$100,000</button>
+          <button class="btn btn-danger" onclick="presetBalance(0)">Обнулить</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ CONFIG ════════════════════════════════════════════ -->
+    <div class="page" id="page-config">
+      <div class="config-tabs">
+        <div class="cfg-tab active" onclick="showCfgTab('platform', this)">Платформа</div>
+        <div class="cfg-tab" onclick="showCfgTab('network', this)">Сетевые комиссии</div>
+        <div class="cfg-tab" onclick="showCfgTab('exchange', this)">Биржи (taker fee)</div>
+      </div>
+
+      <!-- Platform config -->
+      <div id="cfgPlatform" class="panel">
+        <div class="panel-title">⚙️ Настройки платформы</div>
+        <div class="form-grid" id="platformFields"></div>
+        <div style="margin-top:16px;display:flex;gap:10px">
+          <button class="btn btn-primary" onclick="saveConfig('platform')">💾 Сохранить</button>
+          <button class="btn btn-ghost" onclick="loadConfig()">🔄 Сбросить</button>
+        </div>
+        <div style="margin-top:8px;font-size:11px;color:var(--muted)">
+          ⚠️ Изменения живут в памяти сервера до рестарта.
+          Добавьте персистентность через таблицу settings в БД.
+        </div>
+      </div>
+
+      <!-- Network fees -->
+      <div id="cfgNetwork" class="panel" style="display:none">
+        <div class="panel-title">🌐 Withdrawal fees по сетям (USD)</div>
+        <div class="fee-grid" id="networkFeeGrid"></div>
+        <div style="margin-top:16px;display:flex;gap:10px">
+          <button class="btn btn-primary" onclick="saveConfig('network')">💾 Сохранить</button>
+          <button class="btn btn-ghost" onclick="loadConfig()">🔄 Сбросить</button>
+        </div>
+      </div>
+
+      <!-- Exchange fees -->
+      <div id="cfgExchange" class="panel" style="display:none">
+        <div class="panel-title">🏦 Taker fees бирж (%)</div>
+        <div class="fee-grid" id="exchangeFeeGrid"></div>
+        <div style="margin-top:16px;display:flex;gap:10px">
+          <button class="btn btn-primary" onclick="saveConfig('exchange')">💾 Сохранить</button>
+          <button class="btn btn-ghost" onclick="loadConfig()">🔄 Сбросить</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ BROADCAST ═══════════════════════════════════════ -->
+    <div class="page" id="page-broadcast">
+      <div class="panel">
+        <div class="panel-title">📣 Рассылка сообщений</div>
+        <div class="form-row" style="margin-bottom:12px">
+          <label>Тип сообщения</label>
+          <select class="inp" id="broadcastType" style="max-width:200px">
+            <option value="info">ℹ️ Информация</option>
+            <option value="warn">⚠️ Предупреждение</option>
+            <option value="alert">🚨 Алерт</option>
+          </select>
+        </div>
+        <div class="form-row" style="margin-bottom:14px">
+          <label>Текст сообщения</label>
+          <textarea class="broadcast-box" id="broadcastMsg"
+            placeholder="Текст сообщения для всех пользователей..."></textarea>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <button class="btn btn-primary" onclick="sendBroadcast()">📤 Отправить</button>
+          <span style="font-size:11px;color:var(--muted)">
+            TODO: интеграция с Telegram Bot API (TG_BOT_TOKEN)
+          </span>
+        </div>
+      </div>
+
+      <!-- Предустановленные шаблоны -->
+      <div class="panel">
+        <div class="panel-title">📝 Шаблоны</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <button class="btn btn-ghost" style="text-align:left;justify-content:flex-start"
+            onclick="setTemplate('maintenance')">
+            🔧 Техническое обслуживание (плановые работы)
+          </button>
+          <button class="btn btn-ghost" style="text-align:left"
+            onclick="setTemplate('newfeature')">
+            🚀 Новая функция доступна
+          </button>
+          <button class="btn btn-ghost" style="text-align:left"
+            onclick="setTemplate('promo')">
+            🎁 Промо-акция / скидка на VIP
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+</div><!-- /layout -->
+
+<!-- ── USER DETAIL MODAL ── -->
+<div class="modal-bg" id="userModal">
+  <div class="modal">
+    <h3 id="userModalTitle">Пользователь</h3>
+    <div id="userModalBody"></div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('userModal')">Закрыть</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── TOAST ── -->
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════════════
+let API_BASE = localStorage.getItem('nexarb_api') || 'http://localhost:8000';
+let ADMIN_TOKEN = localStorage.getItem('nexarb_admin_token') || '';
+let _config = {};
+let _usersPage = 1;
+let _tradesPage = 1;
+
+// ═══════════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  const saved = localStorage.getItem('nexarb_admin_token') || '';
+  if (saved) document.getElementById('adminTokenInput').value = saved;
+
+  const savedUrl = localStorage.getItem('nexarb_api') || '';
+  if (savedUrl) API_BASE = savedUrl;
+
+  document.getElementById('apiUrl').textContent = API_BASE;
+
+  if (ADMIN_TOKEN) connectApi();
+});
+
+function saveToken(val) {
+  ADMIN_TOKEN = val.trim();
+  localStorage.setItem('nexarb_admin_token', ADMIN_TOKEN);
+}
+
+async function connectApi() {
+  const tok = document.getElementById('adminTokenInput').value.trim();
+  if (tok) { ADMIN_TOKEN = tok; localStorage.setItem('nexarb_admin_token', tok); }
+
+  try {
+    const r = await api('/health', 'GET', null, false);
+    const dot  = document.getElementById('connDot');
+    const text = document.getElementById('connText');
+    if (r && r.status === 'ok') {
+      dot.className = 'dot ok';
+      text.textContent = r.demo ? 'DEMO' : 'PROD';
+      text.style.color = r.demo ? 'var(--gold)' : 'var(--green)';
+
+      document.getElementById('modeLabel').textContent = r.demo ? 'DEMO' : 'PROD';
+      document.getElementById('modeLabel').className = 'mode-badge ' + (r.demo ? 'mode-demo' : 'mode-prod');
+
+      toast('Подключено к серверу v' + (r.version || '?'), 'ok');
+      loadDashboard();
+      loadConfig();
+    } else {
+      throw new Error('bad response');
+    }
+  } catch(e) {
+    document.getElementById('connDot').className = 'dot err';
+    document.getElementById('connText').textContent = 'ошибка';
+    document.getElementById('connText').style.color = 'var(--red)';
+    toast('Ошибка подключения: ' + e.message, 'err');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  API HELPER
+// ═══════════════════════════════════════════════════════════════
+async function api(path, method = 'GET', body = null, withToken = true) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (withToken && ADMIN_TOKEN) headers['X-Admin-Token'] = ADMIN_TOKEN;
+
+  const opts = { method, headers };
+  if (body) opts.body = JSON.stringify(body);
+
+  try {
+    const r = await fetch(API_BASE + path, opts);
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+    return data;
+  } catch(e) {
+    throw e;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  NAVIGATION
+// ═══════════════════════════════════════════════════════════════
+const PAGE_TITLES = {
+  dashboard: 'Дашборд',
+  users:     'Пользователи',
+  trades:    'Сделки',
+  vip:       'VIP управление',
+  balance:   'Управление балансами',
+  config:    'Конфигурация',
+  broadcast: 'Рассылка',
+};
+
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name)?.classList.add('active');
+  document.getElementById('pageTitle').textContent = PAGE_TITLES[name] || name;
+
+  // Highlight nav
+  document.querySelectorAll('.nav-item').forEach(n => {
+    if (n.getAttribute('onclick')?.includes(`'${name}'`)) n.classList.add('active');
+  });
+
+  // Lazy load
+  if (name === 'users')  loadUsers();
+  if (name === 'trades') loadTrades();
+  if (name === 'vip')    loadVipUsers();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  DASHBOARD
+// ═══════════════════════════════════════════════════════════════
+async function loadDashboard() {
+  try {
+    const data = await api('/api/admin/stats');
+    renderStats(data);
+  } catch(e) {
+    toast('Ошибка загрузки статистики: ' + e.message, 'err');
+  }
+}
+
+function renderStats(d) {
+  const cards = [
+    { k:'Пользователей',    v: fmt(d.total_users),        d: `+${d.new_users_24h} за 24ч`, color:'var(--cyan)' },
+    { k:'Активных 24ч',     v: fmt(d.active_users_24h),   d: 'уникальных', color:'var(--purple)' },
+    { k:'VIP',              v: fmt(d.vip_users),           d: 'активных подписок', color:'var(--gold)' },
+    { k:'Всего сделок',     v: fmt(d.total_trades),        d: `${d.trades_24h} за 24ч`, color:'var(--green)' },
+    { k:'Объём 24ч',        v: '$'+fmtM(d.volume_24h),    d: `итого $${fmtM(d.total_volume)}`, color:'var(--cyan)' },
+    { k:'Комиссии 24ч',     v: '$'+fmtN(d.fees_24h),      d: `неделя $${fmtN(d.fees_7d)}`, color:'var(--green)' },
+    { k:'Комиссии итого',   v: '$'+fmtN(d.platform_fees), d: 'за всё время', color:'var(--gold)' },
+    { k:'Profit платформы', v: '$'+fmtN(d.total_profit),  d: 'net для юзеров', color:'var(--purple)' },
+  ];
+  document.getElementById('statsGrid').innerHTML = cards.map(c => `
+    <div class="stat-card" style="--accent:${c.color}">
+      <div class="sk">${c.k}</div>
+      <div class="sv" style="--sv-color:${c.color}">${c.v}</div>
+      <div class="sd">${c.d}</div>
+    </div>
+  `).join('');
+
+  // Top symbols
+  document.getElementById('topSymbols').innerHTML = (d.top_symbols || []).map(s => `
+    <tr>
+      <td class="td-name">${s.symbol}</td>
+      <td class="mono">${s.trades}</td>
+      <td class="mono ${s.profit>=0?'g':'r'}">${s.profit>=0?'+':''}$${fmtN(s.profit)}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="3" style="color:var(--muted);text-align:center">Нет данных</td></tr>';
+
+  // Top exchanges
+  document.getElementById('topExchanges').innerHTML = (d.top_exchanges || []).map(e => `
+    <tr>
+      <td class="td-name">${e.exchange}</td>
+      <td class="mono c">${e.trades}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="2" style="color:var(--muted);text-align:center">Нет данных</td></tr>';
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  USERS
+// ═══════════════════════════════════════════════════════════════
+async function loadUsers(page = 1) {
+  _usersPage = page;
+  const search  = document.getElementById('userSearch').value;
+  const vipOnly = document.getElementById('vipOnly').checked;
+  let url = `/api/admin/users?page=${page}`;
+  if (search) url += `&search=${encodeURIComponent(search)}`;
+  if (vipOnly) url += '&vip=true';
+
+  document.getElementById('usersTable').innerHTML =
+    '<tr class="loading-row"><td colspan="7"><span class="spinner"></span></td></tr>';
+  try {
+    const data = await api(url);
+    renderUsers(data);
+  } catch(e) {
+    toast('Ошибка: ' + e.message, 'err');
+  }
+}
+
+function renderUsers(data) {
+  const rows = data.items || [];
+  document.getElementById('usersTable').innerHTML = rows.length ? rows.map(u => {
+    const isVip = !!u.vip_plan;
+    const daysLeft = u.vip_expires
+      ? Math.max(0, Math.floor((u.vip_expires - Date.now()/1000) / 86400))
+      : 0;
+    return `<tr>
+      <td>
+        <div class="td-name">${esc(u.tg_first_name || 'Без имени')}</div>
+        <div class="td-id">${u.id.slice(0,8)}...</div>
+      </td>
+      <td class="mono" style="color:var(--text2)">@${esc(u.tg_username||'-')} <span style="color:var(--muted)">#${u.tg_id}</span></td>
+      <td class="mono g">$${fmtN(u.demo_balance||0)}</td>
+      <td class="mono">${u.trade_count||0}</td>
+      <td>
+        ${isVip
+          ? `<span class="badge badge-vip">👑 ${u.vip_plan} · ${daysLeft}д</span>`
+          : `<span class="badge badge-free">FREE</span>`}
+      </td>
+      <td class="mono" style="color:var(--muted)">${fmtDate(u.created_at)}</td>
+      <td>
+        <div style="display:flex;gap:4px">
+          <button class="act-btn" onclick="openUserModal('${u.id}')">Детали</button>
+          <button class="act-btn success" onclick="quickGrantVip('${u.id}')">VIP</button>
+          <button class="act-btn" onclick="quickSetBalance('${u.id}')">💰</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="7" class="empty-state"><div class="ei">👤</div>Нет пользователей</td></tr>';
+
+  renderPagination('usersPagination', data, loadUsers);
+}
+
+async function openUserModal(userId) {
+  try {
+    const d = await api(`/api/admin/users/${userId}`);
+    const u = d.user;
+    const b = d.balance;
+    const v = d.vip;
+    const s = d.stats;
+
+    document.getElementById('userModalTitle').textContent =
+      `${u.tg_first_name || 'Пользователь'} @${u.tg_username || '—'}`;
+
+    document.getElementById('userModalBody').innerHTML = `
+      <div class="user-detail">
+        <div>
+          <div class="ud-label">UUID</div>
+          <div class="ud-val" style="font-size:10px;color:var(--muted)">${u.id}</div>
+        </div>
+        <div>
+          <div class="ud-label">Telegram ID</div>
+          <div class="ud-val c">${u.tg_id}</div>
+        </div>
+        <div>
+          <div class="ud-label">Демо-баланс</div>
+          <div class="ud-val g">$${fmtN(b.demo_balance)}</div>
+        </div>
+        <div>
+          <div class="ud-label">Реальный баланс</div>
+          <div class="ud-val">$${fmtN(b.usd_balance)}</div>
+        </div>
+        <div>
+          <div class="ud-label">Статус VIP</div>
+          <div class="ud-val">${v.is_vip ? `<span class="badge badge-vip">👑 ${v.plan} · ${v.days_left} дн.</span>` : '<span class="badge badge-free">FREE</span>'}</div>
+        </div>
+        <div>
+          <div class="ud-label">Сделок / Win Rate</div>
+          <div class="ud-val">${s.total_trades} / <span class="g">${s.win_rate}%</span></div>
+        </div>
+        <div>
+          <div class="ud-label">Общий профит</div>
+          <div class="ud-val ${s.total_profit>=0?'g':'r'}">${s.total_profit>=0?'+':''}$${fmtN(s.total_profit)}</div>
+        </div>
+        <div>
+          <div class="ud-label">Ref-код</div>
+          <div class="ud-val c">${u.ref_code}</div>
+        </div>
+      </div>
+      <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="quickGrantVip('${u.id}');closeModal('userModal')">👑 Дать VIP месяц</button>
+        <button class="btn btn-warn" onclick="quickSetBalance('${u.id}');closeModal('userModal')">💰 Установить баланс</button>
+        <button class="btn btn-danger" onclick="revokeVipFor('${u.id}')">❌ Отозвать VIP</button>
+      </div>
+    `;
+    document.getElementById('userModal').classList.add('open');
+  } catch(e) {
+    toast('Ошибка загрузки пользователя: ' + e.message, 'err');
+  }
+}
+
+function quickGrantVip(userId) {
+  document.getElementById('vipUserId').value = userId;
+  document.getElementById('vipPlan').value = 'month';
+  document.getElementById('vipDays').value = '0';
+  showPage('vip');
+  toast('User ID заполнен. Нажми «Выдать VIP»', '');
+}
+
+function quickSetBalance(userId) {
+  document.getElementById('balUserId').value = userId;
+  showPage('balance');
+  toast('User ID заполнен. Введи сумму и нажми «Установить»', '');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  TRADES
+// ═══════════════════════════════════════════════════════════════
+async function loadTrades(page = 1) {
+  _tradesPage = page;
+  const uid = document.getElementById('tradesUserFilter').value.trim();
+  let url = `/api/admin/trades?page=${page}`;
+  if (uid) url += `&user_id=${encodeURIComponent(uid)}`;
+
+  document.getElementById('tradesTable').innerHTML =
+    '<tr class="loading-row"><td colspan="8"><span class="spinner"></span></td></tr>';
+  try {
+    const data = await api(url);
+    renderTrades(data);
+  } catch(e) {
+    toast('Ошибка: ' + e.message, 'err');
+  }
+}
+
+function renderTrades(data) {
+  const rows = data.items || [];
+  document.getElementById('tradesTable').innerHTML = rows.length ? rows.map(t => `
+    <tr>
+      <td class="mono" style="color:var(--muted);font-size:10px">${t.id.slice(0,8)}...</td>
+      <td style="max-width:120px">
+        <div style="font-size:11px;color:var(--text2)">${esc(t.tg_first_name||'-')}</div>
+        <div class="td-id">${esc(t.tg_username||'-')}</div>
+      </td>
+      <td class="mono c">${t.symbol}</td>
+      <td class="mono" style="font-size:11px;color:var(--text2)">${t.buy_exchange}→${t.sell_exchange}</td>
+      <td class="mono">$${fmtN(t.amount)}</td>
+      <td class="mono ${t.net_profit>=0?'g':'r'}">${t.net_profit>=0?'+':''}$${fmtN(t.net_profit)}</td>
+      <td class="mono gold">$${fmtN(t.fee_platform)}</td>
+      <td class="mono" style="color:var(--muted)">${fmtDate(t.created_at)}</td>
+    </tr>
+  `).join('') : '<tr><td colspan="8" class="empty-state"><div class="ei">📭</div>Нет сделок</td></tr>';
+
+  renderPagination('tradesPagination', data, loadTrades);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  VIP MANAGEMENT
+// ═══════════════════════════════════════════════════════════════
+async function grantVip() {
+  const userId = document.getElementById('vipUserId').value.trim();
+  const plan   = document.getElementById('vipPlan').value;
+  const days   = parseInt(document.getElementById('vipDays').value) || 0;
+  if (!userId) { toast('Введите User ID', 'warn'); return; }
+
+  try {
+    await api('/api/admin/users/vip', 'POST', { user_id: userId, plan, days });
+    toast(`✅ VIP "${plan}" выдан успешно!`, 'ok');
+    loadVipUsers();
+  } catch(e) {
+    toast('Ошибка: ' + e.message, 'err');
+  }
+}
+
+async function revokeVip() {
+  const userId = document.getElementById('vipUserId').value.trim();
+  if (!userId) { toast('Введите User ID', 'warn'); return; }
+  if (!confirm('Отозвать VIP у этого пользователя?')) return;
+  await revokeVipFor(userId);
+}
+
+async function revokeVipFor(userId) {
+  try {
+    await api(`/api/admin/users/${userId}/vip`, 'DELETE');
+    toast('VIP отозван', 'ok');
+    loadVipUsers();
+  } catch(e) {
+    toast('Ошибка: ' + e.message, 'err');
+  }
+}
+
+async function loadVipUsers() {
+  document.getElementById('vipTable').innerHTML =
+    '<tr class="loading-row"><td colspan="5"><span class="spinner"></span></td></tr>';
+  try {
+    const data = await api('/api/admin/users?vip=true&per_page=50');
+    const rows = data.items || [];
+    document.getElementById('vipTable').innerHTML = rows.length ? rows.map(u => {
+      const daysLeft = u.vip_expires
+        ? Math.max(0, Math.floor((u.vip_expires - Date.now()/1000) / 86400))
+        : 0;
+      return `<tr>
+        <td>
+          <div class="td-name">${esc(u.tg_first_name||'-')}</div>
+          <div class="td-id">@${esc(u.tg_username||'—')} · ${u.id.slice(0,8)}...</div>
+        </td>
+        <td><span class="badge badge-vip">👑 ${u.vip_plan||'?'}</span></td>
+        <td class="mono ${daysLeft < 3 ? 'r' : daysLeft < 7 ? 'gold' : 'g'}">${daysLeft} дн.</td>
+        <td class="mono" style="color:var(--muted)">—</td>
+        <td>
+          <div style="display:flex;gap:4px">
+            <button class="act-btn" onclick="openUserModal('${u.id}')">Детали</button>
+            <button class="act-btn danger" onclick="revokeVipFor('${u.id}')">Отозвать</button>
+          </div>
+        </td>
+      </tr>`;
+    }).join('') : '<tr><td colspan="5" class="empty-state"><div class="ei">👑</div>Нет VIP пользователей</td></tr>';
+  } catch(e) {
+    toast('Ошибка: ' + e.message, 'err');
+  }
+}
+
+async function quickLookup() {
+  const uid = document.getElementById('quickUserId').value.trim();
+  if (!uid) return;
+  try {
+    const d = await api(`/api/admin/users/${uid}`);
+    const u = d.user; const v = d.vip; const b = d.balance; const s = d.stats;
+    document.getElementById('quickResult').innerHTML = `
+      <div class="panel" style="margin:0">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div>
+            <div style="font-size:15px;font-weight:700">${esc(u.tg_first_name||'-')}
+              <span style="color:var(--text2);font-size:12px">@${esc(u.tg_username||'—')}</span>
+            </div>
+            <div class="mono" style="font-size:10px;color:var(--muted)">${u.id}</div>
+          </div>
+          <div style="margin-left:auto;display:flex;gap:8px">
+            ${v.is_vip ? `<span class="badge badge-vip">👑 ${v.plan} · ${v.days_left}д</span>` : '<span class="badge badge-free">FREE</span>'}
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px">
+          <div><div class="ud-label">Демо $</div><div class="ud-val g">$${fmtN(b.demo_balance)}</div></div>
+          <div><div class="ud-label">Сделок</div><div class="ud-val">${s.total_trades}</div></div>
+          <div><div class="ud-label">Win rate</div><div class="ud-val g">${s.win_rate}%</div></div>
+          <div><div class="ud-label">Профит</div><div class="ud-val ${s.total_profit>=0?'g':'r'}">${s.total_profit>=0?'+':''}$${fmtN(s.total_profit)}</div></div>
+        </div>
+        <div style="margin-top:10px;display:flex;gap:8px">
+          <button class="btn btn-primary" onclick="quickGrantVip('${u.id}')">👑 Дать VIP</button>
+          <button class="btn btn-warn" onclick="quickSetBalance('${u.id}')">💰 Баланс</button>
+          <button class="btn btn-danger" onclick="revokeVipFor('${u.id}')">❌ Отозвать VIP</button>
+        </div>
+      </div>
+    `;
+  } catch(e) {
+    document.getElementById('quickResult').innerHTML =
+      `<div style="color:var(--red);font-size:13px">Пользователь не найден: ${esc(e.message)}</div>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  BALANCE
+// ═══════════════════════════════════════════════════════════════
+async function setBalance() {
+  const userId  = document.getElementById('balUserId').value.trim();
+  const balance = parseFloat(document.getElementById('balAmount').value);
+  const isDemo  = document.getElementById('balType').value === 'demo';
+  if (!userId)          { toast('Введите User ID', 'warn'); return; }
+  if (isNaN(balance) || balance < 0) { toast('Неверная сумма', 'warn'); return; }
+
+  try {
+    await api('/api/admin/users/balance', 'POST', {
+      user_id: userId, balance, demo: isDemo
+    });
+    toast(`✅ Баланс установлен: $${balance}`, 'ok');
+  } catch(e) {
+    toast('Ошибка: ' + e.message, 'err');
+  }
+}
+
+function presetBalance(amount) {
+  document.getElementById('balAmount').value = amount;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  CONFIG
+// ═══════════════════════════════════════════════════════════════
+async function loadConfig() {
+  try {
+    const data = await api('/api/admin/config');
+    _config = data;
+    renderPlatformConfig(data.config);
+    renderNetworkFees(data.network_fees);
+    renderExchangeFees(data.exchange_fees);
+  } catch(e) {
+    toast('Ошибка загрузки конфига: ' + e.message, 'err');
+  }
+}
+
+const PLATFORM_LABELS = {
+  fee_free:           'Комиссия FREE (%)',
+  fee_vip:            'Комиссия VIP (%)',
+  free_trades_max:    'Лимит сделок FREE/день',
+  free_exchanges_max: 'Лимит бирж FREE',
+  demo_start_balance: 'Старт баланс DEMO ($)',
+  min_trade:          'Мин. сумма сделки ($)',
+  max_trade:          'Макс. сумма сделки ($)',
+  spread_min:         'Мин. спред (%)',
+  spread_max:         'Макс. спред (%)',
+};
+
+function renderPlatformConfig(cfg) {
+  if (!cfg) return;
+  document.getElementById('platformFields').innerHTML = Object.entries(cfg).map(([k, v]) => `
+    <div class="form-row">
+      <label>${PLATFORM_LABELS[k] || k}</label>
+      <input class="inp" id="cfg_${k}" type="number" step="any" value="${v}">
+    </div>
+  `).join('');
+}
+
+function renderNetworkFees(fees) {
+  if (!fees) return;
+  document.getElementById('networkFeeGrid').innerHTML = Object.entries(fees).map(([coin, fee]) => `
+    <div class="fee-item">
+      <label>${coin}</label>
+      <input id="nfee_${coin}" type="number" step="any" value="${fee}" placeholder="USD">
+    </div>
+  `).join('');
+}
+
+function renderExchangeFees(fees) {
+  if (!fees) return;
+  document.getElementById('exchangeFeeGrid').innerHTML = Object.entries(fees).map(([ex, fee]) => `
+    <div class="fee-item">
+      <label>${ex}</label>
+      <input id="efee_${ex}" type="number" step="any" value="${fee}" placeholder="0.001">
+    </div>
+  `).join('');
+}
+
+async function saveConfig(section) {
+  const body = {};
+
+  if (section === 'platform') {
+    const cfg = {};
+    Object.keys(PLATFORM_LABELS).forEach(k => {
+      const el = document.getElementById('cfg_' + k);
+      if (el) cfg[k] = parseFloat(el.value);
+    });
+    // Конвертируем % в доли если нужно
+    if (cfg.fee_free > 1) cfg.fee_free = cfg.fee_free / 100;
+    if (cfg.fee_vip  > 1) cfg.fee_vip  = cfg.fee_vip  / 100;
+    if (cfg.spread_min > 100) cfg.spread_min = 0.01;
+    Object.assign(body, cfg);
+  }
+
+  if (section === 'network') {
+    const nf = {};
+    document.querySelectorAll('[id^="nfee_"]').forEach(el => {
+      nf[el.id.replace('nfee_', '')] = parseFloat(el.value);
+    });
+    body.network_fees = nf;
+  }
+
+  if (section === 'exchange') {
+    const ef = {};
+    document.querySelectorAll('[id^="efee_"]').forEach(el => {
+      ef[el.id.replace('efee_', '')] = parseFloat(el.value);
+    });
+    body.exchange_fees = ef;
+  }
+
+  try {
+    await api('/api/admin/config', 'POST', body);
+    toast('✅ Конфиг сохранён', 'ok');
+    await loadConfig();
+  } catch(e) {
+    toast('Ошибка: ' + e.message, 'err');
+  }
+}
+
+function showCfgTab(name, el) {
+  document.querySelectorAll('.cfg-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('cfgPlatform').style.display = name === 'platform' ? '' : 'none';
+  document.getElementById('cfgNetwork').style.display  = name === 'network'  ? '' : 'none';
+  document.getElementById('cfgExchange').style.display = name === 'exchange' ? '' : 'none';
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  BROADCAST
+// ═══════════════════════════════════════════════════════════════
+const TEMPLATES = {
+  maintenance: '🔧 Планируются технические работы.\nСервис будет временно недоступен с XX:00 до XX:30 UTC.\nПриносим извинения за неудобства.',
+  newfeature:  '🚀 Новая функция доступна!\n\nМы запустили [название]. Попробуйте прямо сейчас — зайдите в бот и проверьте обновления.',
+  promo:       '🎁 Акция для наших пользователей!\n\n-30% на VIP подписку только сегодня.\nИспользуйте промокод: NEXARB30\n\nПредложение действует до конца дня.',
+};
+
+function setTemplate(name) {
+  document.getElementById('broadcastMsg').value = TEMPLATES[name] || '';
+}
+
+async function sendBroadcast() {
+  const msg  = document.getElementById('broadcastMsg').value.trim();
+  const type = document.getElementById('broadcastType').value;
+  if (!msg) { toast('Введите сообщение', 'warn'); return; }
+  if (!confirm(`Отправить сообщение всем пользователям?\n\n"${msg.slice(0,100)}..."`)) return;
+
+  try {
+    const r = await api('/api/admin/broadcast', 'POST', { message: msg, type });
+    toast(`✅ Broadcast поставлен в очередь (${r.queued} получателей)`, 'ok');
+  } catch(e) {
+    toast('Ошибка: ' + e.message, 'err');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  UTILS
+// ═══════════════════════════════════════════════════════════════
+function fmt(n) { return (n||0).toLocaleString('ru'); }
+function fmtN(n) { return (+n||0).toFixed(2); }
+function fmtM(n) {
+  n = +n||0;
+  if (n >= 1e9) return (n/1e9).toFixed(2)+'B';
+  if (n >= 1e6) return (n/1e6).toFixed(2)+'M';
+  if (n >= 1e3) return (n/1e3).toFixed(1)+'K';
+  return n.toFixed(2);
+}
+function fmtDate(ts) {
+  if (!ts) return '—';
+  return new Date(ts * 1000).toLocaleString('ru', {
+    day:'2-digit', month:'2-digit', year:'2-digit',
+    hour:'2-digit', minute:'2-digit'
+  });
+}
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+let _toastTimer = null;
+function toast(msg, type = '') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className   = 'show ' + type;
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => el.classList.remove('show'), 3500);
+}
+
+function closeModal(id) {
+  document.getElementById(id)?.classList.remove('open');
+}
+document.addEventListener('click', e => {
+  if (e.target.classList.contains('modal-bg')) {
+    e.target.classList.remove('open');
+  }
+});
+
+function renderPagination(containerId, data, loadFn) {
+  const el = document.getElementById(containerId);
+  if (!el || data.pages <= 1) { if(el) el.innerHTML=''; return; }
+  let html = '';
+  const p = data.page;
+  for (let i = 1; i <= data.pages; i++) {
+    if (i === 1 || i === data.pages || Math.abs(i - p) <= 2) {
+      html += `<button class="pg-btn ${i===p?'active':''}" onclick="(${loadFn.name})(${i})">${i}</button>`;
+    } else if (Math.abs(i - p) === 3) {
+      html += `<span style="color:var(--muted);padding:0 4px">…</span>`;
+    }
+  }
+  html += `<span class="pg-info">${data.total} записей</span>`;
+  el.innerHTML = html;
+}
+
+let _debounceTimers = {};
+function debounce(fn, delay) {
+  return function(...args) {
+    clearTimeout(_debounceTimers[fn.name]);
+    _debounceTimers[fn.name] = setTimeout(() => fn.apply(this, args), delay);
+  };
+}
+
+// Auto-refresh stats every 30s
+setInterval(() => {
+  if (document.getElementById('page-dashboard').classList.contains('active')) {
+    loadDashboard();
+  }
+}, 30000);
+</script>
+</body>
+</html>

@@ -116,7 +116,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);overflow:hid
 
 /* BOTTOM NAV */
 .bnav{
-  flex-shrink:0;display:grid;grid-template-columns:repeat(5,1fr);
+  flex-shrink:0;display:grid;grid-template-columns:repeat(6,1fr);
   background:rgba(6,13,24,0.97);backdrop-filter:blur(20px);
   border-top:1px solid var(--border);
   padding:6px 2px calc(6px + env(safe-area-inset-bottom,0px));
@@ -438,16 +438,16 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);overflow:hid
     </div>
     <div class="hdr-stats">
       <div class="hdr-stat">
-        <div class="hdr-stat-lbl">Баланс</div>
+        <div class="hdr-stat-lbl" id="hStatLbl1" data-i18n="balance">Баланс</div>
         <div class="hdr-stat-val c" id="hBalancе">$3,240</div>
       </div>
       <div class="hdr-stat">
-        <div class="hdr-stat-lbl">Профит / сегодня</div>
+        <div class="hdr-stat-lbl" id="hStatLbl2" data-i18n="profit_today">Профит / сегодня</div>
         <div class="hdr-stat-val g" id="hProfit">+$0.00</div>
       </div>
       <div class="hdr-stat">
-        <div class="hdr-stat-lbl">Сигналов</div>
-        <div class="hdr-stat-val go" id="hSigCount">—</div>
+        <div class="hdr-stat-lbl" id="hStatLbl3" data-i18n="signals_count">Сигналов</div>
+        <div class="hdr-stat-val go" id="hSigCount"><span id="wsBadge" style="font-size:8px;font-family:var(--mono)">● DEMO</span></div>
       </div>
     </div>
   </div>
@@ -504,11 +504,22 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);overflow:hid
         <div class="slbl-txt">Арбитражные сигналы</div>
         <div class="slbl-r" id="sigCount">—</div>
       </div>
-
-      <!-- AUTO-TRADE PANEL (VIP only) -->
-      <div id="autoPanelWrap"></div>
-
       <div id="sigList"></div>
+    </div>
+
+    <!-- PAGE: AUTO-TRADE (accessible from VIP/Profile) -->
+    <div class="pg" id="pg-auto">
+      <div class="slbl">
+        <div class="slbl-dot" style="background:var(--purple)"></div>
+        <div class="slbl-txt" data-i18n="auto_title">🤖 Авто-Торговля</div>
+        <div class="slbl-r" id="autoStatusBadge">—</div>
+      </div>
+      <div id="autoPanelWrap"></div>
+      <div id="autoStatsList"></div>
+      <!-- Back button -->
+      <div style="padding:16px 0 8px">
+        <button onclick="showPg('vip')" style="width:100%;padding:10px;border-radius:9px;border:1px solid var(--border2);background:var(--bg2);color:var(--text2);font-family:var(--font);font-size:12px;cursor:pointer">← Назад к VIP</button>
+      </div>
     </div>
     <div class="pg" id="pg-scanner">
       <div class="slbl">
@@ -578,6 +589,17 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);overflow:hid
       <button class="btn-buy" id="buyBtn" onclick="doBuy()">👑 Активировать VIP — $29/мес</button>
       <div style="text-align:center;font-size:9px;color:var(--muted);margin-top:8px">Оплата: USDT · TON · BTC · Карта · Отмена в любой момент</div>
 
+      <!-- AUTO-TRADE LINK -->
+      <div style="height:14px"></div>
+      <div style="background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.25);border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:12px;cursor:pointer" onclick="S.vip?showPg('auto'):toastMsg('👑 Авто-торговля только для VIP','warn')">
+        <div style="font-size:28px">🤖</div>
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:13px;color:#c084fc" data-i18n="auto_title">Авто-Торговля 24/7</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:2px">Бот автоматически исполняет сигналы · настройки стратегии</div>
+        </div>
+        <div style="color:var(--muted);font-size:16px">→</div>
+      </div>
+
       <!-- AUTO-TRADE SETTINGS ON VIP PAGE -->
       <div style="height:16px"></div>
       <div class="slbl"><div class="slbl-txt">⚙️ Настройки авто-торговли</div></div>
@@ -591,13 +613,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);overflow:hid
 
   </div><!-- /scroll -->
 
-  <!-- BOTTOM NAV -->
+  <!-- BOTTOM NAV: 5 tabs — Signals, Scanner, Exchanges, History, VIP -->
   <nav class="bnav">
-    <button class="nb on" id="nb-signals" onclick="showPg('signals')"><span class="ni">⚡</span><span class="nl">Сигналы</span></button>
-    <button class="nb" id="nb-scanner" onclick="showPg('scanner')"><span class="ni">📡</span><span class="nl">Сканер</span></button>
-    <button class="nb" id="nb-exchanges" onclick="showPg('exchanges')"><span class="ni">🔗</span><span class="nl">Биржи</span></button>
-    <button class="nb" id="nb-history" onclick="showPg('history')"><span class="ni">📜</span><span class="nl">История</span></button>
-    <button class="nb" id="nb-vip" onclick="showPg('vip')"><span class="ni">👑</span><span class="nl">VIP</span></button>
+    <button class="nb on" id="nb-signals"   onclick="showPg('signals')">  <span class="ni">⚡</span><span class="nl" data-i18n="nav_signals">Сигналы</span></button>
+    <button class="nb"    id="nb-scanner"   onclick="showPg('scanner')">  <span class="ni">📡</span><span class="nl" data-i18n="nav_scanner">Сканер</span></button>
+    <button class="nb"    id="nb-exchanges" onclick="showPg('exchanges')"><span class="ni">🔗</span><span class="nl" data-i18n="nav_exchanges">Биржи</span></button>
+    <button class="nb"    id="nb-history"   onclick="showPg('history')">  <span class="ni">📜</span><span class="nl" data-i18n="nav_history">История</span></button>
+    <button class="nb"    id="nb-vip"       onclick="showPg('vip')">      <span class="ni">👑</span><span class="nl">VIP</span></button>
   </nav>
 </div>
 
@@ -1419,53 +1441,509 @@ function startAutoBot() {
   }, 12000);
 }
 
-// ========================================================
-// LOCALSTORAGE
-// ========================================================
+// ╔══════════════════════════════════════════════════════════╗
+// ║   NEXARB PRODUCTION ARCHITECTURE                        ║
+// ║   Backend API Layer · JWT · XSS · WS · Slippage · RAF  ║
+// ╚══════════════════════════════════════════════════════════╝
+
+// ── 1. XSS PROTECTION ─────────────────────────────────────
+// All user-originated data sanitised before DOM insertion
+const _esc = (s) => String(s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  .replace(/"/g,'&quot;').replace(/'/g,'&#x27;').replace(/\//g,'&#x2F;');
+
+// Safe inner-text setter (never use innerHTML for user data)
+function safeText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = String(val);
+}
+
+// ── 2. JWT SESSION MANAGER ─────────────────────────────────
+// In production: token obtained from POST /api/auth/login
+// Stored in memory only (NOT localStorage) for security
+const SESSION = {
+  token: null,          // Bearer JWT — never persist to localStorage
+  userId: null,
+  expiresAt: null,
+
+  isValid() {
+    return this.token && this.expiresAt && Date.now() < this.expiresAt;
+  },
+
+  // Call after successful login response
+  setToken(jwt, expiresIn = 3600) {
+    this.token = jwt;
+    this.expiresAt = Date.now() + expiresIn * 1000;
+  },
+
+  // Auth headers for every API request
+  headers() {
+    return {
+      'Content-Type': 'application/json',
+      ...(this.token ? { 'Authorization': `Bearer ${this.token}` } : {}),
+    };
+  },
+
+  clear() { this.token = null; this.userId = null; this.expiresAt = null; }
+};
+
+// ── 3. BACKEND API CLIENT ──────────────────────────────────
+// All sensitive state lives on backend, UI only renders
+const API_BASE = '/api/v1'; // Replace with real backend URL
+
+const API = {
+  async request(method, path, body = null) {
+    // Client-side funds check before sending — backend MUST also validate
+    try {
+      const opts = {
+        method,
+        headers: SESSION.headers(),
+        ...(body ? { body: JSON.stringify(body) } : {}),
+      };
+      const res = await fetch(API_BASE + path, opts);
+      if (res.status === 401) {
+        SESSION.clear();
+        toastMsg('⚠️ Сессия истекла. Войдите снова.', 'err');
+        return null;
+      }
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || `HTTP ${res.status}`);
+      }
+      return await res.json();
+    } catch (e) {
+      if (e.name === 'TypeError') {
+        // Network error — WS connection manager handles reconnect
+        wsManager.onNetworkError();
+      }
+      throw e;
+    }
+  },
+
+  // ── Account (balance, VIP, history from backend) ──────
+  // These replace localStorage-stored S.balance / S.vip / S.history
+  async getAccount()     { return this.request('GET', '/account'); },
+  async getHistory(p=1)  { return this.request('GET', `/trades?page=${p}`); },
+
+  // ── Trade Execution ────────────────────────────────────
+  // POST /trades → {orderId, status:'pending', ...}
+  // GET  /trades/:id → {status:'executing'|'completed'|'failed', profit, ...}
+  async submitTrade(payload) { return this.request('POST', '/trades', payload); },
+  async getOrderStatus(id)   { return this.request('GET',  `/trades/${id}`); },
+
+  // ── API Key Management ─────────────────────────────────
+  // Keys are encrypted server-side (envelope encryption)
+  async connectExchange(exId, apiKey, secret, passphrase) {
+    // Keys sent over HTTPS, server stores only encrypted form
+    return this.request('POST', '/exchanges/connect', {
+      exchangeId: _esc(exId),
+      apiKey:     apiKey,   // raw — encrypted in transit via HTTPS
+      secret:     secret,
+      passphrase: passphrase || null,
+    });
+  },
+  async disconnectExchange(exId) {
+    return this.request('DELETE', `/exchanges/${_esc(exId)}`);
+  },
+  async getConnectedExchanges() { return this.request('GET', '/exchanges'); },
+
+  // ── VIP / Payments ────────────────────────────────────
+  async buyVip(plan)    { return this.request('POST', '/vip/subscribe', { plan: _esc(plan) }); },
+  async getVipStatus()  { return this.request('GET', '/vip/status'); },
+};
+
+// ── 4. ORDER STATUS ENGINE ─────────────────────────────────
+// Replaces setTimeout-based fake execution with real order tracking
+// Status flow: pending → executing → completed | failed | cancelled
+const ORDER_STATUS = { PENDING:'pending', EXECUTING:'executing', COMPLETED:'completed', FAILED:'failed', CANCELLED:'cancelled' };
+
+const OrderTracker = {
+  _orders: new Map(),  // orderId → {status, sig, amt, pollTimer}
+
+  // Called when trade submitted to backend
+  track(orderId, sig, amt) {
+    this._orders.set(orderId, { orderId, sig, amt, status: ORDER_STATUS.PENDING });
+    this._startPolling(orderId);
+    this._updateUI(orderId, ORDER_STATUS.PENDING);
+  },
+
+  _startPolling(orderId) {
+    let attempts = 0;
+    const MAX = 20; // 20 × 600ms = 12 seconds max
+    const poll = async () => {
+      if (!this._orders.has(orderId)) return;
+      attempts++;
+      try {
+        const data = await API.getOrderStatus(orderId);
+        if (!data) return;
+        this._updateUI(orderId, data.status, data);
+        if ([ORDER_STATUS.COMPLETED, ORDER_STATUS.FAILED, ORDER_STATUS.CANCELLED].includes(data.status)) {
+          this._finalize(orderId, data);
+          return;
+        }
+        if (attempts < MAX) setTimeout(poll, 600);
+        else this._timeout(orderId);
+      } catch { if (attempts < MAX) setTimeout(poll, 1200); }
+    };
+    setTimeout(poll, 400);
+  },
+
+  _updateUI(orderId, status, data = {}) {
+    const states = {
+      pending:   '⏳ Ожидание подтверждения...',
+      executing: '⚡ Исполнение на бирже...',
+      completed: '✅ Сделка исполнена',
+      failed:    '❌ Сделка не исполнена',
+      cancelled: '🚫 Отменена',
+    };
+    toastMsg(states[status] || status, status === 'completed' ? 'ok' : status === 'failed' ? 'err' : '');
+  },
+
+  _finalize(orderId, data) {
+    const order = this._orders.get(orderId);
+    if (!order) return;
+    if (data.status === ORDER_STATUS.COMPLETED) {
+      // Update state from backend response (never from client calculation)
+      S.profit = +(S.profit + (data.netProfit || 0)).toFixed(4);
+      S.trades++;
+      S.history.push({
+        sym: order.sig.sym, bx: order.sig.bx, sx: order.sig.sx,
+        amount: order.amt, fee: data.platformFee || 0,
+        profit: data.netProfit || 0, spread: order.sig.spread,
+        type: order.sig.type, aiScore: order.sig.aiScore,
+        latency: data.executionMs || 0,
+        time: new Date().toLocaleTimeString('ru'),
+        orderId,
+      });
+      // Refresh balance from backend (not calculated client-side)
+      API.getAccount().then(acc => {
+        if (acc) {
+          S.balance = acc.balance;
+          safeText('hBalancе', '$' + S.balance.toLocaleString('en', {minimumFractionDigits:2}));
+        }
+      }).catch(()=>{});
+      document.getElementById('hProfit').textContent = (S.profit>=0?'+':'')+`$${S.profit.toFixed(2)}`;
+    }
+    if (document.getElementById('pg-history')?.classList.contains('on')) renderHistory();
+    this._orders.delete(orderId);
+  },
+
+  _timeout(orderId) {
+    toastMsg('⚠️ Статус ордера не получен. Проверьте историю.', 'warn');
+    this._orders.delete(orderId);
+  },
+};
+
+// ── 5. WEBSOCKET MANAGER ───────────────────────────────────
+// Replaces Math.random() liveUpdate with real WS price feed
+// Backend sends: {pair:"BTC/USDT", exchange:"binance", price:67840, side:"bid"|"ask", vol:1234.5}
+const wsManager = {
+  ws: null,
+  reconnectDelay: 1000,
+  reconnectTimer: null,
+  isConnected: false,
+  _lastError: null,
+
+  connect(url = 'wss://your-backend.com/ws/prices') {
+    if (this.ws) { try { this.ws.close(); } catch{} }
+    try {
+      this.ws = new WebSocket(url + (SESSION.token ? `?token=${SESSION.token}` : ''));
+      this.ws.onopen    = () => this._onOpen();
+      this.ws.onmessage = (e) => this._onMessage(e);
+      this.ws.onerror   = () => this._onError();
+      this.ws.onclose   = () => this._onClose();
+    } catch(e) {
+      this._scheduleReconnect();
+    }
+  },
+
+  _onOpen() {
+    this.isConnected = true;
+    this.reconnectDelay = 1000;
+    this._updateConnectionUI(true);
+    // Subscribe to connected exchanges
+    this.send({ type: 'subscribe', exchanges: [...S.connected], symbols: Object.keys(BASE_PRICES).slice(0,50) });
+  },
+
+  _onMessage(e) {
+    try {
+      const msgs = JSON.parse(e.data);
+      const arr = Array.isArray(msgs) ? msgs : [msgs];
+      arr.forEach(msg => {
+        if (!msg.pair || !msg.exchange || !msg.price || !msg.side) return;
+        // Validate: price must be positive number
+        if (typeof msg.price !== 'number' || msg.price <= 0) return;
+        const sym = msg.pair.split('/')[0];
+        const exId = msg.exchange.toLowerCase();
+        const key = `${sym}:${exId}`;
+        const cached = PRICE_CACHE.get(key) || { bid: msg.price, ask: msg.price, vol: 0, ts: 0 };
+        if (msg.side === 'bid') cached.bid = msg.price;
+        if (msg.side === 'ask') cached.ask = msg.price;
+        if (msg.vol) cached.vol = msg.vol;
+        cached.ts = Date.now();
+        PRICE_CACHE.set(key, cached);
+      });
+      // Schedule UI update via RAF (throttled)
+      rafScheduler.schedule();
+    } catch { /* malformed frame — ignore */ }
+  },
+
+  _onError()  { this.isConnected = false; this._updateConnectionUI(false); },
+  _onClose()  { this.isConnected = false; this._updateConnectionUI(false); this._scheduleReconnect(); },
+
+  onNetworkError() {
+    this.isConnected = false;
+    this._updateConnectionUI(false);
+  },
+
+  _scheduleReconnect() {
+    clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = setTimeout(() => this.connect(), this.reconnectDelay);
+    this.reconnectDelay = Math.min(this.reconnectDelay * 2, 30000); // exp backoff
+  },
+
+  _updateConnectionUI(ok) {
+    const dot = document.querySelector('.slbl-dot');
+    const badge = document.getElementById('wsBadge');
+    if (badge) {
+      badge.textContent = ok ? '● LIVE' : '○ ОФЛАЙН';
+      badge.style.color = ok ? 'var(--green)' : 'var(--red)';
+    }
+    if (!ok && !this.reconnectTimer) toastMsg('⚠️ Потеряно соединение с сервером котировок. Переподключение...', 'warn');
+  },
+
+  send(data) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(data));
+    }
+  },
+};
+
+// ── 6. RAF THROTTLE FOR PRICE UPDATES ─────────────────────
+// Prevents UI jank when receiving 10+ price updates/second
+const rafScheduler = {
+  _pending: false,
+  _lastRender: 0,
+  MIN_INTERVAL: 200, // Max 5 renders/sec
+
+  schedule() {
+    if (this._pending) return;
+    this._pending = true;
+    requestAnimationFrame(() => {
+      const now = Date.now();
+      if (now - this._lastRender >= this.MIN_INTERVAL) {
+        hftUpdate();
+        if (document.getElementById('pg-signals')?.classList.contains('on')) renderSigs();
+        if (document.getElementById('pg-scanner')?.classList.contains('on')) {
+          renderScanner(parseFloat(document.getElementById('spreadSlider')?.value || 0.3));
+        }
+        this._lastRender = now;
+      }
+      this._pending = false;
+    });
+  },
+};
+
+// ── 7. SLIPPAGE ENGINE ─────────────────────────────────────
+// Profit depends on order size vs available liquidity (order book depth)
+// In production: orderbook depth comes from API
+// simulated here with realistic decay model
+function calcSlippage(amount, sym, exId) {
+  // Approximate available liquidity tiers (USDT depth at each price level)
+  const liquidityTiers = {
+    BTC:  [50000, 100000, 250000, 500000],  // $50K, $100K, $250K, $500K
+    ETH:  [30000,  80000, 200000, 400000],
+    SOL:  [10000,  30000,  80000, 150000],
+    BNB:  [15000,  40000, 100000, 200000],
+    default: [5000,  15000,  40000,  80000],
+  };
+  const tiers = liquidityTiers[sym] || liquidityTiers.default;
+
+  // Exchange liquidity multiplier
+  const liqMult = { binance:2.0, okx:1.8, bybit:1.7, kucoin:1.3, gate:1.1, mexc:1.0, coinbase:1.5, kraken:1.4 };
+  const mult = liqMult[exId] || 1.0;
+  const adjustedTiers = tiers.map(t => t * mult);
+
+  // Slippage estimate: 0% at low amounts, increases exponentially
+  if (amount <= adjustedTiers[0]) return 0.0001;       // <0.01% slippage
+  if (amount <= adjustedTiers[1]) return 0.0005;       // 0.05%
+  if (amount <= adjustedTiers[2]) return 0.0015;       // 0.15%
+  if (amount <= adjustedTiers[3]) return 0.0040;       // 0.40%
+  return 0.0080;                                        // 0.80% for large orders
+}
+
+// Total fee breakdown: network + exchange A + exchange B + platform
+function calcFees(amount, sig) {
+  const feeR = S.vip ? S.vipFee : S.freeFee;
+  const exFees = EX_FEES;
+
+  const feeA = amount * (exFees[sig.bx?.toLowerCase()]?.taker || 0.001);
+  const feeB = amount * (exFees[sig.sx?.toLowerCase()]?.taker || 0.001);
+
+  // Network/withdrawal fee (simulated; real values from exchange API)
+  const networkFees = { BTC:1.5, ETH:0.8, SOL:0.001, BNB:0.05, default:0.3 };
+  const sym = (sig.sym||'').split('/')[0].split(' ')[0].split('→')[0];
+  const netFee = networkFees[sym] !== undefined ? networkFees[sym] : networkFees.default;
+
+  const slippage = calcSlippage(amount, sym, sig.bx?.toLowerCase());
+  const slippageAmt = amount * slippage;
+
+  const platformFee = amount * feeR;
+
+  return {
+    exchangeA:  +feeA.toFixed(4),
+    exchangeB:  +feeB.toFixed(4),
+    network:    +netFee.toFixed(4),
+    slippage:   +slippageAmt.toFixed(4),
+    platform:   +platformFee.toFixed(4),
+    total:      +(feeA + feeB + netFee + slippageAmt + platformFee).toFixed(4),
+  };
+}
+
+// ── 8. i18n TRANSLATION ENGINE ────────────────────────────
+const LANGS = {
+  ru: {
+    nav_signals:'Сигналы', nav_scanner:'Сканер', nav_exchanges:'Биржи',
+    nav_history:'История', auto_title:'Авто-Торговля 24/7',
+    lang_changed:'🌐 Язык изменён',
+    balance:'Баланс', profit_today:'Профит / сегодня', signals_count:'Сигналов',
+    execute:'⚡ Исполнить', enter_pos:'💰 Открыть позицию',
+    funds_check:'💳 Недостаточно средств',
+    order_pending:'⏳ Ожидание...', order_executing:'⚡ Исполнение...',
+    order_ok:'✅ Исполнено', order_fail:'❌ Не исполнено',
+    slippage:'Проскальз.', network_fee:'Сеть',
+    total_fees:'Итого комиссии', net_profit:'ЧИСТЫЙ ПРОФИТ',
+  },
+  en: {
+    nav_signals:'Signals', nav_scanner:'Scanner', nav_exchanges:'Exchanges',
+    nav_history:'History', auto_title:'Auto-Trade 24/7',
+    lang_changed:'🌐 Language changed',
+    balance:'Balance', profit_today:'Profit / today', signals_count:'Signals',
+    execute:'⚡ Execute', enter_pos:'💰 Open Position',
+    funds_check:'💳 Insufficient funds',
+    order_pending:'⏳ Pending...', order_executing:'⚡ Executing...',
+    order_ok:'✅ Completed', order_fail:'❌ Failed',
+    slippage:'Slippage', network_fee:'Network',
+    total_fees:'Total fees', net_profit:'NET PROFIT',
+  },
+  tr: {
+    nav_signals:'Sinyaller', nav_scanner:'Tarayıcı', nav_exchanges:'Borsalar',
+    nav_history:'Geçmiş', auto_title:'Otomatik 24/7',
+    lang_changed:'🌐 Dil değiştirildi',
+    balance:'Bakiye', profit_today:'Kar / bugün', signals_count:'Sinyal',
+    execute:'⚡ Uygula', enter_pos:'💰 Pozisyon Aç',
+    funds_check:'💳 Yetersiz bakiye',
+    order_pending:'⏳ Bekliyor...', order_executing:'⚡ İşleniyor...',
+    order_ok:'✅ Tamamlandı', order_fail:'❌ Başarısız',
+    slippage:'Kayma', network_fee:'Ağ',
+    total_fees:'Toplam ücret', net_profit:'NET KAR',
+  },
+  es: {
+    nav_signals:'Señales', nav_scanner:'Escáner', nav_exchanges:'Bolsas',
+    nav_history:'Historial', auto_title:'Auto-Trade 24/7',
+    lang_changed:'🌐 Idioma cambiado',
+    balance:'Balance', profit_today:'Ganancia / hoy', signals_count:'Señales',
+    execute:'⚡ Ejecutar', enter_pos:'💰 Abrir Posición',
+    funds_check:'💳 Fondos insuficientes',
+    order_pending:'⏳ Pendiente...', order_executing:'⚡ Ejecutando...',
+    order_ok:'✅ Completado', order_fail:'❌ Fallido',
+    slippage:'Desliz.', network_fee:'Red',
+    total_fees:'Total comisiones', net_profit:'GANANCIA NETA',
+  },
+  de: {
+    nav_signals:'Signale', nav_scanner:'Scanner', nav_exchanges:'Börsen',
+    nav_history:'Verlauf', auto_title:'Auto-Handel 24/7',
+    lang_changed:'🌐 Sprache geändert',
+    balance:'Guthaben', profit_today:'Gewinn / heute', signals_count:'Signale',
+    execute:'⚡ Ausführen', enter_pos:'💰 Position öffnen',
+    funds_check:'💳 Unzureichende Mittel',
+    order_pending:'⏳ Ausstehend...', order_executing:'⚡ Ausführung...',
+    order_ok:'✅ Abgeschlossen', order_fail:'❌ Fehlgeschlagen',
+    slippage:'Slippage', network_fee:'Netzwerk',
+    total_fees:'Gesamtgebühren', net_profit:'NETTOGEWINN',
+  },
+  ar: {
+    nav_signals:'إشارات', nav_scanner:'ماسح', nav_exchanges:'بورصات',
+    nav_history:'السجل', auto_title:'تداول آلي 24/7',
+    lang_changed:'🌐 تم تغيير اللغة',
+    balance:'الرصيد', profit_today:'ربح اليوم', signals_count:'إشارات',
+    execute:'⚡ تنفيذ', enter_pos:'💰 فتح مركز',
+    funds_check:'💳 رصيد غير كافٍ',
+    order_pending:'⏳ قيد الانتظار...', order_executing:'⚡ جارٍ التنفيذ...',
+    order_ok:'✅ مكتمل', order_fail:'❌ فشل',
+    slippage:'انزلاق', network_fee:'رسوم الشبكة',
+    total_fees:'إجمالي الرسوم', net_profit:'صافي الربح',
+  },
+};
+
+function t(key) {
+  return (LANGS[S.lang] || LANGS.ru)[key] || (LANGS.ru[key] || key);
+}
+
+// Apply i18n to all [data-i18n] elements
+function applyI18n() {
+  const lang = S.lang;
+  const isRTL = lang === 'ar';
+  document.documentElement.setAttribute('lang', lang);
+  document.documentElement.setAttribute('dir', isRTL ? 'rtl' : 'ltr');
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (LANGS[lang]?.[key]) el.textContent = LANGS[lang][key];
+  });
+}
+
+// ── 9. LOCALSTORAGE ────────────────────────────────────────
+// ⚠️  PRODUCTION NOTE:
+//   S.balance / S.vip / S.history must come from API.getAccount()
+//   localStorage only stores NON-SENSITIVE preferences:
+//   lang, plan selection, UI preferences, refCode
+//   Balance and VIP status MUST be fetched from backend on load
 function saveStorage() {
   try {
-    localStorage.setItem('nexarb_state', JSON.stringify({
-      vip: S.vip,
-      plan: S.plan,
+    // ⚠️ NEVER store balance, vip status, or trade history here in production
+    // Store only UI preferences
+    localStorage.setItem('nexarb_prefs', JSON.stringify({
       lang: S.lang,
-      balance: S.balance,
-      profit: S.profit,
-      trades: S.trades,
-      ownerEarned: S.ownerEarned,
-      connected: [...S.connected],
-      autoEnabled: S.autoEnabled,
-      autoSettings: S.autoSettings,
-      history: S.history.slice(-100),
+      plan: S.plan,
       userId: S.userId,
       refCode: S.refCode,
-      referrals: S.referrals,
-      refEarned: S.refEarned,
-      vipExpiry: S.vipExpiry,
+      // ── Dev-mode only (remove in production): ──
+      _DEV_vip: S.vip,
+      _DEV_balance: S.balance,
+      _DEV_profit: S.profit,
+      _DEV_trades: S.trades,
+      _DEV_connected: [...S.connected],
+      _DEV_autoSettings: S.autoSettings,
+      _DEV_history: S.history.slice(-50),
+      _DEV_referrals: S.referrals,
+      _DEV_refEarned: S.refEarned,
+      _DEV_vipExpiry: S.vipExpiry,
     }));
   } catch(e){}
 }
 
 function loadStorage() {
   try {
-    const raw = localStorage.getItem('nexarb_state');
+    const raw = localStorage.getItem('nexarb_prefs');
     if (!raw) return false;
     const d = JSON.parse(raw);
-    S.vip = d.vip||false;
-    S.plan = d.plan||'year';
-    S.lang = d.lang||'ru';
-    S.balance = d.balance||3240;
-    S.profit = d.profit||0;
-    S.trades = d.trades||0;
-    S.ownerEarned = d.ownerEarned||0;
-    S.connected = new Set(d.connected||['binance','okx']);
-    S.autoEnabled = false; // always off on reload for safety
-    S.autoSettings = {...S.autoSettings,...(d.autoSettings||{})};
-    S.history = d.history||[];
-    S.userId = d.userId||genUserId();
-    S.refCode = d.refCode||(S.userId.slice(0,8).toUpperCase());
-    S.referrals = d.referrals||[];
-    S.refEarned = d.refEarned||0;
-    S.vipExpiry = d.vipExpiry||null;
+    // Safe prefs
+    S.lang  = d.lang  || 'ru';
+    S.plan  = d.plan  || 'year';
+    S.userId = d.userId || genUserId();
+    S.refCode = d.refCode || (S.userId.slice(0,8).toUpperCase());
+    // ── Dev-mode fallbacks (in production replace with API.getAccount()) ──
+    S.vip         = d._DEV_vip    || false;
+    S.balance     = d._DEV_balance || 3240;
+    S.profit      = d._DEV_profit  || 0;
+    S.trades      = d._DEV_trades  || 0;
+    S.connected   = new Set(d._DEV_connected || ['binance','okx']);
+    S.autoEnabled = false; // ALWAYS off on reload (safety)
+    S.autoSettings = {...S.autoSettings, ...(d._DEV_autoSettings || {})};
+    S.history     = d._DEV_history  || [];
+    S.referrals   = d._DEV_referrals || [];
+    S.refEarned   = d._DEV_refEarned || 0;
+    S.vipExpiry   = d._DEV_vipExpiry || null;
     return true;
   } catch(e){ return false; }
 }
@@ -1643,10 +2121,16 @@ function copyRef(link) {
 function changeLang(lang, el) {
   S.lang = lang;
   saveStorage();
-  document.querySelectorAll('.lang-opt').forEach(o=>o.classList.remove('sel'));
-  document.querySelectorAll('.lang-opt').forEach(o=>{ if(o.textContent.toLowerCase().includes(lang)) o.classList.add('sel'); });
+  // Update active state on all lang-opt buttons (profile page)
+  document.querySelectorAll('.lang-opt').forEach(o => o.classList.remove('sel'));
   el.classList.add('sel');
-  toastMsg('🌐 Язык изменён','ok');
+  // Apply translations to entire UI immediately
+  applyI18n();
+  // Re-render pages with new language (header stats labels)
+  safeText('hStatLbl1', t('balance'));
+  safeText('hStatLbl2', t('profit_today'));
+  safeText('hStatLbl3', t('signals_count'));
+  toastMsg(t('lang_changed'), 'ok');
 }
 
 // Demo referrals data
@@ -2097,69 +2581,139 @@ function openScanTrade(sym,b,s,spread) {
   openModal('tradeModal');
 }
 function calcTrade() {
-  const sig=S.currentSig; if(!sig)return;
-  const amt=parseFloat(document.getElementById('tAmt').value)||0;
-  const feeR=S.vip?S.vipFee:S.freeFee;
-  const exchFee=+(amt*(sig.exchFee||0.002)/100*100/100).toFixed(4); // exchange fees
-  const exchFeeAmt=+(amt*(sig.exchFee||0.2)/100).toFixed(4);
-  const platFee=+(amt*feeR).toFixed(4);
-  const gross=+(amt*sig.spread/100).toFixed(4);
-  const net=+(gross-exchFeeAmt-platFee).toFixed(4);
-  const roi=amt>0?(net/amt*100).toFixed(3):0;
+  const sig = S.currentSig; if (!sig) return;
+  const amt = parseFloat(document.getElementById('tAmt').value) || 0;
+
+  // ── Real fee breakdown ─────────────────────────────────
+  const fees = calcFees(amt, sig);
+  const gross = +(amt * sig.spread / 100).toFixed(4);
+  const net = +(gross - fees.total).toFixed(4);
+  const roi = amt > 0 ? (net / amt * 100).toFixed(3) : 0;
   const aiSc = sig.aiScore || aiScore(sig);
   const aiCol = aiSc>=70?'var(--green)':aiSc>=50?'var(--gold)':'var(--red)';
   const latMs = sig.latency || 50;
-  document.getElementById('tCalc').innerHTML=`
-    <div class="tc-row"><span class="tc-k">Сумма инвестиций</span><span class="tc-v">$${amt.toFixed(2)}</span></div>
-    <div class="tc-row"><span class="tc-k">Спред (gross +${sig.spread}%)</span><span class="tc-v g">+$${gross}</span></div>
-    <div class="tc-row"><span class="tc-k">Комиссия биржи (${(sig.exchFee||0.2)}%)</span><span class="tc-v r">-$${exchFeeAmt}</span></div>
-    <div class="tc-row"><span class="tc-k">Платформа (${(feeR*100).toFixed(1)}%)</span><span class="tc-v go">-$${platFee}</span></div>
-    <div class="tc-row" style="border-top:1px solid var(--border);margin-top:4px;padding-top:6px"><span class="tc-k" style="font-weight:700;font-size:13px">ЧИСТЫЙ ПРОФИТ</span><span class="tc-v ${net>=0?'g':'r'} BIG">${net>=0?'+':''}$${net}</span></div>
-    <div class="tc-row"><span class="tc-k">ROI сделки</span><span class="tc-v ${net>=0?'g':'r'}">${net>=0?'+':''}${roi}%</span></div>
-    <div class="tc-row"><span class="tc-k">⚡ Latency исполнения</span><span class="tc-v" style="color:${latMs<50?'var(--green)':'var(--gold)'}">&lt;${latMs}ms</span></div>
-    <div class="tc-row"><span class="tc-k">🤖 AI Score</span><span class="tc-v" style="color:${aiCol}">${aiSc}/100 ${aiSc>=70?'✅':'⚠️'}</span></div>
+  const slippagePct = ((fees.slippage / amt) * 100).toFixed(3);
+
+  // ── Client-side funds pre-check (backend MUST duplicate) ──
+  const fundsOk = amt <= S.balance;
+  const execBtn = document.getElementById('tExecBtn');
+  if (execBtn) {
+    execBtn.disabled = !fundsOk || amt <= 0;
+    execBtn.textContent = !fundsOk ? t('funds_check') : (sig.type==='fund' ? t('enter_pos') : t('execute'));
+  }
+
+  document.getElementById('tCalc').innerHTML = `
+    <div class="tc-row"><span class="tc-k">Сумма</span><span class="tc-v">$${amt.toFixed(2)}</span></div>
+    <div class="tc-row"><span class="tc-k">Спред (+${sig.spread}%)</span><span class="tc-v g">+$${gross}</span></div>
+    <div style="background:rgba(255,59,48,.06);border-radius:7px;padding:4px 0;margin:3px 0">
+      <div class="tc-row"><span class="tc-k">Биржа ${sig.bx||'A'} (taker)</span><span class="tc-v r">-$${fees.exchangeA}</span></div>
+      <div class="tc-row"><span class="tc-k">Биржа ${sig.sx||'B'} (taker)</span><span class="tc-v r">-$${fees.exchangeB}</span></div>
+      <div class="tc-row"><span class="tc-k">${t('network_fee')} / вывод</span><span class="tc-v r">-$${fees.network}</span></div>
+      <div class="tc-row"><span class="tc-k">${t('slippage')} (~${slippagePct}%)</span><span class="tc-v r">-$${fees.slippage}</span></div>
+      <div class="tc-row"><span class="tc-k">Платформа (${(S.vip?0.3:0.8)}%)</span><span class="tc-v" style="color:var(--gold)">-$${fees.platform}</span></div>
+    </div>
+    <div class="tc-row" style="border-top:1px solid var(--border);padding-top:6px">
+      <span class="tc-k" style="font-weight:700">${t('total_fees')}</span>
+      <span class="tc-v r">-$${fees.total}</span>
+    </div>
+    <div class="tc-row" style="margin-top:2px">
+      <span class="tc-k" style="font-weight:700;font-size:13px">${t('net_profit')}</span>
+      <span class="tc-v ${net>=0?'g':'r'} BIG">${net>=0?'+':''}$${net}</span>
+    </div>
+    <div class="tc-row"><span class="tc-k">ROI</span><span class="tc-v ${net>=0?'g':'r'}">${net>=0?'+':''}${roi}%</span></div>
+    <div class="tc-row"><span class="tc-k">⚡ Latency</span><span class="tc-v" style="color:${latMs<50?'var(--green)':'var(--gold)'}">&lt;${latMs}ms</span></div>
+    <div class="tc-row"><span class="tc-k">🤖 AI Score</span><span class="tc-v" style="color:${aiCol}">${aiSc}/100</span></div>
   `;
-  document.getElementById('tCommInfo').innerHTML=`
-    💰 <strong>$${platFee}</strong> (${(feeR*100).toFixed(1)}%) → кошелёк платформы.<br>
-    ${S.vip?'✅ VIP: комиссия 0.3% · приоритетное исполнение':'⚡ FREE: 0.8% комиссия → VIP даёт скидку 62.5%'}
-  `;
+  document.getElementById('tCommInfo').innerHTML =
+    `💰 $${fees.platform} (${S.vip?'0.3':'0.8'}%) → платформа. ` +
+    `${S.vip?'✅ VIP: приоритетное исполнение':'⚡ VIP снижает комиссию до 0.3%'}`;
 }
 
 function execTrade() {
-  const sig=S.currentSig; if(!sig)return;
-  if(!S.vip&&S.trades>=S.maxFree){toastMsg('❌ Лимит 5 сделок/день FREE. Upgrade VIP!','err');closeModal('tradeModal');setTimeout(()=>showPg('vip'),400);return;}
-  const amt=parseFloat(document.getElementById('tAmt').value)||0;
-  const feeR=S.vip?S.vipFee:S.freeFee;
-  const exchFeeAmt=+(amt*(sig.exchFee||0.2)/100).toFixed(4);
-  const platFee=+(amt*feeR).toFixed(4);
-  const gross=+(amt*sig.spread/100).toFixed(4);
-  const net=+(gross-exchFeeAmt-platFee).toFixed(4);
+  const sig = S.currentSig; if (!sig) return;
+  const amt = parseFloat(document.getElementById('tAmt').value) || 0;
+
+  // ── CLIENT-SIDE pre-validation ─────────────────────────
+  // NOTE: Backend MUST duplicate all checks — client-side is UX only
+  if (!S.vip && S.trades >= S.maxFree) {
+    toastMsg('❌ Лимит 5 сделок/день FREE. Upgrade VIP!', 'err');
+    closeModal('tradeModal');
+    setTimeout(() => showPg('vip'), 400);
+    return;
+  }
+  if (amt <= 0) { toastMsg('⚠️ Введите сумму', 'warn'); return; }
+  if (amt > S.balance) { toastMsg(t('funds_check'), 'err'); return; }
+  if (amt < 10) { toastMsg('⚠️ Минимум $10', 'warn'); return; }
+
   closeModal('tradeModal');
 
-  // Simulate HFT execution pipeline
-  const latMs = sig.latency || 50;
-  toastMsg(`⚡ Исполнение... <${latMs}ms`,'ok');
+  // ── In production: POST to /api/v1/trades ─────────────
+  // For demo mode (no backend): simulate order flow
+  const payload = {
+    signalId:   sig.id,
+    symbol:     sig.sym,
+    buyExchange:  sig.bx,
+    sellExchange: sig.sx,
+    amount:     amt,
+    spread:     sig.spread,
+    type:       sig.type,
+    maxSlippage: 0.005, // 0.5% max slippage tolerance
+  };
 
-  setTimeout(()=>{
-    // AI win rate: base on score + some randomness
-    const aiSc = sig.aiScore || 70;
-    const winProb = 0.5 + (aiSc / 200); // 0.5-1.0 based on AI score
-    const ok = Math.random() < winProb;
-    S.trades++; S.ownerEarned+=platFee;
-    if(ok){S.balance=+(S.balance+net).toFixed(2);S.profit=+(S.profit+net).toFixed(4);}
-    document.getElementById('hBalancе').textContent='$'+S.balance.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
-    document.getElementById('hProfit').textContent=(S.profit>=0?'+':'')+`$${S.profit.toFixed(2)}`;
-    S.history.push({
-      sym:sig.sym,bx:sig.bx,sx:sig.sx,amount:amt,fee:platFee,
-      profit:ok?net:-(exchFeeAmt*2),spread:sig.spread,
-      type:sig.type,aiScore:sig.aiScore,latency:latMs,
-      time:new Date().toLocaleTimeString('ru')
-    });
-    saveStorage();
-    if(document.getElementById('pg-history').classList.contains('on'))renderHistory();
-    renderSigs();
-    toastMsg(ok?`✅ +$${net.toFixed(4)} · ${latMs}ms ⚡`:'❌ Слиппаж / цена изменилась',ok?'ok':'err');
-  }, Math.min(latMs * 4, 1800));
+  // DEMO: simulate order status pipeline (replace with real API call)
+  _demoExecuteOrder(payload, sig, amt);
+
+  /* PRODUCTION CODE (uncomment when backend ready):
+  API.submitTrade(payload).then(order => {
+    if (order?.orderId) {
+      toastMsg(`⚡ Ордер создан: ${order.orderId}`, 'ok');
+      OrderTracker.track(order.orderId, sig, amt);
+    }
+  }).catch(err => {
+    toastMsg(`❌ Ошибка: ${err.message}`, 'err');
+  });
+  */
+}
+
+// ── DEMO ORDER SIMULATOR (remove in production) ────────────
+function _demoExecuteOrder(payload, sig, amt) {
+  const fees = calcFees(amt, sig);
+  const gross = amt * sig.spread / 100;
+  const net = +(gross - fees.total).toFixed(4);
+  const latMs = sig.latency || 50;
+
+  toastMsg(t('order_pending'), '');
+
+  setTimeout(() => {
+    toastMsg(t('order_executing'), '');
+    setTimeout(() => {
+      const aiSc = sig.aiScore || 70;
+      const winProb = 0.5 + (aiSc / 200);
+      const ok = Math.random() < winProb;
+
+      S.trades++;
+      S.ownerEarned += fees.platform;
+      if (ok) {
+        S.balance = +(S.balance + net).toFixed(2);
+        S.profit  = +(S.profit + net).toFixed(4);
+      }
+
+      safeText('hBalancе', '$' + S.balance.toLocaleString('en', {minimumFractionDigits:2}));
+      document.getElementById('hProfit').textContent = (S.profit>=0?'+':'') + `$${S.profit.toFixed(2)}`;
+
+      S.history.push({
+        sym: sig.sym, bx: sig.bx, sx: sig.sx, amount: amt,
+        fee: fees.platform, profit: ok ? net : -(fees.exchangeA + fees.exchangeB),
+        spread: sig.spread, type: sig.type, aiScore: sig.aiScore,
+        latency: latMs, time: new Date().toLocaleTimeString('ru'),
+      });
+
+      saveStorage();
+      if (document.getElementById('pg-history')?.classList.contains('on')) renderHistory();
+      renderSigs();
+      toastMsg(ok ? `${t('order_ok')} +$${net} · ${latMs}ms` : `${t('order_fail')} (слиппаж)`, ok ? 'ok' : 'err');
+    }, Math.min(latMs * 5, 2000));
+  }, 500);
 }
 
 // ========================================================
@@ -2178,20 +2732,66 @@ document.addEventListener('click',e=>{
 // NAV
 // ========================================================
 function showPg(name) {
-  document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
-  document.querySelectorAll('.nb').forEach(b=>b.classList.remove('on'));
-  document.getElementById('pg-'+name).classList.add('on');
-  const nb=document.getElementById('nb-'+name);
-  if(nb)nb.classList.add('on');
-  const fz=document.getElementById('filterZone');
-  if(fz)fz.style.display=name==='signals'?'block':'none';
-  if(name==='scanner')renderScanner(parseFloat(document.getElementById('spreadSlider').value));
-  if(name==='history')renderHistory();
-  if(name==='exchanges')renderExchanges();
-  if(name==='signals'){renderAutoPanel();}
-  if(name==='vip'){renderVip();renderVipAutoSettings();}
-  if(name==='profile'){renderProfile();}
-  document.querySelector('.scroll').scrollTop=0;
+  document.querySelectorAll('.pg').forEach(p => p.classList.remove('on'));
+  document.querySelectorAll('.nb').forEach(b => b.classList.remove('on'));
+  const pg = document.getElementById('pg-' + name);
+  if (pg) pg.classList.add('on');
+  const nb = document.getElementById('nb-' + name);
+  if (nb) nb.classList.add('on');
+  const fz = document.getElementById('filterZone');
+  if (fz) fz.style.display = name === 'signals' ? 'block' : 'none';
+  if (name === 'scanner')   renderScanner(parseFloat(document.getElementById('spreadSlider')?.value || 0.3));
+  if (name === 'history')   renderHistory();
+  if (name === 'exchanges') renderExchanges();
+  if (name === 'vip')       { renderVip(); renderVipAutoSettings(); }
+  if (name === 'auto')      renderAutoPage();
+  if (name === 'profile')   renderProfile();
+  if (name === 'signals')   renderAutoPanel(); // keep auto panel updated
+  document.querySelector('.scroll').scrollTop = 0;
+}
+
+function renderAutoPage() {
+  renderAutoPanel();
+  renderVipAutoSettings();
+  const badge = document.getElementById('autoStatusBadge');
+  if (badge) {
+    badge.textContent = S.autoEnabled ? '● АКТИВНА' : '○ СТОП';
+    badge.style.color = S.autoEnabled ? 'var(--green)' : 'var(--muted)';
+  }
+  // Stats section
+  const stats = document.getElementById('autoStatsList');
+  if (!stats) return;
+  if (!S.vip) {
+    stats.innerHTML = `<div style="text-align:center;padding:24px 16px">
+      <div style="font-size:36px;margin-bottom:10px">🤖</div>
+      <div style="font-weight:700;color:var(--gold);font-size:14px;margin-bottom:6px">Авто-торговля только для VIP</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:16px">Бот 24/7 автоматически исполняет сигналы по вашим настройкам</div>
+      <button onclick="showPg('vip')" style="padding:10px 24px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--gold),#f97316);color:#000;font-weight:700;font-size:12px;cursor:pointer">👑 Активировать VIP</button>
+    </div>`;
+    return;
+  }
+  const autoTrades = S.history.filter(h => h.auto);
+  const autoProfit = autoTrades.reduce((a, h) => a + (h.profit || 0), 0);
+  const autoWins = autoTrades.filter(h => h.profit > 0).length;
+  stats.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:4px 0 12px">
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:18px;font-weight:700;color:var(--cyan)">${autoTrades.length}</div>
+        <div style="font-size:9px;color:var(--muted)">Авто-сделок</div>
+      </div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:18px;font-weight:700;color:var(--green)">${autoProfit>=0?'+':''}$${autoProfit.toFixed(2)}</div>
+        <div style="font-size:9px;color:var(--muted)">Авто-профит</div>
+      </div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:18px;font-weight:700;color:var(--gold)">${autoTrades.length ? Math.round(autoWins/autoTrades.length*100) : 0}%</div>
+        <div style="font-size:9px;color:var(--muted)">Win Rate (авто)</div>
+      </div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:18px;font-weight:700;color:var(--purple)">${S.autoSettings.maxPerDay||20}</div>
+        <div style="font-size:9px;color:var(--muted)">Макс/день</div>
+      </div>
+    </div>`;
 }
 function toggleWL(btn){btn.classList.toggle('on');toastMsg(btn.classList.contains('on')?'⭐ Добавлен в вотчлист':'☆ Убран из вотчлиста',btn.classList.contains('on')?'ok':'')}
 
@@ -2207,13 +2807,12 @@ function toastMsg(msg,type=''){
   setTimeout(()=>t.remove(),3200);
 }
 
-// ========================================================
-// LIVE UPDATES
-// ========================================================
-function liveUpdate(){
-  hftUpdate(); // HFT engine: update price cache + signals
-  if(document.getElementById('pg-signals').classList.contains('on'))renderSigs();
-  if(document.getElementById('pg-scanner').classList.contains('on'))renderScanner(parseFloat(document.getElementById('spreadSlider').value));
+// ── LIVE UPDATES ──────────────────────────────────────────
+// In production: wsManager.connect() drives updates via rafScheduler
+// In demo mode: fallback timer
+function liveUpdate() {
+  hftUpdate();
+  rafScheduler.schedule();
 }
 
 // ========================================================
@@ -2324,18 +2923,20 @@ function mkStars(){
 // ========================================================
 // INIT
 // ========================================================
-document.addEventListener('DOMContentLoaded',()=>{
+document.addEventListener('DOMContentLoaded', () => {
   mkStars();
 
-  // Load saved state
+  // Load saved state (dev mode — in production: await API.getAccount())
   const hasData = loadStorage();
 
-  // Generate user ID if new
   if (!S.userId) {
     S.userId = genUserId();
-    S.refCode = S.userId.slice(0,8).toUpperCase();
+    S.refCode = S.userId.slice(0, 8).toUpperCase();
     saveStorage();
   }
+
+  // Apply language immediately
+  applyI18n();
 
   // Show language screen for new users
   if (!hasData) {
@@ -2343,28 +2944,39 @@ document.addEventListener('DOMContentLoaded',()=>{
   }
 
   // Restore header
-  document.getElementById('hBalancе').textContent = '$'+S.balance.toLocaleString('en',{minimumFractionDigits:2});
+  safeText('hBalancе', '$' + S.balance.toLocaleString('en', {minimumFractionDigits:2}));
   document.getElementById('hProfit').textContent = (S.profit>=0?'+':'')+`$${S.profit.toFixed(2)}`;
-  if(document.getElementById('hFee')) document.getElementById('hFee').textContent = S.vip?'0.3%':'0.8%';
   updateHeaderVip();
 
   initDragScroll(document.getElementById('netChips'));
   initDragScroll(document.getElementById('sigChips'));
   initChipClicks();
   renderSigs();
-  renderAutoPanel();
   renderScanner();
   renderExchanges();
   renderHistory();
   renderVip();
   renderVipAutoSettings();
-  setInterval(liveUpdate, 500); // HFT: 500ms update cycle (WebSocket sim)
-  setInterval(() => { // Update header sig count every 2s
+
+  // ── Production: connect WebSocket for live prices ──────
+  // wsManager.connect('wss://your-backend.com/ws/prices');
+  // ── Demo: fallback timer for signal updates ────────────
+  setInterval(liveUpdate, 500);
+
+  // Update signal count display every 2s
+  setInterval(() => {
     const el = document.getElementById('hSigCount');
-    if (el) el.textContent = SIGS.length + ' сигн.';
+    if (el) {
+      const badge = document.getElementById('wsBadge');
+      if (badge && !badge.textContent.includes('LIVE')) {
+        badge.textContent = `${SIGS.length} сигн. · DEMO`;
+        badge.style.color = 'var(--gold)';
+      }
+    }
   }, 2000);
-  setTimeout(()=>toastMsg('🔥 BTC/USDT: новый арбитраж +0.55% на Binance→OKX','ok'),2000);
-  setTimeout(()=>toastMsg(`⚡ HFT Engine: ${SIGS.length} сигналов найдено`,'ok'),5000);
+
+  setTimeout(() => toastMsg('🔥 BTC/USDT: арбитраж +0.55% на Binance→OKX', 'ok'), 2000);
+  setTimeout(() => toastMsg(`⚡ HFT Engine: ${SIGS.length} сигналов · 8 стратегий`, 'ok'), 4500);
 });
 </script>
 </body>

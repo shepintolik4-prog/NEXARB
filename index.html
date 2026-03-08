@@ -1010,21 +1010,22 @@ function genSignals() {
 
   // ── STRATEGY 2: Triangular Arbitrage (VIP) ────────────
   const triPaths = [
-    {sym:'BNB→ETH→BTC', ex:'binance', base:'BNB', spread:()=>0.8+Math.random()*1.2},
-    {sym:'SOL→USDT→BTC', ex:'bybit', base:'SOL', spread:()=>0.6+Math.random()*1.1},
-    {sym:'ETH→BNB→SOL', ex:'binance', base:'ETH', spread:()=>0.9+Math.random()*1.4},
-    {sym:'XRP→BTC→ETH', ex:'okx', base:'XRP', spread:()=>0.5+Math.random()*0.9},
-    {sym:'ADA→BNB→USDT', ex:'binance', base:'ADA', spread:()=>0.7+Math.random()*1.0},
-    {sym:'DOGE→BTC→SOL', ex:'bybit', base:'DOGE', spread:()=>0.8+Math.random()*1.3},
-    {sym:'AVAX→ETH→BTC', ex:'kucoin', base:'AVAX', spread:()=>0.6+Math.random()*0.8},
-    {sym:'MATIC→BNB→ETH', ex:'binance', base:'MATIC', spread:()=>0.5+Math.random()*1.2},
-    {sym:'DOT→SOL→BTC', ex:'okx', base:'DOT', spread:()=>0.7+Math.random()*0.9},
-    {sym:'LINK→ETH→BNB', ex:'binance', base:'LINK', spread:()=>0.6+Math.random()*1.1},
-    {sym:'INJ→BNB→ETH', ex:'kucoin', base:'INJ', spread:()=>1.2+Math.random()*1.8},
-    {sym:'TAO→SOL→BTC', ex:'bybit', base:'TAO', spread:()=>1.4+Math.random()*2.1},
-    {sym:'TIA→ETH→USDT', ex:'okx', base:'TIA', spread:()=>0.9+Math.random()*1.4},
-    {sym:'SUI→BNB→SOL', ex:'gate', base:'SUI', spread:()=>0.8+Math.random()*1.2},
-    {sym:'ARB→ETH→BTC', ex:'binance', base:'ARB', spread:()=>0.7+Math.random()*1.0},
+    // Реальные треугольные: 0.05–0.4% после комиссий (очень конкурентный рынок)
+    {sym:'BNB→ETH→BTC',   ex:'binance', spread:()=>0.05+Math.random()*0.25},
+    {sym:'SOL→USDT→BTC',  ex:'bybit',   spread:()=>0.04+Math.random()*0.20},
+    {sym:'ETH→BNB→SOL',   ex:'binance', spread:()=>0.06+Math.random()*0.30},
+    {sym:'XRP→BTC→ETH',   ex:'okx',     spread:()=>0.04+Math.random()*0.18},
+    {sym:'ADA→BNB→USDT',  ex:'binance', spread:()=>0.05+Math.random()*0.22},
+    {sym:'DOGE→BTC→SOL',  ex:'bybit',   spread:()=>0.06+Math.random()*0.28},
+    {sym:'AVAX→ETH→BTC',  ex:'kucoin',  spread:()=>0.05+Math.random()*0.20},
+    {sym:'MATIC→BNB→ETH', ex:'binance', spread:()=>0.04+Math.random()*0.24},
+    {sym:'DOT→SOL→BTC',   ex:'okx',     spread:()=>0.05+Math.random()*0.18},
+    {sym:'LINK→ETH→BNB',  ex:'binance', spread:()=>0.04+Math.random()*0.20},
+    {sym:'INJ→BNB→ETH',   ex:'kucoin',  spread:()=>0.08+Math.random()*0.35},
+    {sym:'TAO→SOL→BTC',   ex:'bybit',   spread:()=>0.10+Math.random()*0.40},
+    {sym:'TIA→ETH→USDT',  ex:'okx',     spread:()=>0.07+Math.random()*0.28},
+    {sym:'SUI→BNB→SOL',   ex:'gate',    spread:()=>0.06+Math.random()*0.26},
+    {sym:'ARB→ETH→BTC',   ex:'binance', spread:()=>0.05+Math.random()*0.22},
   ];
   triPaths.forEach(t => {
     const sp = +t.spread().toFixed(2);
@@ -1042,29 +1043,37 @@ function genSignals() {
 
   // ── STRATEGY 3: Funding Rate Arbitrage (VIP) ──────────
   const fundingPairs = [
-    {sym:'BTC/USDT Perp', bx:'binance', sx:'bybit', rate:0.015+Math.random()*0.04},
-    {sym:'ETH/USDT Perp', bx:'okx', sx:'binance', rate:0.01+Math.random()*0.03},
-    {sym:'SOL/USDT Perp', bx:'bybit', sx:'okx', rate:0.02+Math.random()*0.05},
-    {sym:'BNB/USDT Perp', bx:'binance', sx:'gate', rate:0.01+Math.random()*0.025},
-    {sym:'XRP/USDT Perp', bx:'okx', sx:'bybit', rate:0.008+Math.random()*0.02},
-    {sym:'DOGE/USDT Perp', bx:'binance', sx:'mexc', rate:0.012+Math.random()*0.03},
-    {sym:'PEPE/USDT Perp', bx:'bybit', sx:'okx', rate:0.04+Math.random()*0.08},
-    {sym:'INJ/USDT Perp', bx:'kucoin', sx:'binance', rate:0.03+Math.random()*0.06},
-    {sym:'TAO/USDT Perp', bx:'bybit', sx:'gate', rate:0.05+Math.random()*0.09},
-    {sym:'WIF/USDT Perp', bx:'mexc', sx:'bybit', rate:0.035+Math.random()*0.07},
+    // Реальные funding rates (данные 2024-2025, типичные значения)
+    // rate = funding rate за 8 часов (%). Binance: 0.01% базовый
+    {sym:'BTC/USDT Perp',  bx:'binance', sx:'bybit',   rate:0.0100+Math.random()*0.0200}, // 0.01–0.03%
+    {sym:'ETH/USDT Perp',  bx:'okx',     sx:'binance', rate:0.0080+Math.random()*0.0150}, // 0.008–0.023%
+    {sym:'SOL/USDT Perp',  bx:'bybit',   sx:'okx',     rate:0.0120+Math.random()*0.0250}, // 0.012–0.037%
+    {sym:'BNB/USDT Perp',  bx:'binance', sx:'gate',    rate:0.0100+Math.random()*0.0180}, // 0.01–0.028%
+    {sym:'XRP/USDT Perp',  bx:'okx',     sx:'bybit',   rate:0.0090+Math.random()*0.0200},
+    {sym:'DOGE/USDT Perp', bx:'binance', sx:'mexc',    rate:0.0150+Math.random()*0.0300}, // мемкоины чуть выше
+    {sym:'PEPE/USDT Perp', bx:'bybit',   sx:'okx',     rate:0.0200+Math.random()*0.0500}, // 0.02–0.07%
+    {sym:'INJ/USDT Perp',  bx:'kucoin',  sx:'binance', rate:0.0180+Math.random()*0.0400},
+    {sym:'TAO/USDT Perp',  bx:'bybit',   sx:'gate',    rate:0.0300+Math.random()*0.0600}, // альты волатильнее
+    {sym:'WIF/USDT Perp',  bx:'mexc',    sx:'bybit',   rate:0.0250+Math.random()*0.0500},
   ];
   fundingPairs.forEach(f => {
-    const sp = +(f.rate).toFixed(4);
+    const ratePct = +(f.rate).toFixed(4); // % за 8 часов, например 0.0300 = 0.03%
+    const annualPct = +(ratePct * 3 * 365).toFixed(1); // ~32.85% годовых при 0.03%/8ч
+    // spread = чистый профит ЗА ОДНУ ВЫПЛАТУ (8ч), после комиссий
+    // Это то, что реально зарабатывается за один цикл
+    const grossPerCycle = ratePct; // % от позиции за 8ч
     const sig = {
       id: `f${++id}`, type: 'fund', sym: f.sym, strategy: 'Funding',
       bx: f.bx, sx: f.sx, bprice: null, sprice: null,
-      spread: +((sp * 3 * 365 * 100) / 100).toFixed(2), // annualized %
-      displaySpread: sp, // per-period funding rate
+      spread: grossPerCycle,          // % за 8ч — реальный спред
+      displayRate: ratePct,           // funding rate %/8ч
+      annualYield: annualPct,         // % годовых (для справки)
       vol: `$${(8+Math.random()*20).toFixed(1)}M`,
-      time: '8ч', risk: 'low', vip: true, hot: sp > 0.04,
-      exchFee: 0.2, aiScore: 0,
+      time: '8ч', risk: 'low', vip: true,
+      hot: ratePct > 0.04,
+      exchFee: 0.1,  // тейкер одной стороны (0.05% × 2 ≈ 0.1%)
+      aiScore: 0,
       latency: Math.round(50 + Math.random()*100),
-      fundingInfo: `${(sp*100).toFixed(3)}%/8ч · ~${(sp*3*365*100).toFixed(0)}%/год`,
     };
     sig.aiScore = aiScore(sig);
     all.push(sig);
@@ -1072,18 +1081,19 @@ function genSignals() {
 
   // ── STRATEGY 4: DEX Arbitrage (VIP) ──────────────────
   const dexPairs = [
-    {sym:'ETH', bx:'Uniswap V3', sx:'Curve', spread:()=>0.4+Math.random()*1.2},
-    {sym:'SOL', bx:'Raydium', sx:'Jupiter', spread:()=>0.6+Math.random()*1.6},
-    {sym:'BTC', bx:'Uniswap V3', sx:'Balancer', spread:()=>0.3+Math.random()*0.9},
-    {sym:'ARB', bx:'Camelot', sx:'Uniswap V3', spread:()=>0.8+Math.random()*2.0},
-    {sym:'OP', bx:'Velodrome', sx:'Uniswap V3', spread:()=>0.7+Math.random()*1.8},
-    {sym:'MATIC', bx:'QuickSwap', sx:'Uniswap V3', spread:()=>0.5+Math.random()*1.4},
-    {sym:'AVAX', bx:'Trader Joe', sx:'Pangolin', spread:()=>0.6+Math.random()*1.5},
-    {sym:'TON', bx:'DeDust', sx:'STON.fi', spread:()=>0.8+Math.random()*2.2},
-    {sym:'SUI', bx:'Cetus', sx:'Turbos', spread:()=>1.0+Math.random()*2.5},
-    {sym:'APT', bx:'Liquidswap', sx:'Thala', spread:()=>0.9+Math.random()*2.0},
-    {sym:'NEAR', bx:'Ref Finance', sx:'Jumbo', spread:()=>0.7+Math.random()*1.8},
-    {sym:'INJ', bx:'Helix', sx:'DojoSwap', spread:()=>1.2+Math.random()*2.4},
+    // DEX реально: 0.05–0.6% (конкурентнее чем CEX из-за MEV ботов)
+    {sym:'ETH',   bx:'Uniswap V3', sx:'Curve',      spread:()=>0.05+Math.random()*0.35},
+    {sym:'SOL',   bx:'Raydium',    sx:'Jupiter',     spread:()=>0.08+Math.random()*0.45},
+    {sym:'BTC',   bx:'Uniswap V3', sx:'Balancer',   spread:()=>0.04+Math.random()*0.25},
+    {sym:'ARB',   bx:'Camelot',    sx:'Uniswap V3', spread:()=>0.10+Math.random()*0.55},
+    {sym:'OP',    bx:'Velodrome',  sx:'Uniswap V3', spread:()=>0.08+Math.random()*0.50},
+    {sym:'MATIC', bx:'QuickSwap',  sx:'Uniswap V3', spread:()=>0.06+Math.random()*0.40},
+    {sym:'AVAX',  bx:'Trader Joe', sx:'Pangolin',   spread:()=>0.07+Math.random()*0.42},
+    {sym:'TON',   bx:'DeDust',     sx:'STON.fi',    spread:()=>0.10+Math.random()*0.60},
+    {sym:'SUI',   bx:'Cetus',      sx:'Turbos',     spread:()=>0.12+Math.random()*0.65},
+    {sym:'APT',   bx:'Liquidswap', sx:'Thala',      spread:()=>0.10+Math.random()*0.55},
+    {sym:'NEAR',  bx:'Ref Finance',sx:'Jumbo',      spread:()=>0.08+Math.random()*0.50},
+    {sym:'INJ',   bx:'Helix',      sx:'DojoSwap',   spread:()=>0.15+Math.random()*0.70},
   ];
   dexPairs.forEach(d => {
     const sp = +d.spread().toFixed(2);
@@ -1102,26 +1112,27 @@ function genSignals() {
 
   // ── STRATEGY 5: Statistical Arbitrage (VIP) ───────────
   const statPairs = [
-    {sym:'BTC/ETH',  bx:'binance', sx:'okx',  spread:()=>0.3+Math.random()*0.8},
-    {sym:'SOL/AVAX', bx:'bybit',   sx:'kucoin',spread:()=>0.4+Math.random()*1.2},
-    {sym:'BNB/ETH',  bx:'okx',     sx:'bybit', spread:()=>0.3+Math.random()*0.7},
-    {sym:'XRP/ADA',  bx:'kucoin',  sx:'binance',spread:()=>0.5+Math.random()*1.5},
-    {sym:'DOT/ATOM', bx:'kraken',  sx:'okx',   spread:()=>0.4+Math.random()*1.1},
-    {sym:'INJ/SEI',  bx:'binance', sx:'bybit', spread:()=>0.8+Math.random()*2.0},
-    {sym:'TIA/NEAR', bx:'okx',     sx:'kucoin',spread:()=>0.6+Math.random()*1.8},
-    {sym:'WIF/BONK', bx:'bybit',   sx:'mexc',  spread:()=>1.2+Math.random()*3.0},
+    // Стат арбитраж: очень малые спреды 0.02–0.3%, высокая частота
+    {sym:'BTC/ETH',  bx:'binance', sx:'okx',    spread:()=>0.02+Math.random()*0.15},
+    {sym:'SOL/AVAX', bx:'bybit',   sx:'kucoin', spread:()=>0.03+Math.random()*0.20},
+    {sym:'BNB/ETH',  bx:'okx',     sx:'bybit',  spread:()=>0.02+Math.random()*0.12},
+    {sym:'XRP/ADA',  bx:'kucoin',  sx:'binance',spread:()=>0.04+Math.random()*0.25},
+    {sym:'DOT/ATOM', bx:'kraken',  sx:'okx',    spread:()=>0.03+Math.random()*0.18},
+    {sym:'INJ/SEI',  bx:'binance', sx:'bybit',  spread:()=>0.05+Math.random()*0.30},
+    {sym:'TIA/NEAR', bx:'okx',     sx:'kucoin', spread:()=>0.04+Math.random()*0.22},
+    {sym:'WIF/BONK', bx:'bybit',   sx:'mexc',   spread:()=>0.06+Math.random()*0.35},
   ];
   statPairs.forEach(s => {
-    const sp = +s.spread().toFixed(2);
+    const sp = +s.spread().toFixed(3);
     const baseSym = s.sym.split('/')[0];
     const sig = {
       id: `st${++id}`, type: 'stat', sym: s.sym, strategy: 'Stat Arb',
       bx: s.bx, sx: s.sx,
       bprice: BASE_PRICES[baseSym], sprice: null,
       spread: sp, vol: `$${(150+Math.random()*800).toFixed(0)}K`,
-      time: `~${15+Math.round(Math.random()*60)}с`, risk: sp > 1.5 ? 'med' : 'low',
+      time: `~${15+Math.round(Math.random()*60)}с`, risk: 'low',
       vip: true, hot: false, exchFee: 0.2, aiScore: 0,
-      latency: Math.round(30 + Math.random()*60),
+      latency: Math.round(20 + Math.random()*40),
     };
     sig.aiScore = aiScore(sig);
     all.push(sig);
@@ -1129,12 +1140,13 @@ function genSignals() {
 
   // ── STRATEGY 6: Cross-Chain Arbitrage (VIP) ───────────
   const xchainPairs = [
-    {sym:'ETH', chainA:'Ethereum', chainB:'Arbitrum', bx:'Uniswap', sx:'Camelot',   spread:()=>0.4+Math.random()*1.2},
-    {sym:'ETH', chainA:'Ethereum', chainB:'Optimism', bx:'Uniswap', sx:'Velodrome', spread:()=>0.3+Math.random()*1.0},
-    {sym:'BTC', chainA:'BTC',      chainB:'ETH(WBTC)',bx:'binance', sx:'Uniswap',   spread:()=>0.2+Math.random()*0.8},
-    {sym:'MATIC',chainA:'ETH',     chainB:'Polygon',  bx:'Uniswap', sx:'QuickSwap', spread:()=>0.5+Math.random()*1.5},
-    {sym:'SOL', chainA:'Solana',   chainB:'ETH(SOL)', bx:'Raydium', sx:'Uniswap',   spread:()=>0.6+Math.random()*1.8},
-    {sym:'AVAX',chainA:'Avalanche',chainB:'ETH',      bx:'TraderJoe',sx:'Uniswap',  spread:()=>0.4+Math.random()*1.3},
+    // Cross-chain: 0.1–0.5% (bridge fees съедают много)
+    {sym:'ETH',  chainA:'Ethereum', chainB:'Arbitrum',  bx:'Uniswap',  sx:'Camelot',    spread:()=>0.08+Math.random()*0.30},
+    {sym:'ETH',  chainA:'Ethereum', chainB:'Optimism',  bx:'Uniswap',  sx:'Velodrome',  spread:()=>0.06+Math.random()*0.25},
+    {sym:'MATIC',chainA:'ETH',      chainB:'Polygon',   bx:'Uniswap',  sx:'QuickSwap',  spread:()=>0.10+Math.random()*0.40},
+    {sym:'SOL',  chainA:'Solana',   chainB:'ETH(SOL)',  bx:'Raydium',  sx:'Uniswap',    spread:()=>0.12+Math.random()*0.45},
+    {sym:'AVAX', chainA:'Avalanche',chainB:'ETH',       bx:'TraderJoe',sx:'Uniswap',    spread:()=>0.08+Math.random()*0.35},
+    {sym:'BTC',  chainA:'Bitcoin',  chainB:'ETH(WBTC)', bx:'binance',  sx:'Uniswap',    spread:()=>0.05+Math.random()*0.20},
   ];
   xchainPairs.forEach(x => {
     const sp = +x.spread().toFixed(2);
@@ -1723,43 +1735,54 @@ function renderSigs() {
     const canTrade = bConn && sConn;
     const limitHit = !S.vip && S.trades >= S.maxFree;
 
-    // Net profit calculation
     const exchFeePct = sig.exchFee || 0.2;
     const platFeePct = feeR * 100;
-    const netPct = +(sig.spread - exchFeePct - platFeePct).toFixed(3);
-    if (!locked && netPct <= 0) return '';
-
-    // Latency badge
     const latMs = sig.latency || 0;
     const latCol = latMs < 30 ? 'var(--green)' : latMs < 100 ? 'var(--gold)' : 'var(--red)';
-    const latLabel = latMs < 30 ? `${latMs}ms ⚡` : latMs < 100 ? `${latMs}ms` : `${latMs}ms`;
-
-    // Funding display
-    const isFunding = sig.type === 'fund';
-    const displaySpread = isFunding
-      ? `${(sig.displaySpread*100||sig.spread).toFixed(3)}%`
-      : `+${sig.spread}%`;
-
     const ico = getCoinIco(sig.sym.split('/')[0].split(' ')[0].split('→')[0]);
+
+    // ── Расчёт чистого профита зависит от типа стратегии ──
+    let netPct, rateLabel, rateSub, profitLabel, displayAnnual = '';
+    if (sig.type === 'fund') {
+      // Funding: ставка %/8ч. Показываем профит за 1 цикл (8ч)
+      // Комиссии биржи и платформы — разовые при открытии позиции
+      // Они амортизируются, но для честности показываем их отдельно
+      const rate = sig.displayRate || sig.spread; // %/8ч, напр. 0.0300
+      netPct = +(rate - exchFeePct - platFeePct).toFixed(4);
+      rateLabel = `${rate.toFixed(4)}%`;
+      rateSub = '/8ч';
+      profitLabel = 'чистый /8ч';
+      displayAnnual = sig.annualYield ? `~${sig.annualYield}%/год` : '';
+    } else {
+      // CEX/DEX/Tri/etc: разовая сделка
+      netPct = +(sig.spread - exchFeePct - platFeePct).toFixed(3);
+      rateLabel = `+${sig.spread}%`;
+      rateSub = '';
+      profitLabel = 'чистый профит';
+    }
+
+    if (!locked && netPct <= 0) return '';
+    const profitCol = sig.type==='fund'
+      ? (netPct>0.01?'var(--green)':'var(--gold)')
+      : (netPct>0.3?'var(--green)':'var(--gold)');
+    const profitDisplay = locked ? '?.????' : '+'+Math.abs(netPct).toFixed(sig.type==='fund'?4:2)+'%';
 
     return `<div class="ac ${sig.hot&&!locked?'hot':''} ${locked?'locked':''}" onclick="${locked?`showPg('vip')`:`openTrade('${sig.id}')`}">
       <div class="ac-top">
         <div class="ac-pair">
-          <div class="ac-icons">
-            <div class="ci">${ico}</div>
-          </div>
+          <div class="ac-icons"><div class="ci">${ico}</div></div>
           <div>
-            <div class="ac-pname">${sig.sym.length > 18 ? sig.sym.slice(0,18)+'…' : sig.sym}${locked?' 🔒':''}</div>
+            <div class="ac-pname">${sig.sym.length>18?sig.sym.slice(0,18)+'…':sig.sym}${locked?' 🔒':''}</div>
             <div class="ac-ptype" style="color:${tm.color}">${tm.icon} ${tm.label} · ${sig.strategy||tm.label}</div>
           </div>
         </div>
         <div class="ac-profit">
-          <div class="pct ${netPct<0.3?'warn':''} ${locked?'blurred':''}">${locked?'??.?':'+'+netPct.toFixed(2)}%</div>
-          <div class="pct-sub">${locked?'VIP Only':'чистый профит'}</div>
+          <div class="pct ${locked?'blurred':''}" style="color:${locked?'var(--text2)':profitCol}">${profitDisplay}</div>
+          <div class="pct-sub">${locked?'VIP Only':profitLabel}</div>
         </div>
       </div>
       ${locked ? `<div style="text-align:center;padding:10px 14px 12px;color:var(--text2);font-size:11px">
-        👑 Стратегия доступна в VIP · <button onclick="event.stopPropagation();showPg('vip')" style="background:none;border:1px solid rgba(245,166,35,.4);border-radius:5px;padding:3px 9px;color:var(--gold);font-size:10px;font-weight:700;cursor:pointer;font-family:var(--font)">Получить VIP →</button>
+        👑 VIP стратегия · <button onclick="event.stopPropagation();showPg('vip')" style="background:none;border:1px solid rgba(245,166,35,.4);border-radius:5px;padding:3px 9px;color:var(--gold);font-size:10px;font-weight:700;cursor:pointer;font-family:var(--font)">Получить VIP →</button>
       </div>` : `
       <div class="ac-route">
         <div class="rs"><span class="rs-ex">${sig.bx}</span>${sig.bprice?`<span class="rs-pr">$${fmtP(sig.bprice)}</span>`:''}</div>
@@ -1767,19 +1790,25 @@ function renderSigs() {
         <div class="rs"><span class="rs-ex">${sig.sx}</span>${sig.sprice?`<span class="rs-pr">$${fmtP(sig.sprice)}</span>`:''}</div>
       </div>
       <div class="ac-meta">
-        <div class="mi"><div class="mi-k">Спред</div><div class="mi-v g">${displaySpread}${isFunding?`<span style="font-size:8px;color:var(--muted);margin-left:3px">/8ч</span>`:''}</div></div>
+        <div class="mi">
+          <div class="mi-k">${sig.type==='fund'?'Ставка /8ч':'Спред'}</div>
+          <div class="mi-v g">${rateLabel}<span style="font-size:8px;color:var(--muted)">${rateSub}</span></div>
+        </div>
         <div class="mi"><div class="mi-k">Биржа</div><div class="mi-v r">−${exchFeePct}%</div></div>
         <div class="mi"><div class="mi-k">Платформа</div><div class="mi-v r">−${platFeePct.toFixed(1)}%</div></div>
-        <div class="mi"><div class="mi-k">Риск</div><div class="mi-v go">${{low:'🟢 Низкий',med:'🟡 Средний',high:'🔴 Высокий'}[sig.risk]}</div></div>
+        <div class="mi"><div class="mi-k">Риск</div><div class="mi-v">${{low:'🟢 Низкий',med:'🟡 Средний',high:'🔴 Высокий'}[sig.risk]}</div></div>
       </div>
-      <div style="padding:4px 12px 6px;display:flex;align-items:center;gap:8px">
+      ${sig.type==='fund'?`<div style="padding:1px 12px 5px;font-size:9px;color:var(--muted);line-height:1.4">
+        ℹ️ Рыночно-нейтральная позиция: long spot + short perp. Выплата каждые 8ч.${displayAnnual?` Доходность: <span style="color:var(--green)">${displayAnnual}</span>`:''}
+      </div>`:''}
+      <div style="padding:3px 12px 5px;display:flex;align-items:center;gap:8px">
         <div style="flex:1">
           <div style="font-size:9px;color:var(--muted);margin-bottom:2px">AI Score</div>
           ${aiBar(sig.aiScore)}
         </div>
         <div style="text-align:right">
           <div style="font-size:9px;color:var(--muted)">Latency</div>
-          <div style="font-size:10px;font-family:var(--mono);color:${latCol}">${latLabel}</div>
+          <div style="font-size:10px;font-family:var(--mono);color:${latCol}">${latMs}ms</div>
         </div>
         <div style="text-align:right">
           <div style="font-size:9px;color:var(--muted)">Объём</div>
@@ -1788,11 +1817,10 @@ function renderSigs() {
       </div>
       <div class="ac-foot">
         <button class="btn-ex" ${(!canTrade||limitHit)?'disabled':''} onclick="event.stopPropagation();openTrade('${sig.id}')">
-          ${limitHit?'⚠️ Лимит FREE 5/д':!canTrade?`🔗 Подключи ${sig.bx}`:sig.type==='fund'?'💰 Войти в позицию':'⚡ Исполнить'}
+          ${limitHit?'⚠️ Лимит FREE 5/д':!canTrade?`🔗 Подключи ${sig.bx}`:sig.type==='fund'?'💰 Открыть позицию':'⚡ Исполнить'}
         </button>
         <div class="btn-wl" onclick="event.stopPropagation();toggleWL(this)">⭐</div>
-      </div>
-      `}
+      </div>`}
     </div>`;
   }).join('') || `<div class="empty"><div class="ei">📭</div><div class="et">Нет сигналов</div><div class="es">Попробуй другой фильтр или подключи биржи</div></div>`;
 }

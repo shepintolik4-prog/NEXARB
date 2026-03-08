@@ -2084,70 +2084,127 @@ function applyI18n() {
   });
 }
 
-// ── LOCALSTORAGE ──────────────────────────────────────────────
-// Only UI preferences are stored locally.
-// Financial state (balance, vip, history) is fetched from backend on load.
-// _DEV_* keys exist ONLY for demo mode — removed when backend is live.
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  БЕЗОПАСНОЕ ХРАНИЛИЩЕ                                        ║
+// ║                                                              ║
+// ║  localStorage → ТОЛЬКО UI-настройки (язык, тема, autoSet)   ║
+// ║  НИКАКИХ финансовых данных в localStorage                    ║
+// ║  Баланс / VIP / История → ТОЛЬКО из API.getAccount()        ║
+// ╚══════════════════════════════════════════════════════════════╝
+
+// Разрешённые ключи для localStorage (только UI-настройки)
+const SAFE_PREFS_KEYS = ['lang', 'plan', 'autoSettings'];
+
 function saveStorage() {
+  // СОХРАНЯЕМ только UI-настройки — НОЛЬ финансовых данных
   try {
-    const prefs = {
-      lang: S.lang, plan: S.plan,
-      userId: S.userId, refCode: S.refCode,
+    localStorage.setItem('nexarb_ui_v6', JSON.stringify({
+      lang:         S.lang,
+      plan:         S.plan,
       autoSettings: S.autoSettings,
-      connected: [...S.connected],
-      referrals: S.referrals, refEarned: S.refEarned,
-    };
-    // ── DEMO ONLY: remove this block when backend is live ──
-    Object.assign(prefs, {
-      _DEV_vip: S.vip, _DEV_balance: S.balance, _DEV_profit: S.profit,
-      _DEV_trades: S.trades, _DEV_history: S.history.slice(-50),
-      _DEV_vipExpiry: S.vipExpiry,
-    });
-    // ───────────────────────────────────────────────────────
-    localStorage.setItem('nexarb_prefs_v5', JSON.stringify(prefs));
+      // userId и refCode НЕ сохраняем — приходят с сервера при каждом логине
+    }));
   } catch {}
 }
 
 function loadStorage() {
+  // Загружаем ТОЛЬКО UI-настройки — никакого баланса, VIP, истории
   try {
-    const raw = localStorage.getItem('nexarb_prefs_v5');
+    const raw = localStorage.getItem('nexarb_ui_v6');
     if (!raw) return false;
     const d = JSON.parse(raw);
-    // Safe UI prefs
-    S.lang  = d.lang  || 'ru';
-    S.plan  = d.plan  || 'year';
-    S.userId = d.userId || '';
-    S.refCode = d.refCode || '';
-    S.autoSettings = { ...S.autoSettings, ...(d.autoSettings || {}) };
-    S.connected = new Set(d.connected || ['binance','okx']);
-    S.referrals = d.referrals || [];
-    S.refEarned = d.refEarned || 0;
-    // ── DEMO ONLY: replace with API.getAccount() call ──
-    if (d._DEV_vip !== undefined) {
-      S.vip = d._DEV_vip;
-      S.vipExpiry = d._DEV_vipExpiry || null;
-      S.trades = d._DEV_trades || 0;
-      S.history = d._DEV_history || [];
-      if (d._DEV_balance !== undefined) _ui.setBalance(d._DEV_balance);
-      if (d._DEV_profit  !== undefined) _ui.setProfit(d._DEV_profit);
+    // Только безопасные UI-настройки
+    if (d.lang && typeof d.lang === 'string') S.lang = d.lang;
+    if (d.plan && typeof d.plan === 'string') S.plan = d.plan;
+    if (d.autoSettings && typeof d.autoSettings === 'object') {
+      S.autoSettings = { ...S.autoSettings, ...d.autoSettings };
     }
-    // ──────────────────────────────────────────────────
-    S.autoEnabled = false; // ALWAYS disabled on reload (safety)
+    S.autoEnabled = false; // ВСЕГДА выключен при перезагрузке
     return true;
   } catch { return false; }
 }
 
-function genUserId() {
-  // Use cryptographically secure random for user ID
-  // In production: ID is assigned by backend, not generated client-side
+// ── API: загрузка аккаунта с сервера ─────────────────────────
+// Это ЕДИНСТВЕННЫЙ способ получить баланс, VIP, историю
+async function loadAccountFromServer() {
+  const spinner = document.getElementById('loadingSpinner');
+  if (spinner) spinner.style.display = 'flex';
+
   try {
-    const arr = new Uint8Array(8);
-    crypto.getRandomValues(arr);
-    return 'NX' + Array.from(arr, b => b.toString(16).padStart(2,'0')).join('').toUpperCase().slice(0,12);
-  } catch {
-    // Fallback for environments without crypto API
-    return 'NX' + Date.now().toString(36).toUpperCase();
+    const data = await API.getAccount();
+    if (!data) return false;
+
+    // Все финансовые данные — только от сервера
+    _ui.setBalance(data.balance);
+    _ui.setProfit(data.profit || 0);
+    _ui.setTrades(data.trades || 0);
+    _ui.setVip(data.vip, data.vip_expires);
+
+    // userId и refCode — только от сервера, не генерируются клиентом
+    S.userId  = data.user_id  || '';
+    S.refCode = data.ref_code || '';
+
+    // Подключённые биржи — синхронизируем из сервера
+    if (Array.isArray(data.connected_exchanges)) {
+      S.connected = new Set(data.connected_exchanges);
+    }
+
+    // Загружаем историю
+    try {
+      const hist = await API.request('GET', '/trades?page=1');
+      if (hist?.items) S.history = hist.items;
+    } catch {}
+
+    return true;
+  } catch (e) {
+    // Нет соединения — показываем состояние ошибки
+    _netStatus.setError('network');
+    return false;
+  } finally {
+    if (spinner) spinner.style.display = 'none';
   }
+}
+
+// ── AUTH: логин через Telegram initData ──────────────────────
+async function loginWithTelegram() {
+  // Получаем initData от Telegram WebApp API
+  const initData = window.Telegram?.WebApp?.initData || '';
+
+  // Реферальный код из URL параметра
+  const urlRef = new URLSearchParams(window.location.search).get('ref') || '';
+
+  try {
+    const resp = await fetch(API_BASE + '/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ init_data: initData, ref_code: urlRef }),
+    });
+
+    if (!resp.ok) throw new Error(`Auth failed: ${resp.status}`);
+    const data = await resp.json();
+
+    if (!data.token) throw new Error('No token received');
+
+    // Сохраняем JWT только в памяти (SESSION object)
+    // НЕ в localStorage, НЕ в cookie
+    SESSION.set(data.token, data.user_id, data.ttl || 3600);
+
+    return true;
+  } catch (e) {
+    console.warn('Login failed:', e.message);
+    // В demo-режиме: продолжаем без аутентификации
+    return false;
+  }
+}
+
+// genUserId УДАЛЕНА — ID теперь генерирует только сервер
+// Оставлена как заглушка чтобы не сломать вызовы в коде
+function genUserId() {
+  // ⚠️  НЕ ИСПОЛЬЗУЕТСЯ в production
+  // ID назначается сервером при POST /api/v1/auth/login
+  // Эта функция существует только для совместимости demo-режима
+  console.warn('genUserId() called — should use server-assigned ID');
+  return 'DEMO_' + Date.now().toString(36).toUpperCase();
 }
 
 // ========================================================
@@ -2710,20 +2767,34 @@ function selPlan(id, el) {
 }
 
 function doBuy() {
-  toastMsg('💳 Переход к оплате...','ok');
-  setTimeout(()=>{
-    S.vip = true;
-    const days = S.plan==='week'?7:S.plan==='month'?30:365;
-    S.vipExpiry = new Date(Date.now()+days*86400000).toISOString();
-    updateHeaderVip();
-    addDemoReferrals();
-    renderSigs(); renderExchanges(); renderVip();
-    renderAutoPanel(); renderVipAutoSettings();
-    saveStorage();
-    toastMsg('🎉 VIP активирован! Добро пожаловать!','ok');
-    setTimeout(()=>toastMsg('🤖 Авто-торговля доступна в меню','ok'),1500);
-    showPg('signals');
-  },1400);
+  // ── БЕЗОПАСНОСТЬ: VIP активируется ТОЛЬКО сервером ──────
+  // Клиент не может сам поставить S.vip = true
+  // Активация происходит только после подтверждения от /api/v1/vip/subscribe
+  const plan = S.plan;
+  toastMsg('💳 Отправка запроса на сервер...', '');
+
+  API.buyVip(plan)
+    .then(result => {
+      if (!result || !result.ok) {
+        toastMsg('❌ Ошибка активации VIP', 'err');
+        return;
+      }
+      // Данные о VIP приходят с сервера, не устанавливаются клиентом
+      _ui.setVip(true, result.expires_at ? new Date(result.expires_at * 1000).toISOString() : null);
+
+      // Обновляем полный аккаунт с сервера
+      loadAccountFromServer().then(() => {
+        renderSigs(); renderExchanges(); renderVip();
+        renderAutoPanel(); renderVipAutoSettings();
+        saveStorage();
+        toastMsg('🎉 VIP активирован! Подтверждено сервером ✅', 'ok');
+        setTimeout(() => toastMsg('🤖 Авто-торговля доступна в меню', 'ok'), 1500);
+        showPg('signals');
+      });
+    })
+    .catch(err => {
+      toastMsg(`❌ ${err.message || 'Ошибка сервера'}`, 'err');
+    });
 }
 
 // ========================================================
@@ -2743,17 +2814,65 @@ function openConn(id) {
   openModal('connModal');
 }
 function doConnect() {
-  if(!document.getElementById('apiKey').value.trim()||!document.getElementById('apiSecret').value.trim()){toastMsg('⚠️ Заполни оба поля','warn');return;}
-  S.connected.add(pendingEx);
-  closeModal('connModal');
-  renderExchanges(); renderSigs();
-  const e=EXCMAP[pendingEx];
-  toastMsg(`✅ ${e.name} подключена!`,'ok');
+  const apiKey    = document.getElementById('apiKey').value.trim();
+  const apiSecret = document.getElementById('apiSecret').value.trim();
+  const apiPass   = document.getElementById('apiPass').value.trim();
+
+  if (!apiKey || !apiSecret) {
+    toastMsg('⚠️ Заполни оба поля', 'warn');
+    return;
+  }
+  if (apiKey.length < 8 || apiSecret.length < 8) {
+    toastMsg('⚠️ Слишком короткий ключ', 'warn');
+    return;
+  }
+
+  // ── БЕЗОПАСНОСТЬ: ключи отправляются на сервер по HTTPS ─
+  // Клиент НЕ хранит ключи — только сервер
+  // Сервер возвращает только маску (xxxx****xxxx)
+  const btn = document.querySelector('#connModal .btn-primary') ||
+              document.querySelector('#connModal button[onclick*="doConnect"]');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Подключение...'; }
+
+  API.connectExchange(pendingEx, apiKey, apiSecret, apiPass)
+    .then(result => {
+      if (!result?.ok) {
+        toastMsg(`❌ ${result?.error || 'Ошибка подключения'}`, 'err');
+        return;
+      }
+      // Добавляем в локальный Set только после подтверждения сервера
+      S.connected.add(pendingEx);
+      closeModal('connModal');
+
+      // Очищаем поля сразу после отправки
+      document.getElementById('apiKey').value   = '';
+      document.getElementById('apiSecret').value = '';
+      document.getElementById('apiPass').value   = '';
+
+      renderExchanges(); renderSigs();
+      const e = EXCMAP[pendingEx];
+      toastMsg(`✅ ${e.name} подключена! Ключ: ${result.keyMask}`, 'ok');
+    })
+    .catch(err => {
+      toastMsg(`❌ ${err.message}`, 'err');
+    })
+    .finally(() => {
+      if (btn) { btn.disabled = false; btn.textContent = 'Подключить'; }
+    });
 }
+
 function doDisconnect(id) {
-  S.connected.delete(id);
-  renderExchanges(); renderSigs();
-  toastMsg(`🔌 ${EXCMAP[id].name} отключена`,'warn');
+  API.disconnectExchange(id)
+    .then(() => {
+      S.connected.delete(id);
+      renderExchanges(); renderSigs();
+      toastMsg(`🔌 ${EXCMAP[id]?.name || id} отключена`, 'warn');
+    })
+    .catch(() => {
+      // Даже при ошибке сети — убираем локально
+      S.connected.delete(id);
+      renderExchanges(); renderSigs();
+    });
 }
 
 // ========================================================
@@ -2829,53 +2948,61 @@ function execTrade() {
   const sig = S.currentSig; if (!sig) return;
   const amt = parseFloat(document.getElementById('tAmt').value) || 0;
 
-  // ── CLIENT-SIDE pre-validation ─────────────────────────
-  // NOTE: Backend MUST duplicate all checks — client-side is UX only
-  if (!S.vip && S.trades >= S.maxFree) {
-    toastMsg('❌ Лимит 5 сделок/день FREE. Upgrade VIP!', 'err');
-    closeModal('tradeModal');
-    setTimeout(() => showPg('vip'), 400);
-    return;
-  }
-  if (amt <= 0) { toastMsg('⚠️ Введите сумму', 'warn'); return; }
+  // ── Клиентская предварительная проверка (UX only) ────────
+  // СЕРВЕР дублирует ВСЕ эти проверки независимо
+  if (amt <= 0)  { toastMsg('⚠️ Введите сумму', 'warn'); return; }
+  if (amt < 10)  { toastMsg('⚠️ Минимум $10', 'warn'); return; }
   if (amt > S.balance) { toastMsg(t('funds_check'), 'err'); return; }
-  if (amt < 10) { toastMsg('⚠️ Минимум $10', 'warn'); return; }
 
   closeModal('tradeModal');
+  toastMsg(t('order_pending'), '');
 
-  // ── In production: POST to /api/v1/trades ─────────────
-  // For demo mode (no backend): simulate order flow
+  // ── ОТПРАВЛЯЕМ ТОЛЬКО ПАРАМЕТРЫ — не результат ───────────
+  // Клиент передаёт: что торговать, на сколько, через какие биржи
+  // Сервер САМИ считает: все комиссии, проскальзывание, чистую прибыль
+  // Клиент не может подделать netProfit — он вычисляется только на сервере
   const payload = {
-    signalId:   sig.id,
-    symbol:     sig.sym,
+    symbol:       sig.sym,
     buyExchange:  sig.bx,
     sellExchange: sig.sx,
-    amount:     amt,
-    spread:     sig.spread,
-    type:       sig.type,
-    maxSlippage: 0.005, // 0.5% max slippage tolerance
+    amount:       amt,
+    spread:       sig.spread,
+    type:         sig.type,
+    aiScore:      sig.aiScore || 0,
+    latency:      sig.latency || 50,
   };
 
-  // DEMO: simulate order status pipeline (replace with real API call)
-  _demoExecuteOrder(payload, sig, amt);
+  API.submitTrade(payload)
+    .then(order => {
+      if (!order) { toastMsg('❌ Нет ответа от сервера', 'err'); return; }
 
-  /* PRODUCTION CODE (uncomment when backend ready):
-  API.submitTrade(payload).then(order => {
-    if (order?.orderId) {
-      toastMsg(`⚡ Ордер создан: ${order.orderId}`, 'ok');
-      OrderTracker.track(order.orderId, sig, amt);
-    }
-  }).catch(err => {
-    toastMsg(`❌ Ошибка: ${err.message}`, 'err');
-  });
-  */
+      // ── ВСЕ финансовые данные — только от сервера ─────────
+      // order.netProfit вычислен на сервере, не клиентом
+      // order.newBalance обновлён в БД атомарно
+      _ui.applyOrderResult(order);
+
+      const net = order.netProfit || 0;
+      const ms  = order.executionMs || 0;
+      toastMsg(
+        net >= 0
+          ? `${t('order_ok')} +$${net.toFixed(4)} · ${ms}ms`
+          : `${t('order_fail')} $${net.toFixed(4)}`,
+        net >= 0 ? 'ok' : 'err'
+      );
+    })
+    .catch(err => {
+      // Ошибка может быть: нет баланса, лимит FREE, биржа недоступна
+      const msg = err.message || 'Ошибка выполнения';
+      toastMsg(`❌ ${msg}`, 'err');
+    });
 }
 
-// ── DEMO ORDER SIMULATOR (remove in production) ────────────
-// ⚠️  This function exists ONLY for demo mode.
-// In production: execTrade() calls API.submitTrade() and OrderTracker.track()
-// Outcome is determined by the exchange, reported by backend via WS push.
+// ── DEMO FALLBACK (используется когда сервер недоступен) ─────
+// Только для демонстрации UI. В production эта функция не вызывается.
 function _demoExecuteOrder(payload, sig, amt) {
+  // Предупреждение: этот режим небезопасен для реальных денег
+  console.warn('[DEMO] _demoExecuteOrder called — no real server validation');
+
   const fees = calcFees(amt, sig);
   const gross = amt * (sig.displayRate || sig.spread) / 100;
   const net = +(gross - fees.total).toFixed(4);
@@ -2883,38 +3010,25 @@ function _demoExecuteOrder(payload, sig, amt) {
   const aiSc = sig.aiScore || 70;
 
   toastMsg(t('order_pending'), '');
-
   setTimeout(() => {
     toastMsg(t('order_executing'), '');
     setTimeout(() => {
-      // Demo: outcome based on spread positivity + AI score (no Math.random)
-      // Production: outcome is 100% from real exchange fill, sent by server
       const ok = net > 0 && aiSc >= 40;
-
       S.trades++;
       S.ownerEarned = +(S.ownerEarned + fees.platform).toFixed(4);
-
-      if (ok) {
-        // Use _ui methods — direct S.balance = X is intentionally blocked
-        _ui.setBalance(S.balance + net);
-        _ui.setProfit(S.profit + net);
-      }
-
+      if (ok) { _ui.setBalance(S.balance + net); _ui.setProfit(S.profit + net); }
       S.history.unshift({
         sym: sig.sym, bx: sig.bx, sx: sig.sx, amount: amt,
-        fee: fees.platform,
-        profit: ok ? net : -(fees.exchangeA + fees.exchangeB),
-        spread: sig.spread, type: sig.type,
-        aiScore: aiSc, latency: latMs,
+        fee: fees.platform, profit: ok ? net : -(fees.exchangeA + fees.exchangeB),
+        spread: sig.spread, type: sig.type, aiScore: aiSc, latency: latMs,
         time: new Date().toLocaleTimeString('ru'),
       });
       if (S.history.length > 200) S.history.length = 200;
-
       saveStorage();
       if (document.getElementById('pg-history')?.classList.contains('on')) renderHistory();
       renderSigs();
       toastMsg(
-        ok ? `${t('order_ok')} +$${net.toFixed(4)} · ${latMs}ms` : `${t('order_fail')}`,
+        ok ? `[DEMO] ${t('order_ok')} +$${net.toFixed(4)}` : `[DEMO] ${t('order_fail')}`,
         ok ? 'ok' : 'err'
       );
     }, Math.min(latMs * 5, 2000));
@@ -3130,36 +3244,46 @@ function mkStars(){
 // ========================================================
 // INIT
 // ========================================================
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   mkStars();
 
-  // ── Load preferences ──────────────────────────────────────
-  // PRODUCTION: replace with await API.getAccount() to get real balance/VIP
-  const hasData = loadStorage();
+  // ── Шаг 1: загружаем UI-настройки из localStorage ─────────
+  // Только язык / тема / autoSettings — НОЛЬ финансовых данных
+  const hasUiPrefs = loadStorage();
 
-  if (!S.userId) {
-    S.userId = genUserId();
-    S.refCode = S.userId.slice(0, 8).toUpperCase();
-    saveStorage();
-  }
-
-  // Set demo starting balance only for first-time users (no backend data)
-  if (!hasData) {
-    _ui.setBalance(3240);
-    _ui.setProfit(0);
-  }
-
-  // Apply i18n to entire UI
+  // ── Шаг 2: применяем язык сразу ──────────────────────────
   applyI18n();
 
-  // Show language screen for new users
-  if (!hasData) {
-    document.getElementById('langScreen').style.display = 'flex';
+  // Рендерим UI заглушкой пока данные грузятся
+  safeText('hBalancе', '$ —');
+  const hProfit = document.getElementById('hProfit');
+  if (hProfit) hProfit.textContent = '— —';
+
+  // ── Шаг 3: аутентификация через Telegram ─────────────────
+  // JWT токен генерирует СЕРВЕР, userId генерирует СЕРВЕР
+  const loggedIn = await loginWithTelegram();
+
+  // ── Шаг 4: загружаем финансовые данные с сервера ──────────
+  // Баланс, VIP, история — ТОЛЬКО из БД сервера
+  const accountLoaded = loggedIn ? await loadAccountFromServer() : false;
+
+  if (!accountLoaded) {
+    // Нет сервера — demo-режим с заглушкой
+    // В production это место должно показывать ошибку подключения
+    _ui.setBalance(3000);
+    _ui.setProfit(0);
+    S.connected = new Set(['binance', 'okx']);
+    console.warn('[DEMO] Server unavailable — using local demo state');
   }
 
   updateHeaderVip();
 
-  // Init UI components
+  // Показываем экран выбора языка новым пользователям
+  if (!hasUiPrefs) {
+    document.getElementById('langScreen').style.display = 'flex';
+  }
+
+  // ── Шаг 5: инициализация UI компонентов ──────────────────
   initDragScroll(document.getElementById('netChips'));
   initDragScroll(document.getElementById('sigChips'));
   initChipClicks();
@@ -3170,33 +3294,47 @@ document.addEventListener('DOMContentLoaded', () => {
   renderVip();
   renderVipAutoSettings();
 
-  // ── Network status badge default ─────────────────────────
-  _netStatus._state = 'network'; // demo mode — not connected to real WS
+  // ── Статус подключения ────────────────────────────────────
   const badge = document.getElementById('wsBadge');
   if (badge) {
-    badge.textContent = `${SIGS.length} сигн. · DEMO`;
-    badge.style.color = 'var(--gold)';
+    if (SESSION.valid()) {
+      badge.textContent = `${SIGS.length} сигн. · CONNECTED`;
+      badge.style.color = 'var(--green)';
+    } else {
+      badge.textContent = `${SIGS.length} сигн. · DEMO`;
+      badge.style.color = 'var(--gold)';
+    }
   }
 
-  // ── PRODUCTION: Connect WebSocket ─────────────────────────
-  // Uncomment this line when backend is ready.
-  // wsManager.connect('wss://your-backend.com/ws/prices');
-  //
-  // The WS will drive all price/signal updates.
-  // Remove setInterval(liveUpdate) below when WS is active.
-
-  // ── DEMO: fallback price simulation timer ─────────────────
-  // ⚠️  Remove this in production — real data comes from wsManager
+  // ── Сигналы: обновление каждые 500ms ─────────────────────
+  // Production: заменить на wsManager.connect('wss://...')
   setInterval(liveUpdate, 500);
 
-  // Refresh signal count badge
+  // Обновляем badge
   setInterval(() => {
     const b = document.getElementById('wsBadge');
     if (b && !wsManager.connected) {
-      b.textContent = `${SIGS.length} сигн. · DEMO`;
-      b.style.color = 'var(--gold)';
+      const label = SESSION.valid() ? 'CONNECTED' : 'DEMO';
+      const color = SESSION.valid() ? 'var(--green)' : 'var(--gold)';
+      b.textContent = `${SIGS.length} сигн. · ${label}`;
+      b.style.color = color;
     }
   }, 3000);
+
+  // Периодически обновляем баланс с сервера (если авторизованы)
+  if (SESSION.valid()) {
+    setInterval(async () => {
+      if (SESSION.valid()) {
+        try {
+          const data = await API.getAccount();
+          if (data) {
+            _ui.setBalance(data.balance);
+            _ui.setVip(data.vip, data.vip_expires);
+          }
+        } catch {}
+      }
+    }, 30000); // каждые 30 сек
+  }
 });
 </script>
 </body>

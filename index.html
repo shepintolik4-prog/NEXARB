@@ -1515,42 +1515,7 @@ const SESSION = {
   },
 };
 
-// ── UI STATE (READ-ONLY MIRROR FROM BACKEND) ──────────────────
-// ⚠️  This state is for DISPLAY ONLY.
-// ⚠️  NONE of these values authorize any financial operation.
-// ⚠️  Backend ignores any balance/vip claim from client.
-// ⚠️  S.balance is updated ONLY after backend confirms via WS or API.
-const S = {
-  // ── Display values (mirrors of backend state) ──
-  balance: 0,       // READONLY mirror — set by _ui.setBalance()
-  profit: 0,        // READONLY mirror — set by _ui.setProfit()
-  vip: false,       // READONLY mirror — set by _ui.setVip()
-  trades: 0,        // READONLY mirror — trade count display only
-  // ── UI preferences (safe to store locally) ──
-  lang: 'ru',
-  plan: 'year',
-  connected: new Set(),      // which exchanges are linked (display)
-  history: [],               // display-only trade log (from backend)
-  sigFilter: 'all',
-  netFilter: 'all',
-  currentSig: null,
-  autoEnabled: false,
-  autoSettings: {
-    amount: 100, minSpread: 0.5, maxRisk: 'med',
-    stopLoss: 1.0, maxPerDay: 20, networkFilter: 'all',
-  },
-  autoTimer: null,
-  // ── Identity (non-sensitive) ──
-  userId: '',
-  refCode: '',
-  referrals: [],
-  refEarned: 0,
-  vipExpiry: null,
-  maxFree: 5,
-  freeFee: 0.008,
-  vipFee: 0.003,
-  ownerEarned: 0,
-};
+// ── UI STATE: defined above as const S ──
 
 // ── PROTECTED UI UPDATER ──────────────────────────────────────
 // All financial state updates go through this — not directly to S
@@ -3055,55 +3020,7 @@ function liveUpdate() {
   rafScheduler.schedule();
 }
 
-// ── DEMO ORDER SIMULATOR ──────────────────────────────────
-// Remove this function entirely in production.
-// Production: execTrade() calls API.submitTrade() → OrderTracker.track()
-function _demoExecuteOrder(payload, sig, amt) {
-  const fees = calcFees(amt, sig);
-  const gross = amt * (sig.displayRate || sig.spread) / 100;
-  const net = +(gross - fees.total).toFixed(4);
-  const latMs = sig.latency || 50;
-  const aiSc = sig.aiScore || 70;
 
-  toastMsg(t('order_pending'), '');
-
-  setTimeout(() => {
-    toastMsg(t('order_executing'), '');
-    setTimeout(() => {
-      // DEMO outcome: based on AI score + positive spread (no pure random)
-      // In production: outcome is 100% from exchange execution, reported by server
-      const profitPositive = net > 0;
-      const aiOk = aiSc >= 40;
-      const ok = profitPositive && aiOk;
-
-      S.trades++;
-      S.ownerEarned = +(S.ownerEarned + fees.platform).toFixed(4);
-
-      if (ok) {
-        // Always use _ui methods — never manipulate S.balance directly
-        _ui.setBalance(S.balance + net);
-        _ui.setProfit(S.profit + net);
-      }
-
-      S.history.unshift({
-        sym: sig.sym, bx: sig.bx, sx: sig.sx, amount: amt,
-        fee: fees.platform, profit: ok ? net : -(fees.exchangeA + fees.exchangeB),
-        spread: sig.spread, type: sig.type, aiScore: aiSc,
-        latency: latMs, time: new Date().toLocaleTimeString('ru'),
-      });
-      if (S.history.length > 200) S.history.length = 200;
-
-      saveStorage();
-      if (document.getElementById('pg-history')?.classList.contains('on')) renderHistory();
-      renderSigs();
-
-      toastMsg(
-        ok ? `${t('order_ok')} +$${net.toFixed(4)} · ${latMs}ms` : `${t('order_fail')}`,
-        ok ? 'ok' : 'err'
-      );
-    }, Math.min(latMs * 5, 2000));
-  }, 500);
-}
 
 // ========================================================
 // DRAG-SCROLL ENGINE FOR CHIP ROWS

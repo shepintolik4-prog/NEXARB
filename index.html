@@ -103,19 +103,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);overflow:hid
 .hdr-stat-val{font-family:var(--mono);font-size:13px;font-weight:600}
 .c{color:var(--cyan)}.g{color:var(--green)}.go{color:var(--gold)}
 
-/* TICKER */
-.ticker{
-  flex-shrink:0;height:28px;overflow:hidden;
-  background:var(--bg1);border-bottom:1px solid var(--border);
-  display:flex;align-items:center;
-}
-.ticker-inner{display:flex;gap:0;white-space:nowrap;animation:tick 40s linear infinite}
-@keyframes tick{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-.tick-item{display:inline-flex;align-items:center;gap:7px;padding:0 16px;font-family:var(--mono);font-size:10px;border-right:1px solid var(--border)}
-.tick-sym{color:var(--text2);font-weight:600}
-.tick-p{color:var(--text)}
-.tick-up{color:var(--green)}
-.tick-dn{color:var(--red)}
+/* TICKER REMOVED */
 
 /* SCROLL AREA */
 .scroll{flex:1;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
@@ -349,6 +337,74 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);overflow:hid
 .empty .ei{font-size:36px;margin-bottom:10px}
 .empty .et{font-size:13px;font-weight:600;margin-bottom:5px;color:var(--text2)}
 .empty .es{font-size:11px;line-height:1.5}
+
+/* LANGUAGE ONBOARDING */
+.lang-screen{position:fixed;inset:0;background:var(--bg);z-index:500;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px}
+.lang-logo{font-size:52px;margin-bottom:12px;filter:drop-shadow(0 0 20px rgba(0,207,255,.5))}
+.lang-title{font-size:26px;font-weight:800;color:var(--text);margin-bottom:4px;letter-spacing:1px}
+.lang-title em{color:var(--cyan);font-style:normal}
+.lang-sub{font-size:12px;color:var(--text2);margin-bottom:32px;text-align:center}
+.lang-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:340px;margin-bottom:24px}
+.lang-btn{padding:14px 10px;border-radius:12px;border:1px solid var(--border2);background:var(--bg2);display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;transition:all .2s}
+.lang-btn.sel{border-color:var(--cyan);background:rgba(0,207,255,.08)}
+.lang-flag{font-size:28px}
+.lang-name{font-size:12px;font-weight:700;color:var(--text)}
+.lang-native{font-size:10px;color:var(--text2)}
+.lang-confirm{width:100%;max-width:340px;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--cyan),var(--purple));color:#000;font-family:var(--font);font-size:14px;font-weight:800;cursor:pointer}
+/* AT = Auto-Trade redesign */
+.at-card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:10px}
+.at-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:linear-gradient(135deg,rgba(0,232,122,.07),rgba(0,207,255,.04));border-bottom:1px solid var(--border)}
+.at-title{font-size:14px;font-weight:800;display:flex;align-items:center;gap:8px}
+.at-badge{font-size:9px;padding:3px 8px;border-radius:5px;font-weight:700;letter-spacing:.5px}
+.at-badge.on{background:rgba(0,232,122,.15);color:var(--green);border:1px solid rgba(0,232,122,.3)}
+.at-badge.off{background:rgba(61,96,128,.15);color:var(--muted);border:1px solid var(--border)}
+.at-toggle-row{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border)}
+.at-settings{padding:4px 16px 12px}
+.at-row{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid rgba(19,32,53,.5)}
+.at-row:last-child{border-bottom:none}
+.at-key{font-size:11px;color:var(--text2);display:flex;align-items:center;gap:5px}
+.at-inp{background:var(--bg3);border:1px solid var(--border2);border-radius:7px;padding:5px 10px;color:var(--text);font-family:var(--mono);font-size:12px;width:100px;outline:none;text-align:right;transition:border-color .2s}
+.at-inp:focus{border-color:var(--cyan)}
+.at-sel{background:var(--bg3);border:1px solid var(--border2);border-radius:7px;padding:5px 10px;color:var(--text);font-family:var(--font);font-size:11px;outline:none;cursor:pointer}
+.at-live{margin:0 16px 14px;padding:10px 12px;background:rgba(0,207,255,.04);border:1px solid rgba(0,207,255,.12);border-radius:9px;display:flex;align-items:center;gap:10px}
+.at-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.at-dot.on{background:var(--green);box-shadow:0 0 8px var(--green);animation:blink 1.2s infinite}
+.at-dot.off{background:var(--muted)}
+.at-locked{margin:14px;padding:20px 16px;border-radius:12px;background:rgba(245,166,35,.04);border:1px dashed rgba(245,166,35,.25);text-align:center;cursor:pointer}
+.at-locked-ico{font-size:36px;margin-bottom:8px}
+.at-locked-title{font-size:13px;font-weight:700;color:var(--gold);margin-bottom:4px}
+.at-locked-sub{font-size:10px;color:var(--text2);line-height:1.6}
+.at-locked-btn{margin-top:12px;display:inline-block;padding:8px 20px;border-radius:8px;border:1px solid rgba(245,166,35,.4);background:rgba(245,166,35,.1);color:var(--gold);font-family:var(--font);font-size:11px;font-weight:700;cursor:pointer}
+/* PROFILE */
+.prof-hero{background:linear-gradient(135deg,rgba(0,207,255,.06),rgba(168,85,247,.05));border:1px solid rgba(0,207,255,.15);border-radius:14px;padding:18px 16px;margin-bottom:12px;position:relative;overflow:hidden}
+.prof-hero::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--cyan),transparent)}
+.prof-avatar{width:54px;height:54px;border-radius:14px;background:linear-gradient(135deg,var(--cyan),var(--purple));display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:10px;box-shadow:0 4px 18px rgba(0,207,255,.25)}
+.prof-name{font-size:17px;font-weight:800;margin-bottom:2px}
+.prof-id{font-size:10px;color:var(--text2);font-family:var(--mono)}
+.prof-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.prof-stat{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 8px;text-align:center}
+.prof-stat-v{font-family:var(--mono);font-size:15px;font-weight:700;margin-bottom:3px}
+.prof-stat-l{font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px}
+.prof-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px}
+.prof-card-title{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text2);font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:6px}
+.prof-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(19,32,53,.5);font-size:11px}
+.prof-row:last-child{border-bottom:none}
+.prof-key{color:var(--text2)}
+.prof-val{font-weight:600;font-family:var(--mono)}
+.vip-timer-bar{height:5px;background:var(--bg3);border-radius:3px;margin-top:8px;overflow:hidden}
+.vip-timer-fill{height:100%;background:linear-gradient(90deg,var(--gold),var(--purple));border-radius:3px}
+.ref-link-box{background:var(--bg2);border:1px solid var(--border2);border-radius:9px;padding:10px 12px;display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.ref-link-text{flex:1;font-family:var(--mono);font-size:10px;color:var(--cyan);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ref-copy-btn{flex-shrink:0;padding:5px 10px;border-radius:6px;border:1px solid rgba(0,207,255,.3);background:rgba(0,207,255,.08);color:var(--cyan);font-size:10px;font-weight:700;cursor:pointer;font-family:var(--font);transition:all .15s}
+.ref-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px}
+.ref-stat{background:var(--bg2);border:1px solid var(--border);border-radius:9px;padding:10px;text-align:center}
+.ref-stat-v{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--cyan)}
+.ref-stat-l{font-size:9px;color:var(--muted);margin-top:2px}
+.ref-item{display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:1px solid rgba(19,32,53,.5)}
+.ref-item:last-child{border-bottom:none}
+.ref-item-ico{width:30px;height:30px;border-radius:8px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.lang-opt{padding:5px 12px;border-radius:6px;border:1px solid var(--border2);background:var(--bg2);font-size:11px;cursor:pointer;transition:all .15s;font-family:var(--font)}
+.lang-opt.sel{border-color:var(--cyan);color:var(--cyan);background:rgba(0,207,255,.08)}
 </style>
 </head>
 <body>
@@ -385,9 +441,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);overflow:hid
       </div>
     </div>
   </div>
-
-  <!-- TICKER -->
-  <div class="ticker"><div class="ticker-inner" id="tickerInner"></div></div>
 
   <!-- FILTER ZONE -->
   <div id="filterZone" style="flex-shrink:0;background:rgba(6,13,24,0.97);border-bottom:1px solid var(--border)">
@@ -513,6 +566,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);overflow:hid
       <div id="vipAutoSettings"></div>
     </div>
 
+    <!-- PAGE: PROFILE -->
+    <div class="pg" id="pg-profile">
+      <div id="profContent"></div>
+    </div>
+
   </div><!-- /scroll -->
 
   <!-- BOTTOM NAV -->
@@ -523,6 +581,22 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);overflow:hid
     <button class="nb" id="nb-history" onclick="showPg('history')"><span class="ni">📜</span><span class="nl">История</span></button>
     <button class="nb" id="nb-vip" onclick="showPg('vip')"><span class="ni">👑</span><span class="nl">VIP</span></button>
   </nav>
+</div>
+
+<!-- LANGUAGE ONBOARDING -->
+<div class="lang-screen" id="langScreen" style="display:none">
+  <div class="lang-logo" style="font-size:52px;font-weight:800;background:linear-gradient(135deg,var(--cyan),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:12px">N∞</div>
+  <div class="lang-title">NEX<em>ARB</em></div>
+  <div class="lang-sub">Крипто-арбитраж · Выберите язык</div>
+  <div class="lang-grid" id="langGrid">
+    <div class="lang-btn sel" data-lang="ru" onclick="selLang('ru',this)"><span class="lang-flag">🇷🇺</span><span class="lang-name">Русский</span><span class="lang-native">Russian</span></div>
+    <div class="lang-btn" data-lang="en" onclick="selLang('en',this)"><span class="lang-flag">🇬🇧</span><span class="lang-name">English</span><span class="lang-native">English</span></div>
+    <div class="lang-btn" data-lang="tr" onclick="selLang('tr',this)"><span class="lang-flag">🇹🇷</span><span class="lang-name">Türkçe</span><span class="lang-native">Turkish</span></div>
+    <div class="lang-btn" data-lang="es" onclick="selLang('es',this)"><span class="lang-flag">🇪🇸</span><span class="lang-name">Español</span><span class="lang-native">Spanish</span></div>
+    <div class="lang-btn" data-lang="de" onclick="selLang('de',this)"><span class="lang-flag">🇩🇪</span><span class="lang-name">Deutsch</span><span class="lang-native">German</span></div>
+    <div class="lang-btn" data-lang="ar" onclick="selLang('ar',this)"><span class="lang-flag">🇸🇦</span><span class="lang-name">العربية</span><span class="lang-native">Arabic</span></div>
+  </div>
+  <button class="lang-confirm" id="langConfirmBtn" onclick="confirmLang()">Продолжить →</button>
 </div>
 
 <!-- CONNECT MODAL -->
@@ -567,6 +641,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);overflow:hid
 // ========================================================
 const S = {
   vip: false, plan: 'year',
+  lang: 'ru',
   connected: new Set(['binance','okx']),
   trades: 0, maxFree: 5,
   balance: 3240, profit: 0,
@@ -576,7 +651,11 @@ const S = {
   currentSig: null,
   sigFilter: 'all',
   netFilter: 'all',
-  // Auto-trade
+  userId: '',
+  refCode: '',
+  referrals: [],
+  refEarned: 0,
+  vipExpiry: null,
   autoEnabled: false,
   autoSettings: {
     amount: 100,
@@ -584,10 +663,10 @@ const S = {
     maxRisk: 'med',
     stopLoss: 1.0,
     maxPerDay: 20,
+    networkFilter: 'all',
     networks: new Set(['all']),
   },
   autoTimer: null,
-  autoTradesLeft: 0,
 };
 
 // ========================================================
@@ -817,129 +896,110 @@ function setNet(net) {
 // ========================================================
 // AUTO-TRADE PANEL RENDER
 // ========================================================
+// ========================================================
+// AUTO-TRADE PANEL - REDESIGNED
+// ========================================================
+function atHTML(idSuffix) {
+  const as = S.autoSettings;
+  const isRun = S.autoEnabled;
+  return `
+  <div class="at-card">
+    <div class="at-header">
+      <div class="at-title">🤖 Авто-торговля <span class="at-badge ${S.vip?'on':'off'}">${S.vip?'VIP · АКТИВНА':'ТОЛЬКО VIP'}</span></div>
+      <label class="toggle">
+        <input type="checkbox" ${isRun?'checked':''} onchange="toggleAuto(this.checked)">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div class="at-settings">
+      <div class="at-row">
+        <span class="at-key">💵 Сумма на сделку (USDT)</span>
+        <input class="at-inp" type="number" value="${as.amount}" min="10" oninput="S.autoSettings.amount=+this.value;saveStorage()">
+      </div>
+      <div class="at-row">
+        <span class="at-key">📈 Мин. спред для входа (%)</span>
+        <input class="at-inp" type="number" value="${as.minSpread}" step="0.1" min="0.1" oninput="S.autoSettings.minSpread=+this.value;saveStorage()">
+      </div>
+      <div class="at-row">
+        <span class="at-key">⚠️ Макс. уровень риска</span>
+        <select class="at-sel" onchange="S.autoSettings.maxRisk=this.value;saveStorage()">
+          <option value="low" ${as.maxRisk==='low'?'selected':''}>Только низкий</option>
+          <option value="med" ${as.maxRisk==='med'?'selected':''}>Низкий + Средний</option>
+          <option value="high" ${as.maxRisk==='high'?'selected':''}>Все сделки</option>
+        </select>
+      </div>
+      <div class="at-row">
+        <span class="at-key">🔢 Макс. сделок в день</span>
+        <input class="at-inp" type="number" value="${as.maxPerDay}" min="1" max="500" oninput="S.autoSettings.maxPerDay=+this.value;saveStorage()">
+      </div>
+      <div class="at-row">
+        <span class="at-key">🛑 Стоп-лосс на сделку (%)</span>
+        <input class="at-inp" type="number" value="${as.stopLoss}" step="0.1" oninput="S.autoSettings.stopLoss=+this.value;saveStorage()">
+      </div>
+      <div class="at-row">
+        <span class="at-key">🌐 Только сеть</span>
+        <select class="at-sel" onchange="S.autoSettings.networkFilter=this.value;saveStorage()">
+          <option value="all" ${as.networkFilter==='all'?'selected':''}>Все сети</option>
+          <option value="eth" ${as.networkFilter==='eth'?'selected':''}>Ethereum</option>
+          <option value="bsc" ${as.networkFilter==='bsc'?'selected':''}>BSC</option>
+          <option value="sol" ${as.networkFilter==='sol'?'selected':''}>Solana</option>
+          <option value="arb" ${as.networkFilter==='arb'?'selected':''}>Arbitrum</option>
+          <option value="ton" ${as.networkFilter==='ton'?'selected':''}>TON</option>
+        </select>
+      </div>
+    </div>
+    <div class="at-live">
+      <div class="at-dot ${isRun?'on':'off'}"></div>
+      <div style="flex:1;font-size:10px;color:var(--text2);line-height:1.6">
+        ${isRun
+          ? `<strong style="color:var(--green)">Бот работает</strong> · Сделок сегодня: <strong>${S.history.length}</strong> · Профит: <strong style="color:var(--green)">+$${S.profit.toFixed(2)}</strong><br>Каждые 30 сек сканирует спреды >${as.minSpread}% на подключённых биржах`
+          : `<strong>Бот остановлен</strong> · Включите переключатель для старта<br>Бот будет сам находить и исполнять арбитраж 24/7`
+        }
+      </div>
+    </div>
+  </div>`;
+}
+
 function renderAutoPanel() {
   const wrap = document.getElementById('autoPanelWrap');
   if (!wrap) return;
   if (!S.vip) {
-    wrap.innerHTML = `<div class="auto-panel-locked" onclick="showPg('vip')">
-      <div style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--gold)">
-        🤖 Авто-торговля
-        <span style="margin-left:auto;font-size:9px;background:rgba(245,166,35,.15);border:1px solid rgba(245,166,35,.3);padding:2px 8px;border-radius:4px">👑 VIP</span>
-      </div>
-      <div style="font-size:10px;color:var(--text2);margin-top:5px">Бот сам исполняет арбитраж 24/7 пока вы спите. Доступно в VIP →</div>
-    </div>`;
+    wrap.innerHTML = `
+      <div class="at-card" onclick="showPg('vip')" style="cursor:pointer">
+        <div class="at-locked">
+          <div class="at-locked-ico">🤖</div>
+          <div class="at-locked-title">Авто-торговля 24/7</div>
+          <div class="at-locked-sub">Бот сам находит арбитраж и исполняет сделки пока вы спите.<br>Прибыль без участия — только для VIP пользователей.</div>
+          <div class="at-locked-btn">👑 Получить VIP →</div>
+        </div>
+      </div>`;
     return;
   }
-  const as = S.autoSettings;
-  const isRun = S.autoEnabled;
-  wrap.innerHTML = `
-    <div class="auto-panel">
-      <div class="auto-hdr">
-        <div class="auto-title">🤖 Авто-торговля <span style="font-size:9px;color:var(--green);background:rgba(0,232,122,.1);padding:2px 7px;border-radius:4px;font-weight:700">VIP</span></div>
-        <div class="toggle-wrap">
-          <span style="font-size:10px;color:var(--text2)">${isRun?'<span style="color:var(--green)">ВКЛ</span>':'ВЫКЛ'}</span>
-          <label class="toggle">
-            <input type="checkbox" id="autoToggle" ${isRun?'checked':''} onchange="toggleAuto(this.checked)">
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-      </div>
-      <div class="auto-row">
-        <span class="auto-key">Сумма на сделку (USDT)</span>
-        <input class="auto-inp" type="number" value="${as.amount}" id="ai-amt" oninput="S.autoSettings.amount=+this.value" min="10">
-      </div>
-      <div class="auto-row">
-        <span class="auto-key">Мин. спред для входа</span>
-        <input class="auto-inp" type="number" value="${as.minSpread}" id="ai-spread" step="0.1" oninput="S.autoSettings.minSpread=+this.value">
-      </div>
-      <div class="auto-row">
-        <span class="auto-key">Макс. риск</span>
-        <select class="auto-sel" id="ai-risk" onchange="S.autoSettings.maxRisk=this.value">
-          <option value="low" ${as.maxRisk==='low'?'selected':''}>Низкий</option>
-          <option value="med" ${as.maxRisk==='med'?'selected':''}>Средний</option>
-          <option value="high" ${as.maxRisk==='high'?'selected':''}>Высокий</option>
-        </select>
-      </div>
-      <div class="auto-row">
-        <span class="auto-key">Макс. сделок в день</span>
-        <input class="auto-inp" type="number" value="${as.maxPerDay}" id="ai-max" oninput="S.autoSettings.maxPerDay=+this.value" min="1" max="500">
-      </div>
-      <div class="auto-row">
-        <span class="auto-key">Стоп-лосс (%)</span>
-        <input class="auto-inp" type="number" value="${as.stopLoss}" id="ai-sl" step="0.1" oninput="S.autoSettings.stopLoss=+this.value">
-      </div>
-      <div class="auto-status ${isRun?'run':'stop'}">
-        <div class="auto-status-dot"></div>
-        ${isRun
-          ? `Бот активен · Исполнено сегодня: <strong style="margin-left:4px">${S.history.filter(x=>{const d=new Date();return x.time.includes(d.toLocaleTimeString('ru').slice(0,2))}).length}</strong> сделок`
-          : 'Бот остановлен · Включи переключатель для старта'
-        }
-      </div>
-    </div>`;
+  wrap.innerHTML = atHTML('1');
 }
 
 function renderVipAutoSettings() {
   const el = document.getElementById('vipAutoSettings');
   if (!el) return;
   if (!S.vip) {
-    el.innerHTML = `<div class="auto-panel-locked">
-      <div style="font-size:12px;font-weight:700;color:var(--gold);margin-bottom:5px">🔒 Активируй VIP выше чтобы настроить авто-торговлю</div>
-      <div style="font-size:10px;color:var(--text2)">Бот будет сам находить и исполнять арбитражные сделки 24/7</div>
-    </div>`;
+    el.innerHTML = `
+      <div class="at-card" onclick="showPg('vip')" style="cursor:pointer;margin-bottom:16px">
+        <div class="at-locked">
+          <div class="at-locked-ico">🔒</div>
+          <div class="at-locked-title">Активируй VIP чтобы открыть настройки</div>
+          <div class="at-locked-sub">Бот будет сам исполнять арбитражные сделки 24/7 с твоими настройками</div>
+          <div class="at-locked-btn">👑 Активировать VIP →</div>
+        </div>
+      </div>`;
     return;
   }
-  // Reuse the same panel HTML
-  const as = S.autoSettings;
-  const isRun = S.autoEnabled;
-  el.innerHTML = `
-    <div class="auto-panel">
-      <div class="auto-hdr">
-        <div class="auto-title">🤖 Авто-торговля</div>
-        <div class="toggle-wrap">
-          <span style="font-size:10px;color:var(--text2)">${isRun?'<span style="color:var(--green)">РАБОТАЕТ</span>':'ВЫКЛЮЧЕН'}</span>
-          <label class="toggle">
-            <input type="checkbox" id="autoToggle2" ${isRun?'checked':''} onchange="toggleAuto(this.checked)">
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-      </div>
-      <div class="auto-row"><span class="auto-key">Сумма на 1 сделку (USDT)</span><input class="auto-inp" type="number" value="${as.amount}" oninput="S.autoSettings.amount=+this.value" min="10"></div>
-      <div class="auto-row"><span class="auto-key">Мин. спред для входа (%)</span><input class="auto-inp" type="number" value="${as.minSpread}" step="0.1" oninput="S.autoSettings.minSpread=+this.value"></div>
-      <div class="auto-row"><span class="auto-key">Максимальный уровень риска</span>
-        <select class="auto-sel" onchange="S.autoSettings.maxRisk=this.value">
-          <option value="low" ${as.maxRisk==='low'?'selected':''}>Только низкий</option>
-          <option value="med" ${as.maxRisk==='med'?'selected':''}>Низкий + Средний</option>
-          <option value="high" ${as.maxRisk==='high'?'selected':''}>Все сделки</option>
-        </select>
-      </div>
-      <div class="auto-row"><span class="auto-key">Макс. сделок в день</span><input class="auto-inp" type="number" value="${as.maxPerDay}" oninput="S.autoSettings.maxPerDay=+this.value" min="1" max="500"></div>
-      <div class="auto-row"><span class="auto-key">Стоп-лосс на сделку (%)</span><input class="auto-inp" type="number" value="${as.stopLoss}" step="0.1" oninput="S.autoSettings.stopLoss=+this.value"></div>
-      <div class="auto-row"><span class="auto-key">Только выбранные сети</span>
-        <select class="auto-sel" onchange="S.autoSettings.networks=new Set([this.value])">
-          <option value="all">Все сети</option>
-          <option value="eth">Ethereum</option>
-          <option value="bsc">BSC</option>
-          <option value="sol">Solana</option>
-          <option value="arb">Arbitrum</option>
-          <option value="ton">TON</option>
-        </select>
-      </div>
-      <div class="auto-status ${isRun?'run':'stop'}">
-        <div class="auto-status-dot"></div>
-        ${isRun ? `✅ Бот активен · Сегодня исполнено: ${S.history.length} сделок · Профит: +$${S.profit.toFixed(2)}` : '⏸ Бот остановлен'}
-      </div>
-    </div>
-    <div style="background:rgba(0,207,255,.04);border:1px solid rgba(0,207,255,.15);border-radius:9px;padding:11px 13px;font-size:10px;color:var(--text2);line-height:1.7;margin-bottom:12px">
-      <strong style="color:var(--cyan);display:block;margin-bottom:4px">⚙️ Как работает авто-торговля</strong>
-      Бот каждые <strong>30 секунд</strong> сканирует спреды между твоими подключёнными биржами.<br>
-      При нахождении спреда выше <strong>${as.minSpread}%</strong> и уровне риска ≤ выбранного — автоматически исполняет сделку.<br>
-      Комиссия платформы списывается с каждой авто-сделки аналогично ручной торговле.
-    </div>`;
+  el.innerHTML = atHTML('2');
 }
 
 function toggleAuto(checked) {
   if (!S.vip) { toastMsg('👑 Авто-торговля только для VIP','warn'); return; }
   S.autoEnabled = checked;
+  saveStorage();
   if (checked) {
     toastMsg('🤖 Авто-торговля запущена!','ok');
     startAutoBot();
@@ -956,7 +1016,6 @@ function startAutoBot() {
   S.autoTimer = setInterval(() => {
     if (!S.autoEnabled || !S.vip) return;
     const as = S.autoSettings;
-    // Find eligible signals
     const eligible = SIGS.filter(sig =>
       !sig.vip &&
       sig.spread >= as.minSpread &&
@@ -965,7 +1024,6 @@ function startAutoBot() {
       (S.connected.has(sig.sx.toLowerCase()) || sig.type==='tri')
     );
     if (!eligible.length) return;
-    // Pick best spread
     const sig = eligible.sort((a,b)=>b.spread-a.spread)[0];
     const amt = as.amount;
     const feeR = S.vipFee;
@@ -979,34 +1037,254 @@ function startAutoBot() {
     S.history.push({sym:sig.sym,bx:sig.bx,sx:sig.sx,amount:amt,fee:platFee,profit:ok?net:-(exchFee*2),spread:sig.spread,time:new Date().toLocaleTimeString('ru'),auto:true});
     document.getElementById('hBalancе').textContent='$'+S.balance.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
     document.getElementById('hProfit').textContent=(S.profit>=0?'+':'')+`$${S.profit.toFixed(2)}`;
+    saveStorage();
     if (document.getElementById('pg-history').classList.contains('on')) renderHistory();
     if (document.getElementById('pg-vip').classList.contains('on')) renderVipAutoSettings();
     toastMsg(`🤖 Авто: ${sig.sym} ${ok?`+$${net.toFixed(3)}`:'сорвалась'}`, ok?'ok':'err');
-  }, 12000); // every 12s in demo (30s in prod)
+  }, 12000);
 }
 
 // ========================================================
-// RENDER TICKER
-const TDATA = [
-  {sym:'BTC',p:'$67,842',c:'+1.24%',up:true},{sym:'ETH',p:'$3,541',c:'-0.41%',up:false},
-  {sym:'BNB',p:'$578',c:'+2.10%',up:true},{sym:'SOL',p:'$148',c:'+3.42%',up:true},
-  {sym:'XRP',p:'$0.506',c:'-0.82%',up:false},{sym:'DOGE',p:'$0.163',c:'+5.21%',up:true},
-  {sym:'ADA',p:'$0.441',c:'-1.12%',up:false},{sym:'AVAX',p:'$34.5',c:'+1.90%',up:true},
-  {sym:'TON',p:'$5.42',c:'+4.30%',up:true},{sym:'DOT',p:'$7.84',c:'-0.55%',up:false},
-  {sym:'PEPE',p:'$0.0000124',c:'+8.41%',up:true},{sym:'BONK',p:'$0.0000330',c:'+6.12%',up:true},
-  {sym:'WIF',p:'$2.89',c:'+11.2%',up:true},{sym:'TAO',p:'$488',c:'+3.80%',up:true},
-  {sym:'SUI',p:'$3.22',c:'+4.90%',up:true},{sym:'INJ',p:'$28.8',c:'+5.70%',up:true},
-];
+// LOCALSTORAGE
+// ========================================================
+function saveStorage() {
+  try {
+    localStorage.setItem('nexarb_state', JSON.stringify({
+      vip: S.vip,
+      plan: S.plan,
+      lang: S.lang,
+      balance: S.balance,
+      profit: S.profit,
+      trades: S.trades,
+      ownerEarned: S.ownerEarned,
+      connected: [...S.connected],
+      autoEnabled: S.autoEnabled,
+      autoSettings: S.autoSettings,
+      history: S.history.slice(-100),
+      userId: S.userId,
+      refCode: S.refCode,
+      referrals: S.referrals,
+      refEarned: S.refEarned,
+      vipExpiry: S.vipExpiry,
+    }));
+  } catch(e){}
+}
 
-function renderTicker() {
-  const html = [...TDATA,...TDATA].map(t=>`
-    <div class="tick-item">
-      <span class="tick-sym">${t.sym}</span>
-      <span class="tick-p">${t.p}</span>
-      <span class="${t.up?'tick-up':'tick-dn'}">${t.c}</span>
+function loadStorage() {
+  try {
+    const raw = localStorage.getItem('nexarb_state');
+    if (!raw) return false;
+    const d = JSON.parse(raw);
+    S.vip = d.vip||false;
+    S.plan = d.plan||'year';
+    S.lang = d.lang||'ru';
+    S.balance = d.balance||3240;
+    S.profit = d.profit||0;
+    S.trades = d.trades||0;
+    S.ownerEarned = d.ownerEarned||0;
+    S.connected = new Set(d.connected||['binance','okx']);
+    S.autoEnabled = false; // always off on reload for safety
+    S.autoSettings = {...S.autoSettings,...(d.autoSettings||{})};
+    S.history = d.history||[];
+    S.userId = d.userId||genUserId();
+    S.refCode = d.refCode||(S.userId.slice(0,8).toUpperCase());
+    S.referrals = d.referrals||[];
+    S.refEarned = d.refEarned||0;
+    S.vipExpiry = d.vipExpiry||null;
+    return true;
+  } catch(e){ return false; }
+}
+
+function genUserId() {
+  return 'NX' + Math.random().toString(36).slice(2,10).toUpperCase();
+}
+
+// ========================================================
+// LANGUAGE
+// ========================================================
+let selectedLang = 'ru';
+
+function selLang(lang, el) {
+  selectedLang = lang;
+  document.querySelectorAll('#langGrid .lang-btn').forEach(b=>b.classList.remove('sel'));
+  el.classList.add('sel');
+}
+
+function confirmLang() {
+  S.lang = selectedLang;
+  saveStorage();
+  document.getElementById('langScreen').style.display = 'none';
+  toastMsg('🌐 Язык сохранён · Language saved','ok');
+}
+
+// ========================================================
+// VIP PROFILE BUTTON + PROFILE PAGE
+// ========================================================
+function updateHeaderVip() {
+  const btn = document.getElementById('tierBtn');
+  if (S.vip) {
+    btn.className = 'tier-btn tier-vip';
+    btn.textContent = '👤 Кабинет';
+    btn.onclick = () => showPg('profile');
+  } else {
+    btn.className = 'tier-btn tier-free';
+    btn.textContent = '⚡ FREE → VIP';
+    btn.onclick = () => showPg('vip');
+  }
+}
+
+function renderProfile() {
+  const el = document.getElementById('profContent');
+  if (!el) return;
+  const refLink = `https://nexarb.app/ref/${S.refCode}`;
+  const vipDays = S.vipExpiry ? Math.max(0, Math.ceil((new Date(S.vipExpiry)-Date.now())/(1000*86400))) : 0;
+  const vipPct = S.vipExpiry ? Math.max(0,Math.min(100,(1-vipDays/365)*100)).toFixed(0) : 0;
+  const vipLabel = S.vipExpiry
+    ? (vipDays > 0 ? `Активен · Осталось ${vipDays} дн.` : 'Истёк · Продлите подписку')
+    : 'VIP не активен';
+
+  el.innerHTML = `
+  <!-- HERO -->
+  <div class="prof-hero">
+    <div class="prof-avatar">🎯</div>
+    <div class="prof-name">${S.userId}</div>
+    <div class="prof-id">ID: ${S.userId} · ${S.lang==='ru'?'🇷🇺 Русский':S.lang==='en'?'🇬🇧 English':'🌐 '+S.lang}</div>
+    <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+      ${S.vip?`<span style="font-size:9px;padding:3px 8px;border-radius:4px;background:rgba(245,166,35,.15);color:var(--gold);border:1px solid rgba(245,166,35,.3);font-weight:700">👑 VIP</span>`:''}
+      <span style="font-size:9px;padding:3px 8px;border-radius:4px;background:rgba(0,207,255,.1);color:var(--cyan);border:1px solid rgba(0,207,255,.2);font-weight:700">📊 ${S.trades} сделок</span>
     </div>
-  `).join('');
-  document.getElementById('tickerInner').innerHTML = html;
+  </div>
+
+  <!-- STATS -->
+  <div class="prof-stats">
+    <div class="prof-stat">
+      <div class="prof-stat-v g">+$${S.profit.toFixed(2)}</div>
+      <div class="prof-stat-l">Мой профит</div>
+    </div>
+    <div class="prof-stat">
+      <div class="prof-stat-v c">${S.trades}</div>
+      <div class="prof-stat-l">Сделок</div>
+    </div>
+    <div class="prof-stat">
+      <div class="prof-stat-v go">$${S.refEarned.toFixed(2)}</div>
+      <div class="prof-stat-l">Реф. доход</div>
+    </div>
+  </div>
+
+  <!-- VIP STATUS -->
+  <div class="prof-card">
+    <div class="prof-card-title">👑 Статус подписки</div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+      <div style="font-size:28px">${S.vip?'👑':'🔒'}</div>
+      <div>
+        <div style="font-size:13px;font-weight:700;color:${S.vip?'var(--gold)':'var(--muted)'}">${S.vip?'VIP активен':'FREE план'}</div>
+        <div style="font-size:10px;color:var(--text2);margin-top:2px">${vipLabel}</div>
+      </div>
+      ${S.vip?'':`<button onclick="showPg('vip')" style="margin-left:auto;padding:7px 14px;border-radius:8px;border:1px solid rgba(245,166,35,.4);background:rgba(245,166,35,.1);color:var(--gold);font-family:var(--font);font-size:10px;font-weight:700;cursor:pointer">Купить VIP</button>`}
+    </div>
+    ${S.vip&&S.vipExpiry?`
+    <div class="vip-timer-bar"><div class="vip-timer-fill" style="width:${100-vipPct}%"></div></div>
+    <div style="font-size:9px;color:var(--muted);margin-top:5px;font-family:var(--mono)">Истекает: ${new Date(S.vipExpiry).toLocaleDateString('ru')}</div>`:''}
+  </div>
+
+  <!-- REFERRAL -->
+  <div class="prof-card">
+    <div class="prof-card-title">🔗 Реферальная программа</div>
+    <div style="font-size:10px;color:var(--text2);margin-bottom:10px;line-height:1.6">
+      Приглашайте друзей и получайте <strong style="color:var(--cyan)">20% от их комиссии платформы</strong> на ваш баланс навсегда.
+    </div>
+    <div class="ref-link-box">
+      <span class="ref-link-text">${refLink}</span>
+      <button class="ref-copy-btn" onclick="copyRef('${refLink}')">📋 Копировать</button>
+    </div>
+    <div class="ref-stats">
+      <div class="ref-stat"><div class="ref-stat-v">${S.referrals.length}</div><div class="ref-stat-l">Рефералов</div></div>
+      <div class="ref-stat"><div class="ref-stat-v go">$${S.refEarned.toFixed(2)}</div><div class="ref-stat-l">Заработано</div></div>
+      <div class="ref-stat"><div class="ref-stat-v g">${S.referrals.filter(r=>r.active).length}</div><div class="ref-stat-l">Активных</div></div>
+    </div>
+    ${S.referrals.length ? S.referrals.map(r=>`
+      <div class="ref-item">
+        <div class="ref-item-ico">👤</div>
+        <div>
+          <div style="font-size:11px;font-weight:600">${r.name}</div>
+          <div style="font-size:9px;color:var(--text2)">${r.trades} сделок · ${r.active?'<span style="color:var(--green)">Активен</span>':'Неактивен'}</div>
+        </div>
+        <div style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--green)">+$${r.earned.toFixed(2)}</div>
+      </div>`).join('') : '<div style="text-align:center;padding:16px;color:var(--muted);font-size:11px">Рефералов пока нет · Поделитесь ссылкой!</div>'}
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="prof-card">
+    <div class="prof-card-title">⚙️ Настройки аккаунта</div>
+    <div class="prof-row">
+      <span class="prof-key">🌐 Язык интерфейса</span>
+      <div style="display:flex;gap:5px">
+        <span class="lang-opt ${S.lang==='ru'?'sel':''}" onclick="changeLang('ru',this)">🇷🇺 RU</span>
+        <span class="lang-opt ${S.lang==='en'?'sel':''}" onclick="changeLang('en',this)">🇬🇧 EN</span>
+        <span class="lang-opt ${S.lang==='tr'?'sel':''}" onclick="changeLang('tr',this)">🇹🇷 TR</span>
+        <span class="lang-opt ${S.lang==='es'?'sel':''}" onclick="changeLang('es',this)">🇪🇸 ES</span>
+      </div>
+    </div>
+    <div class="prof-row">
+      <span class="prof-key">💳 Комиссия (FREE/VIP)</span>
+      <span class="prof-val">0.8% / 0.3%</span>
+    </div>
+    <div class="prof-row">
+      <span class="prof-key">🏦 Подключено бирж</span>
+      <span class="prof-val c">${S.connected.size} / 15</span>
+    </div>
+    <div class="prof-row">
+      <span class="prof-key">📊 Реф. комиссия</span>
+      <span class="prof-val go">20% от платформы</span>
+    </div>
+  </div>
+
+  <!-- AUTO-TRADE SHORTCUT -->
+  <div class="prof-card">
+    <div class="prof-card-title">🤖 Авто-торговля</div>
+    <div id="profAutoTrade"></div>
+  </div>
+
+  <!-- HISTORY SHORTCUT -->
+  <div class="prof-card">
+    <div class="prof-card-title">📜 Последние сделки</div>
+    ${S.history.length ? [...S.history].reverse().slice(0,5).map(x=>`
+      <div class="prof-row">
+        <span class="prof-key">${x.sym} · ${x.bx}→${x.sx}</span>
+        <span class="prof-val ${x.profit>0?'g':'r'}">${x.profit>0?'+':''}$${x.profit.toFixed(3)}</span>
+      </div>`).join('') : '<div style="color:var(--muted);font-size:11px;padding:8px 0">Сделок пока нет</div>'}
+    <button onclick="showPg('history')" style="width:100%;margin-top:8px;padding:8px;border-radius:7px;border:1px solid var(--border2);background:var(--bg2);color:var(--text2);font-family:var(--font);font-size:11px;cursor:pointer">Все сделки →</button>
+  </div>`;
+
+  // Render auto-trade inside profile
+  const pat = document.getElementById('profAutoTrade');
+  if (pat) pat.innerHTML = S.vip ? atHTML('prof') : `<div style="font-size:11px;color:var(--muted);padding:6px 0">Доступно в VIP · <span style="color:var(--gold);cursor:pointer" onclick="showPg('vip')">Активировать →</span></div>`;
+}
+
+function copyRef(link) {
+  navigator.clipboard?.writeText(link).then(()=>toastMsg('✅ Ссылка скопирована!','ok')).catch(()=>toastMsg('📋 '+link,'ok'));
+}
+
+function changeLang(lang, el) {
+  S.lang = lang;
+  saveStorage();
+  document.querySelectorAll('.lang-opt').forEach(o=>o.classList.remove('sel'));
+  document.querySelectorAll('.lang-opt').forEach(o=>{ if(o.textContent.toLowerCase().includes(lang)) o.classList.add('sel'); });
+  el.classList.add('sel');
+  toastMsg('🌐 Язык изменён','ok');
+}
+
+// Demo referrals data
+function addDemoReferrals() {
+  if (S.referrals.length === 0 && S.vip) {
+    S.referrals = [
+      {name:'Alex_crypto',trades:47,earned:12.40,active:true},
+      {name:'trade_master',trades:23,earned:6.15,active:true},
+      {name:'moonshot99',trades:8,earned:1.82,active:false},
+    ];
+    S.refEarned = S.referrals.reduce((a,r)=>a+r.earned,0);
+    saveStorage();
+  }
 }
 
 // ========================================================
@@ -1243,7 +1521,7 @@ function renderHistory() {
 const PLANS=[
   {id:'week',name:'1 Неделя',price:'$9',per:'/неделю',save:'',badge:''},
   {id:'month',name:'1 Месяц',price:'$29',per:'/месяц',save:'',badge:'POPULAR'},
-  {id:'year',name:'1 Год',price:'$149',per:'/год',save:'ЭКОНОМИЯ 57%',badge:'ЛУЧШАЯ ЦЕНА'},
+  {id:'year',name:'1 Год',price:'$149',per:'/год',save:'ЭКОНОМИЯ 27%',badge:'ЛУЧШАЯ ЦЕНА'},
 ];
 const FEATS=[
   {ico:'📡',name:'Сигналов в день',free:'10',vip:'∞'},
@@ -1290,13 +1568,18 @@ function selPlan(id, el) {
 function doBuy() {
   toastMsg('💳 Переход к оплате...','ok');
   setTimeout(()=>{
-    S.vip=true;
-    document.getElementById('tierBtn').className='tier-btn tier-vip';
-    document.getElementById('tierBtn').textContent='👑 VIP ACTIVE';
+    S.vip = true;
+    // Set VIP expiry based on plan
+    const days = S.plan==='week'?7:S.plan==='month'?30:365;
+    S.vipExpiry = new Date(Date.now()+days*86400000).toISOString();
     document.getElementById('hFee').textContent='0.3%';
+    updateHeaderVip();
+    addDemoReferrals();
     renderSigs(); renderExchanges(); renderVip();
     renderAutoPanel(); renderVipAutoSettings();
-    toastMsg('🎉 VIP активирован! Настрой авто-торговлю 🤖','ok');
+    saveStorage();
+    toastMsg('🎉 VIP активирован! Добро пожаловать!','ok');
+    setTimeout(()=>toastMsg('🤖 Авто-торговля доступна → Кабинет','ok'),1500);
     showPg('signals');
   },1400);
 }
@@ -1417,7 +1700,6 @@ function showPg(name) {
   document.getElementById('pg-'+name).classList.add('on');
   const nb=document.getElementById('nb-'+name);
   if(nb)nb.classList.add('on');
-  // Show filter zone only on signals page
   const fz=document.getElementById('filterZone');
   if(fz)fz.style.display=name==='signals'?'block':'none';
   if(name==='scanner')renderScanner(parseFloat(document.getElementById('spreadSlider').value));
@@ -1425,6 +1707,7 @@ function showPg(name) {
   if(name==='exchanges')renderExchanges();
   if(name==='signals'){renderAutoPanel();}
   if(name==='vip'){renderVip();renderVipAutoSettings();}
+  if(name==='profile'){renderProfile();}
   document.querySelector('.scroll').scrollTop=0;
 }
 function toggleWL(btn){btn.classList.toggle('on');toastMsg(btn.classList.contains('on')?'⭐ Добавлен в вотчлист':'☆ Убран из вотчлиста',btn.classList.contains('on')?'ok':'')}
@@ -1560,10 +1843,31 @@ function mkStars(){
 // ========================================================
 document.addEventListener('DOMContentLoaded',()=>{
   mkStars();
+
+  // Load saved state
+  const hasData = loadStorage();
+
+  // Generate user ID if new
+  if (!S.userId) {
+    S.userId = genUserId();
+    S.refCode = S.userId.slice(0,8).toUpperCase();
+    saveStorage();
+  }
+
+  // Show language screen for new users
+  if (!hasData) {
+    document.getElementById('langScreen').style.display = 'flex';
+  }
+
+  // Restore header
+  document.getElementById('hBalancе').textContent = '$'+S.balance.toLocaleString('en',{minimumFractionDigits:2});
+  document.getElementById('hProfit').textContent = (S.profit>=0?'+':'')+`$${S.profit.toFixed(2)}`;
+  document.getElementById('hFee').textContent = S.vip?'0.3%':'0.8%';
+  updateHeaderVip();
+
   initDragScroll(document.getElementById('netChips'));
   initDragScroll(document.getElementById('sigChips'));
   initChipClicks();
-  renderTicker();
   renderSigs();
   renderAutoPanel();
   renderScanner();

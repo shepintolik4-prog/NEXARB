@@ -405,6 +405,16 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);overflow:hid
 .ref-item-ico{width:30px;height:30px;border-radius:8px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
 .lang-opt{padding:5px 12px;border-radius:6px;border:1px solid var(--border2);background:var(--bg2);font-size:11px;cursor:pointer;transition:all .15s;font-family:var(--font)}
 .lang-opt.sel{border-color:var(--cyan);color:var(--cyan);background:rgba(0,207,255,.08)}
+
+/* AI SCORE + HFT improvements */
+.ac-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:0;padding:6px 12px 4px;border-top:1px solid var(--border)}
+.ac .ac-meta .mi{border:none;padding:4px 2px}
+.pct.warn{color:var(--gold)}
+.blurred{filter:blur(5px);user-select:none}
+.g{color:var(--green)}
+.r{color:var(--red)}
+.c{color:var(--cyan)}
+.go{color:var(--gold)}
 </style>
 </head>
 <body>
@@ -421,7 +431,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);overflow:hid
         <div class="brand-cube">N∞</div>
         <div>
           <div class="brand-name">NEX<em>ARB</em></div>
-          <div class="brand-ver">v3.0 · CRYPTO ARBITRAGE</div>
+          <div class="brand-ver">v4.0 · HFT ENGINE · 8 СТРАТЕГИЙ</div>
         </div>
       </div>
       <button class="tier-btn tier-free" id="tierBtn" onclick="showPg('vip')">⚡ FREE → VIP</button>
@@ -436,8 +446,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);overflow:hid
         <div class="hdr-stat-val g" id="hProfit">+$0.00</div>
       </div>
       <div class="hdr-stat">
-        <div class="hdr-stat-lbl">Комиссия платформы</div>
-        <div class="hdr-stat-val go" id="hFee">0.8%</div>
+        <div class="hdr-stat-lbl">Сигналов</div>
+        <div class="hdr-stat-val go" id="hSigCount">—</div>
       </div>
     </div>
   </div>
@@ -470,9 +480,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);overflow:hid
       <div id="sigChips" style="position:absolute;top:0;left:0;display:flex;align-items:center;gap:6px;padding:5px 12px;height:34px;will-change:transform;cursor:grab;user-select:none;-webkit-user-select:none">
         <div class="ch on" data-flt="all">Все</div>
         <div class="ch" data-flt="cex">CEX▸CEX</div>
-        <div class="ch" data-flt="dex">DEX</div>
         <div class="ch" data-flt="tri">Треугольный</div>
         <div class="ch" data-flt="fund">Фандинг</div>
+        <div class="ch" data-flt="dex">DEX</div>
+        <div class="ch" data-flt="stat">Стат.Арб</div>
+        <div class="ch" data-flt="xchain">Cross-Chain</div>
+        <div class="ch" data-flt="vol">Volatility</div>
+        <div class="ch" data-flt="spread">Spread</div>
         <div class="ch" data-flt="hot">🔥 Горячие</div>
         <div class="ch" data-flt="viponly">👑 VIP</div>
       </div>
@@ -499,19 +513,23 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);overflow:hid
     <div class="pg" id="pg-scanner">
       <div class="slbl">
         <div class="slbl-dot"></div>
-        <div class="slbl-txt">Live сканер спредов</div>
+        <div class="slbl-txt">⚡ HFT Live Сканер · 15 бирж</div>
         <div class="slbl-r" id="scanTime">--:--:--</div>
       </div>
-      <div class="hdr-stat" style="margin-bottom:10px;display:flex;align-items:center;gap:10px;padding:8px 12px">
+      <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--card);border:1px solid var(--border);border-radius:10px;margin-bottom:8px">
         <span style="font-size:10px;color:var(--text2);white-space:nowrap">Мин. спред:</span>
-        <input type="range" id="spreadSlider" min="0.1" max="5" step="0.1" value="0.3" style="flex:1;accent-color:var(--cyan)" oninput="updScanner()">
-        <span class="mono g" style="font-size:11px;min-width:34px" id="spreadLbl">0.3%</span>
+        <input type="range" id="spreadSlider" min="0.05" max="5" step="0.05" value="0.3" style="flex:1;accent-color:var(--cyan)" oninput="updScanner()">
+        <span class="mono g" style="font-size:11px;min-width:36px" id="spreadLbl">0.3%</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 2px 8px;font-size:10px">
+        <div id="scanStats" style="color:var(--text2)">Сканирование...</div>
+        <div style="color:var(--muted);font-family:var(--mono)">refresh: 500ms</div>
       </div>
       <div style="background:var(--card);border:1px solid var(--border);border-radius:11px;overflow:hidden">
         <div style="overflow-x:auto">
           <table class="stbl">
             <thead><tr>
-              <th>Монета</th><th>Купить</th><th>Продать</th><th>Спред</th><th>Действие</th>
+              <th>Монета</th><th>Купить</th><th>Продать</th><th>Спред</th><th></th>
             </tr></thead>
             <tbody id="scanBody"></tbody>
           </table>
@@ -813,60 +831,405 @@ const COINS = [
 const EXCNAMES = EXCHS.map(e=>e.id);
 const EXCMAP = Object.fromEntries(EXCHS.map(e=>[e.id,e]));
 
-function mkPrice(base, spread) {
-  return base * (1 + (Math.random()-0.45)*0.005);
+// ╔══════════════════════════════════════════════════════╗
+// ║        NEXARB HFT ENGINE v4.0                       ║
+// ║   Multi-Strategy Arbitrage · AI Scoring · 300+ sig  ║
+// ╚══════════════════════════════════════════════════════╝
+
+// ── MARKET DATA ENGINE ─────────────────────────────────
+// Simulates WebSocket price feeds from 15 exchanges
+// In production: replace with real WS connections
+
+const PRICE_CACHE = new Map(); // symbol:exchange → {bid,ask,vol,ts}
+const SIGNAL_CACHE = new Map(); // deduplication cache
+
+// Exchange fee structure
+const EX_FEES = {
+  binance:{maker:0.001,taker:0.001},  okx:{maker:0.0008,taker:0.001},
+  bybit:{maker:0.001,taker:0.001},    kucoin:{maker:0.001,taker:0.001},
+  gate:{maker:0.002,taker:0.002},     mexc:{maker:0.0,taker:0.002},
+  htx:{maker:0.002,taker:0.002},      coinbase:{maker:0.004,taker:0.006},
+  kraken:{maker:0.0016,taker:0.0026}, bitget:{maker:0.001,taker:0.001},
+  bitmart:{maker:0.0025,taker:0.0025},phemex:{maker:0.001,taker:0.001},
+  crypto:{maker:0.004,taker:0.004},   bingx:{maker:0.001,taker:0.002},
+  lbank:{maker:0.001,taker:0.002},
+};
+
+// Base prices for simulation (realistic 2025 prices)
+const BASE_PRICES = {
+  BTC:67840, ETH:3541, BNB:578, SOL:148, XRP:0.506,
+  DOGE:0.162, ADA:0.441, AVAX:34.1, DOT:7.82, MATIC:0.881,
+  LINK:14.8, UNI:9.42, LTC:84.2, BCH:371, ETC:26.4,
+  ATOM:8.41, FIL:5.82, ICP:12.4, APT:9.81, ARB:1.021,
+  OP:2.14, NEAR:6.84, SUI:3.21, TON:5.42, TRX:0.121,
+  PEPE:0.00001211, SHIB:0.00002481, FLOKI:0.000182, BONK:0.0000320, WIF:2.84,
+  BOME:0.0088, MEME:0.0291, ORDI:41.2, SATS:0.000000408,
+  WLD:2.41, ALGO:0.182, VET:0.038, EGLD:44.2, ROSE:0.0842,
+  XMR:164, ZEC:28.4, DASH:28.1, AAVE:91.2, CRV:0.442,
+  MKR:2841, COMP:58.4, SNX:2.84, GRT:0.181, LDO:1.84,
+  RPL:18.4, SAND:0.412, MANA:0.381, AXS:6.82, ENJ:0.181,
+  GALA:0.038, IMX:1.84, FLOW:0.682, XTZ:0.841, EOS:0.681,
+  THETA:1.42, HBAR:0.084, INJ:28.4, SEI:0.481, TIA:6.84,
+  JTO:2.84, PYTH:0.481, JUP:0.682, STRK:0.881, EIGEN:2.41,
+  ENA:0.681, W:0.481, ONDO:0.881, RENDER:8.21, FET:2.41,
+  AGIX:0.481, TAO:488, PRIME:12.4, BLUR:0.281, NFT:0.000682,
+};
+
+// Which exchanges carry which coins
+const EX_COINS = {
+  binance:['BTC','ETH','BNB','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC','LINK','UNI','LTC','ATOM','APT','ARB','OP','NEAR','SUI','TON','TRX','PEPE','SHIB','BONK','WIF','WLD','ALGO','AAVE','GRT','LDO','INJ','SEI','TIA','JTO','PYTH','JUP','ENA','W','RENDER','FET','TAO'],
+  okx:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','DOT','LINK','ARB','OP','NEAR','SUI','TON','TRX','PEPE','BONK','WIF','WLD','ALGO','AAVE','INJ','SEI','TIA','ENA','FET','TAO','ORDI'],
+  bybit:['BTC','ETH','BNB','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC','LINK','APT','ARB','OP','NEAR','SUI','TON','PEPE','SHIB','BONK','WIF','MEME','WLD','AAVE','INJ','SEI','TIA','JTO','ENA','RENDER','TAO'],
+  kucoin:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','DOT','LINK','UNI','APT','ARB','NEAR','TON','FLOKI','BONK','WIF','ALGO','AAVE','GRT','INJ','TIA','FET','AGIX','RENDER'],
+  gate:['BTC','ETH','BNB','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC','LINK','ARB','NEAR','SUI','PEPE','SHIB','FLOKI','BONK','WIF','BOME','MEME','ORDI','ALGO','VET','AAVE','INJ','ENA','FET','RENDER','TAO','BLUR'],
+  mexc:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','ARB','NEAR','TON','PEPE','SHIB','FLOKI','BONK','WIF','BOME','MEME','ORDI','SATS','WLD','ALGO','INJ','SEI','ENA','FET','AGIX','RENDER','BLUR','NFT'],
+  htx:['BTC','ETH','BNB','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC','LINK','TON','PEPE','WLD','ALGO','VET','AAVE','INJ'],
+  coinbase:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC','LINK','UNI','LTC','ATOM','APT','ARB','NEAR','ALGO','AAVE','GRT','COMP','SNX'],
+  kraken:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC','LINK','UNI','LTC','BCH','ETC','ATOM','XMR','ZEC','DASH','AAVE','GRT'],
+  bitget:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','APT','ARB','NEAR','TON','PEPE','BONK','WIF','MEME','INJ','SEI','ENA','RENDER','TAO'],
+  bitmart:['BTC','ETH','SOL','XRP','ADA','AVAX','NEAR','TON','PEPE','SHIB','FLOKI','WIF','BOME','MEME'],
+  phemex:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','ARB','NEAR'],
+  crypto:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC','LINK','UNI','LTC','CRO'],
+  bingx:['BTC','ETH','SOL','XRP','DOGE','PEPE','SHIB','BONK','WIF'],
+  lbank:['BTC','ETH','SOL','XRP','DOGE','PEPE','SHIB','FLOKI','BONK'],
+};
+
+// ── PRICE SIMULATION ENGINE ────────────────────────────
+// Realistic: each exchange has slight price variations
+const EX_BIAS = { // Price bias per exchange (some exchanges run higher/lower)
+  binance:0, okx:-0.0001, bybit:0.0002, kucoin:0.0003, gate:0.0008,
+  mexc:0.0012, htx:0.0005, coinbase:0.0025, kraken:0.0018, bitget:0.0004,
+  bitmart:0.0015, phemex:0.0006, crypto:0.002, bingx:0.0009, lbank:0.0020,
+};
+
+function simPrice(sym, exId) {
+  const base = BASE_PRICES[sym] || 1;
+  const key = `${sym}:${exId}`;
+  let cached = PRICE_CACHE.get(key);
+  const now = Date.now();
+  if (!cached || now - cached.ts > 500) { // Refresh every 500ms = WebSocket sim
+    const drift = (Math.random() - 0.49) * 0.003; // Random walk
+    const bias = EX_BIAS[exId] || 0;
+    const prevMid = cached ? (cached.bid + cached.ask) / 2 : base * (1 + bias);
+    const mid = prevMid * (1 + drift + bias * 0.01);
+    const spread_bps = sym === 'BTC' ? 0.0001 : sym === 'ETH' ? 0.0002 : 0.0005;
+    cached = { bid: mid * (1 - spread_bps), ask: mid * (1 + spread_bps),
+               vol: base * (80000 + Math.random() * 200000), ts: now };
+    PRICE_CACHE.set(key, cached);
+  }
+  return cached;
 }
 
+// ── AI SIGNAL SCORER ───────────────────────────────────
+function aiScore(sig) {
+  // Multi-factor AI scoring 0-100
+  let score = 0;
+
+  // 1. Spread quality (40 pts)
+  const spreadScore = Math.min(40, sig.spread * 12);
+  score += spreadScore;
+
+  // 2. Liquidity (20 pts) — based on exchange volume
+  const exVols = { binance:100, okx:80, bybit:75, kucoin:60, gate:55,
+    mexc:50, htx:45, coinbase:70, kraken:65, bitget:50,
+    bitmart:30, phemex:35, crypto:40, bingx:35, lbank:25 };
+  const liq = ((exVols[sig.bx]||30) + (exVols[sig.sx]||30)) / 200 * 20;
+  score += liq;
+
+  // 3. Risk factor (20 pts)
+  const riskPts = { low: 20, med: 12, high: 5 };
+  score += riskPts[sig.risk] || 10;
+
+  // 4. Speed factor (10 pts) — faster = better
+  const timePts = sig.type === 'tri' ? 10 : sig.type === 'fund' ? 8 : sig.type === 'dex' ? 5 : 7;
+  score += timePts;
+
+  // 5. Historical win rate bonus (10 pts)
+  const typeBonus = { cex: 8, tri: 9, fund: 10, dex: 6, stat: 7 };
+  score += typeBonus[sig.type] || 5;
+
+  return Math.min(99, Math.round(score));
+}
+
+// ── MULTI-STRATEGY SIGNAL GENERATOR ───────────────────
+// Target: 300-1000 signals/day = ~15-50 active at any time
+
 function genSignals() {
-  const all = [
-    // CEX▸CEX majors
-    {id:'s01',type:'cex',sym:'BTC',bx:'binance',sx:'okx',bprice:67842,sprice:68214,spread:0.55,vol:'$4.2M',time:'~8с',risk:'low',vip:false,hot:true},
-    {id:'s02',type:'cex',sym:'ETH',bx:'bybit',sx:'binance',bprice:3541,sprice:3558,spread:0.48,vol:'$2.1M',time:'~6с',risk:'low',vip:false,hot:true},
-    {id:'s03',type:'cex',sym:'SOL',bx:'kucoin',sx:'gate',bprice:147.82,sprice:149.24,spread:0.96,vol:'$1.4M',time:'~10с',risk:'low',vip:false,hot:false},
-    {id:'s04',type:'cex',sym:'XRP',bx:'mexc',sx:'bybit',bprice:0.5021,sprice:0.5098,spread:1.53,vol:'$3.8M',time:'~12с',risk:'med',vip:false,hot:true},
-    {id:'s05',type:'cex',sym:'BNB',bx:'htx',sx:'binance',bprice:578.10,sprice:581.90,spread:0.66,vol:'$890K',time:'~9с',risk:'low',vip:false,hot:false},
-    {id:'s06',type:'cex',sym:'DOGE',bx:'gate',sx:'coinbase',bprice:0.1621,sprice:0.1652,spread:1.91,vol:'$2.9M',time:'~14с',risk:'med',vip:false,hot:false},
-    {id:'s07',type:'cex',sym:'ADA',bx:'kucoin',sx:'bitget',bprice:0.4412,sprice:0.4461,spread:1.11,vol:'$1.2M',time:'~11с',risk:'low',vip:false,hot:false},
-    {id:'s08',type:'cex',sym:'AVAX',bx:'bybit',sx:'kraken',bprice:34.12,sprice:34.52,spread:1.17,vol:'$780K',time:'~13с',risk:'med',vip:false,hot:false},
-    {id:'s09',type:'cex',sym:'NEAR',bx:'kucoin',sx:'mexc',bprice:6.841,sprice:6.921,spread:1.17,vol:'$430K',time:'~10с',risk:'med',vip:false,hot:false},
-    {id:'s10',type:'cex',sym:'ARB',bx:'binance',sx:'bitget',bprice:1.021,sprice:1.039,spread:1.76,vol:'$670K',time:'~8с',risk:'med',vip:false,hot:true},
-    // Meme coins
-    {id:'s11',type:'cex',sym:'PEPE',bx:'mexc',sx:'binance',bprice:0.00001211,sprice:0.00001259,spread:3.96,vol:'$8.1M',time:'~18с',risk:'high',vip:false,hot:true},
-    {id:'s12',type:'cex',sym:'SHIB',bx:'lbank',sx:'gate',bprice:0.00002481,sprice:0.00002534,spread:2.14,vol:'$5.4M',time:'~20с',risk:'high',vip:false,hot:false},
-    {id:'s13',type:'cex',sym:'BONK',bx:'mexc',sx:'bybit',bprice:0.000032,sprice:0.0000331,spread:3.44,vol:'$3.1M',time:'~15с',risk:'high',vip:false,hot:true},
-    {id:'s14',type:'cex',sym:'WIF',bx:'bitmart',sx:'binance',bprice:2.841,sprice:2.912,spread:2.50,vol:'$2.1M',time:'~16с',risk:'high',vip:false,hot:false},
-    {id:'s15',type:'cex',sym:'FLOKI',bx:'lbank',sx:'mexc',bprice:0.000182,sprice:0.000189,spread:3.85,vol:'$1.8M',time:'~18с',risk:'high',vip:false,hot:false},
-    // DeFi / L1
-    {id:'s16',type:'cex',sym:'LINK',bx:'kraken',sx:'binance',bprice:14.82,sprice:15.01,spread:1.28,vol:'$920K',time:'~12с',risk:'med',vip:false,hot:false},
-    {id:'s17',type:'cex',sym:'DOT',bx:'htx',sx:'kucoin',bprice:7.812,sprice:7.921,spread:1.39,vol:'$540K',time:'~11с',risk:'med',vip:false,hot:false},
-    {id:'s18',type:'cex',sym:'TON',bx:'okx',sx:'bybit',bprice:5.421,sprice:5.511,spread:1.66,vol:'$1.1M',time:'~9с',risk:'low',vip:false,hot:true},
-    {id:'s19',type:'cex',sym:'SUI',bx:'bybit',sx:'mexc',bprice:3.214,sprice:3.281,spread:2.08,vol:'$780K',time:'~10с',risk:'med',vip:false,hot:false},
-    {id:'s20',type:'cex',sym:'APT',bx:'binance',sx:'kucoin',bprice:9.812,sprice:9.941,spread:1.31,vol:'$620K',time:'~8с',risk:'low',vip:false,hot:false},
-    // Triangular (VIP)
-    {id:'s21',type:'tri',sym:'BNB→ETH→BTC',bx:'binance',sx:'binance',bprice:null,sprice:null,spread:1.24,vol:'$320K',time:'~3с',risk:'med',vip:true,hot:false},
-    {id:'s22',type:'tri',sym:'SOL→USDT→BTC',bx:'bybit',sx:'bybit',bprice:null,sprice:null,spread:0.92,vol:'$280K',time:'~4с',risk:'med',vip:true,hot:false},
-    {id:'s23',type:'tri',sym:'ETH→BNB→SOL',bx:'binance',sx:'binance',bprice:null,sprice:null,spread:1.58,vol:'$410K',time:'~3с',risk:'med',vip:true,hot:true},
-    // DEX (VIP)
-    {id:'s24',type:'dex',sym:'ETH',bx:'Uniswap',sx:'Curve',bprice:3537,sprice:3562,spread:0.71,vol:'$1.2M',time:'~15с',risk:'med',vip:true,hot:false},
-    {id:'s25',type:'dex',sym:'SOL',bx:'Raydium',sx:'Jupiter',bprice:146.91,sprice:148.44,spread:1.04,vol:'$780K',time:'~8с',risk:'med',vip:true,hot:true},
-    // Funding arb (VIP)
-    {id:'s26',type:'fund',sym:'BTC/USDT Perp',bx:'binance',sx:'bybit',bprice:null,sprice:null,spread:0.038,vol:'$12M',time:'8ч',risk:'low',vip:true,hot:false},
-    {id:'s27',type:'fund',sym:'ETH/USDT Perp',bx:'okx',sx:'binance',bprice:null,sprice:null,spread:0.021,vol:'$8M',time:'8ч',risk:'low',vip:true,hot:false},
-    // New AI coins (VIP)
-    {id:'s28',type:'cex',sym:'TAO',bx:'bybit',sx:'gate',bprice:481.2,sprice:492.4,spread:2.33,vol:'$320K',time:'~20с',risk:'high',vip:true,hot:true},
-    {id:'s29',type:'cex',sym:'RENDER',bx:'mexc',sx:'binance',bprice:8.211,sprice:8.392,spread:2.20,vol:'$240K',time:'~14с',risk:'high',vip:true,hot:false},
-    {id:'s30',type:'cex',sym:'INJ',bx:'kucoin',sx:'bybit',bprice:28.41,sprice:29.12,spread:2.50,vol:'$410K',time:'~12с',risk:'high',vip:true,hot:true},
+  const all = [];
+  let id = 0;
+
+  const risk = (spread) => spread >= 2.5 ? 'high' : spread >= 1.2 ? 'med' : 'low';
+  const hot = (spread, vol) => spread >= 2.0 || vol > 5000000;
+  const exNames = Object.keys(EX_FEES);
+
+  // ── STRATEGY 1: CEX-CEX Direct Arbitrage ──────────────
+  // Scan all exchange pairs for each coin
+  const cexCoins = Object.keys(BASE_PRICES).slice(0, 50);
+  cexCoins.forEach(sym => {
+    const carriers = exNames.filter(ex => (EX_COINS[ex]||[]).includes(sym));
+    if (carriers.length < 2) return;
+
+    for (let i = 0; i < carriers.length - 1; i++) {
+      const exA = carriers[i], exB = carriers[i+1];
+      const pA = simPrice(sym, exA), pB = simPrice(sym, exB);
+
+      // Check A→B direction: buy on A (ask), sell on B (bid)
+      const spreadAB = (pB.bid - pA.ask) / pA.ask * 100;
+      // Check B→A direction
+      const spreadBA = (pA.bid - pB.ask) / pB.ask * 100;
+
+      const bestSpread = Math.max(spreadAB, spreadBA);
+      const buyEx = spreadAB > spreadBA ? exA : exB;
+      const sellEx = spreadAB > spreadBA ? exB : exA;
+      const buyPrice = spreadAB > spreadBA ? pA.ask : pB.ask;
+      const sellPrice = spreadAB > spreadBA ? pB.bid : pA.bid;
+
+      const exchFee = (EX_FEES[buyEx]?.taker||0.001) + (EX_FEES[sellEx]?.taker||0.001);
+      const netSpread = +(bestSpread - exchFee * 100).toFixed(3);
+
+      if (netSpread > 0.05) { // Min 0.05% gross before platform fee
+        const sig = {
+          id: `c${++id}`, type: 'cex', sym, strategy: 'CEX-CEX',
+          bx: buyEx, sx: sellEx,
+          bprice: buyPrice, sprice: sellPrice,
+          spread: +bestSpread.toFixed(3),
+          vol: `$${(pA.vol/1000).toFixed(0)}K`,
+          time: `~${Math.round(8 + Math.random()*12)}с`,
+          risk: risk(bestSpread),
+          vip: false,
+          hot: hot(bestSpread, pA.vol),
+          exchFee: +(exchFee*100).toFixed(3),
+          aiScore: 0, // filled below
+          latency: Math.round(20 + Math.random()*30),
+        };
+        sig.aiScore = aiScore(sig);
+        all.push(sig);
+      }
+    }
+  });
+
+  // ── STRATEGY 2: Triangular Arbitrage (VIP) ────────────
+  const triPaths = [
+    {sym:'BNB→ETH→BTC', ex:'binance', base:'BNB', spread:()=>0.8+Math.random()*1.2},
+    {sym:'SOL→USDT→BTC', ex:'bybit', base:'SOL', spread:()=>0.6+Math.random()*1.1},
+    {sym:'ETH→BNB→SOL', ex:'binance', base:'ETH', spread:()=>0.9+Math.random()*1.4},
+    {sym:'XRP→BTC→ETH', ex:'okx', base:'XRP', spread:()=>0.5+Math.random()*0.9},
+    {sym:'ADA→BNB→USDT', ex:'binance', base:'ADA', spread:()=>0.7+Math.random()*1.0},
+    {sym:'DOGE→BTC→SOL', ex:'bybit', base:'DOGE', spread:()=>0.8+Math.random()*1.3},
+    {sym:'AVAX→ETH→BTC', ex:'kucoin', base:'AVAX', spread:()=>0.6+Math.random()*0.8},
+    {sym:'MATIC→BNB→ETH', ex:'binance', base:'MATIC', spread:()=>0.5+Math.random()*1.2},
+    {sym:'DOT→SOL→BTC', ex:'okx', base:'DOT', spread:()=>0.7+Math.random()*0.9},
+    {sym:'LINK→ETH→BNB', ex:'binance', base:'LINK', spread:()=>0.6+Math.random()*1.1},
+    {sym:'INJ→BNB→ETH', ex:'kucoin', base:'INJ', spread:()=>1.2+Math.random()*1.8},
+    {sym:'TAO→SOL→BTC', ex:'bybit', base:'TAO', spread:()=>1.4+Math.random()*2.1},
+    {sym:'TIA→ETH→USDT', ex:'okx', base:'TIA', spread:()=>0.9+Math.random()*1.4},
+    {sym:'SUI→BNB→SOL', ex:'gate', base:'SUI', spread:()=>0.8+Math.random()*1.2},
+    {sym:'ARB→ETH→BTC', ex:'binance', base:'ARB', spread:()=>0.7+Math.random()*1.0},
   ];
-  return all.map(s=>({...s, spread:+(s.spread+(Math.random()-.5)*.2).toFixed(2)}));
+  triPaths.forEach(t => {
+    const sp = +t.spread().toFixed(2);
+    const sig = {
+      id: `t${++id}`, type: 'tri', sym: t.sym, strategy: 'Triangular',
+      bx: t.ex, sx: t.ex, bprice: null, sprice: null,
+      spread: sp, vol: `$${(200+Math.random()*400).toFixed(0)}K`,
+      time: `~${2+Math.round(Math.random()*4)}с`, risk: risk(sp),
+      vip: true, hot: sp > 1.8, exchFee: 0.3, aiScore: 0,
+      latency: Math.round(5 + Math.random()*15),
+    };
+    sig.aiScore = aiScore(sig);
+    all.push(sig);
+  });
+
+  // ── STRATEGY 3: Funding Rate Arbitrage (VIP) ──────────
+  const fundingPairs = [
+    {sym:'BTC/USDT Perp', bx:'binance', sx:'bybit', rate:0.015+Math.random()*0.04},
+    {sym:'ETH/USDT Perp', bx:'okx', sx:'binance', rate:0.01+Math.random()*0.03},
+    {sym:'SOL/USDT Perp', bx:'bybit', sx:'okx', rate:0.02+Math.random()*0.05},
+    {sym:'BNB/USDT Perp', bx:'binance', sx:'gate', rate:0.01+Math.random()*0.025},
+    {sym:'XRP/USDT Perp', bx:'okx', sx:'bybit', rate:0.008+Math.random()*0.02},
+    {sym:'DOGE/USDT Perp', bx:'binance', sx:'mexc', rate:0.012+Math.random()*0.03},
+    {sym:'PEPE/USDT Perp', bx:'bybit', sx:'okx', rate:0.04+Math.random()*0.08},
+    {sym:'INJ/USDT Perp', bx:'kucoin', sx:'binance', rate:0.03+Math.random()*0.06},
+    {sym:'TAO/USDT Perp', bx:'bybit', sx:'gate', rate:0.05+Math.random()*0.09},
+    {sym:'WIF/USDT Perp', bx:'mexc', sx:'bybit', rate:0.035+Math.random()*0.07},
+  ];
+  fundingPairs.forEach(f => {
+    const sp = +(f.rate).toFixed(4);
+    const sig = {
+      id: `f${++id}`, type: 'fund', sym: f.sym, strategy: 'Funding',
+      bx: f.bx, sx: f.sx, bprice: null, sprice: null,
+      spread: +((sp * 3 * 365 * 100) / 100).toFixed(2), // annualized %
+      displaySpread: sp, // per-period funding rate
+      vol: `$${(8+Math.random()*20).toFixed(1)}M`,
+      time: '8ч', risk: 'low', vip: true, hot: sp > 0.04,
+      exchFee: 0.2, aiScore: 0,
+      latency: Math.round(50 + Math.random()*100),
+      fundingInfo: `${(sp*100).toFixed(3)}%/8ч · ~${(sp*3*365*100).toFixed(0)}%/год`,
+    };
+    sig.aiScore = aiScore(sig);
+    all.push(sig);
+  });
+
+  // ── STRATEGY 4: DEX Arbitrage (VIP) ──────────────────
+  const dexPairs = [
+    {sym:'ETH', bx:'Uniswap V3', sx:'Curve', spread:()=>0.4+Math.random()*1.2},
+    {sym:'SOL', bx:'Raydium', sx:'Jupiter', spread:()=>0.6+Math.random()*1.6},
+    {sym:'BTC', bx:'Uniswap V3', sx:'Balancer', spread:()=>0.3+Math.random()*0.9},
+    {sym:'ARB', bx:'Camelot', sx:'Uniswap V3', spread:()=>0.8+Math.random()*2.0},
+    {sym:'OP', bx:'Velodrome', sx:'Uniswap V3', spread:()=>0.7+Math.random()*1.8},
+    {sym:'MATIC', bx:'QuickSwap', sx:'Uniswap V3', spread:()=>0.5+Math.random()*1.4},
+    {sym:'AVAX', bx:'Trader Joe', sx:'Pangolin', spread:()=>0.6+Math.random()*1.5},
+    {sym:'TON', bx:'DeDust', sx:'STON.fi', spread:()=>0.8+Math.random()*2.2},
+    {sym:'SUI', bx:'Cetus', sx:'Turbos', spread:()=>1.0+Math.random()*2.5},
+    {sym:'APT', bx:'Liquidswap', sx:'Thala', spread:()=>0.9+Math.random()*2.0},
+    {sym:'NEAR', bx:'Ref Finance', sx:'Jumbo', spread:()=>0.7+Math.random()*1.8},
+    {sym:'INJ', bx:'Helix', sx:'DojoSwap', spread:()=>1.2+Math.random()*2.4},
+  ];
+  dexPairs.forEach(d => {
+    const sp = +d.spread().toFixed(2);
+    const sig = {
+      id: `d${++id}`, type: 'dex', sym: d.sym, strategy: 'DEX',
+      bx: d.bx, sx: d.sx,
+      bprice: BASE_PRICES[d.sym], sprice: BASE_PRICES[d.sym]*(1+sp/100),
+      spread: sp, vol: `$${(300+Math.random()*1200).toFixed(0)}K`,
+      time: `~${5+Math.round(Math.random()*30)}с`, risk: risk(sp),
+      vip: true, hot: sp > 1.5, exchFee: 0.6, aiScore: 0,
+      latency: Math.round(80 + Math.random()*200),
+    };
+    sig.aiScore = aiScore(sig);
+    all.push(sig);
+  });
+
+  // ── STRATEGY 5: Statistical Arbitrage (VIP) ───────────
+  const statPairs = [
+    {sym:'BTC/ETH',  bx:'binance', sx:'okx',  spread:()=>0.3+Math.random()*0.8},
+    {sym:'SOL/AVAX', bx:'bybit',   sx:'kucoin',spread:()=>0.4+Math.random()*1.2},
+    {sym:'BNB/ETH',  bx:'okx',     sx:'bybit', spread:()=>0.3+Math.random()*0.7},
+    {sym:'XRP/ADA',  bx:'kucoin',  sx:'binance',spread:()=>0.5+Math.random()*1.5},
+    {sym:'DOT/ATOM', bx:'kraken',  sx:'okx',   spread:()=>0.4+Math.random()*1.1},
+    {sym:'INJ/SEI',  bx:'binance', sx:'bybit', spread:()=>0.8+Math.random()*2.0},
+    {sym:'TIA/NEAR', bx:'okx',     sx:'kucoin',spread:()=>0.6+Math.random()*1.8},
+    {sym:'WIF/BONK', bx:'bybit',   sx:'mexc',  spread:()=>1.2+Math.random()*3.0},
+  ];
+  statPairs.forEach(s => {
+    const sp = +s.spread().toFixed(2);
+    const baseSym = s.sym.split('/')[0];
+    const sig = {
+      id: `st${++id}`, type: 'stat', sym: s.sym, strategy: 'Stat Arb',
+      bx: s.bx, sx: s.sx,
+      bprice: BASE_PRICES[baseSym], sprice: null,
+      spread: sp, vol: `$${(150+Math.random()*800).toFixed(0)}K`,
+      time: `~${15+Math.round(Math.random()*60)}с`, risk: sp > 1.5 ? 'med' : 'low',
+      vip: true, hot: false, exchFee: 0.2, aiScore: 0,
+      latency: Math.round(30 + Math.random()*60),
+    };
+    sig.aiScore = aiScore(sig);
+    all.push(sig);
+  });
+
+  // ── STRATEGY 6: Cross-Chain Arbitrage (VIP) ───────────
+  const xchainPairs = [
+    {sym:'ETH', chainA:'Ethereum', chainB:'Arbitrum', bx:'Uniswap', sx:'Camelot',   spread:()=>0.4+Math.random()*1.2},
+    {sym:'ETH', chainA:'Ethereum', chainB:'Optimism', bx:'Uniswap', sx:'Velodrome', spread:()=>0.3+Math.random()*1.0},
+    {sym:'BTC', chainA:'BTC',      chainB:'ETH(WBTC)',bx:'binance', sx:'Uniswap',   spread:()=>0.2+Math.random()*0.8},
+    {sym:'MATIC',chainA:'ETH',     chainB:'Polygon',  bx:'Uniswap', sx:'QuickSwap', spread:()=>0.5+Math.random()*1.5},
+    {sym:'SOL', chainA:'Solana',   chainB:'ETH(SOL)', bx:'Raydium', sx:'Uniswap',   spread:()=>0.6+Math.random()*1.8},
+    {sym:'AVAX',chainA:'Avalanche',chainB:'ETH',      bx:'TraderJoe',sx:'Uniswap',  spread:()=>0.4+Math.random()*1.3},
+  ];
+  xchainPairs.forEach(x => {
+    const sp = +x.spread().toFixed(2);
+    const sig = {
+      id: `x${++id}`, type: 'xchain', sym: `${x.sym} ${x.chainA}→${x.chainB}`,
+      strategy: 'Cross-Chain',
+      bx: x.bx, sx: x.sx,
+      bprice: BASE_PRICES[x.sym], sprice: BASE_PRICES[x.sym]*(1+sp/100),
+      spread: sp, vol: `$${(200+Math.random()*600).toFixed(0)}K`,
+      time: `~${60+Math.round(Math.random()*300)}с`, risk: sp > 1.0 ? 'high' : 'med',
+      vip: true, hot: false, exchFee: 0.8, aiScore: 0,
+      latency: Math.round(200 + Math.random()*500),
+    };
+    sig.aiScore = aiScore(sig);
+    all.push(sig);
+  });
+
+  // ── STRATEGY 7: Volatility Arbitrage (VIP) ────────────
+  const volPairs = [
+    {sym:'BTC', bx:'Deribit', sx:'binance', spread:()=>0.5+Math.random()*2.0},
+    {sym:'ETH', bx:'Deribit', sx:'okx',     spread:()=>0.4+Math.random()*1.8},
+    {sym:'SOL', bx:'okx',     sx:'bybit',   spread:()=>0.6+Math.random()*2.5},
+    {sym:'BNB', bx:'binance', sx:'Deribit', spread:()=>0.8+Math.random()*2.2},
+  ];
+  volPairs.forEach(v => {
+    const sp = +v.spread().toFixed(2);
+    const sig = {
+      id: `v${++id}`, type: 'vol', sym: `${v.sym} IV`, strategy: 'Vol Arb',
+      bx: v.bx, sx: v.sx, bprice: null, sprice: null,
+      spread: sp, vol: `$${(500+Math.random()*2000).toFixed(0)}K`,
+      time: `~${30+Math.round(Math.random()*60)}с`, risk: 'med',
+      vip: true, hot: sp > 1.8, exchFee: 0.4, aiScore: 0,
+      latency: Math.round(40 + Math.random()*80),
+    };
+    sig.aiScore = aiScore(sig);
+    all.push(sig);
+  });
+
+  // ── STRATEGY 8: Spread Trading ────────────────────────
+  const spreadPairs = [
+    {sym:'BTC spot/perp',  bx:'binance', sx:'binance', spread:()=>0.05+Math.random()*0.3},
+    {sym:'ETH spot/perp',  bx:'okx',     sx:'okx',     spread:()=>0.04+Math.random()*0.25},
+    {sym:'SOL spot/perp',  bx:'bybit',   sx:'bybit',   spread:()=>0.06+Math.random()*0.35},
+    {sym:'BNB spot/perp',  bx:'binance', sx:'binance', spread:()=>0.03+Math.random()*0.2},
+    {sym:'DOGE spot/perp', bx:'bybit',   sx:'bybit',   spread:()=>0.08+Math.random()*0.4},
+  ];
+  spreadPairs.forEach(sp => {
+    const spread = +sp.spread().toFixed(3);
+    const sig = {
+      id: `sp${++id}`, type: 'spread', sym: sp.sym, strategy: 'Spread',
+      bx: sp.bx, sx: sp.sx, bprice: null, sprice: null,
+      spread, vol: `$${(1+Math.random()*5).toFixed(1)}M`,
+      time: `~${2+Math.round(Math.random()*8)}с`, risk: 'low',
+      vip: true, hot: false, exchFee: 0.1, aiScore: 0,
+      latency: Math.round(10 + Math.random()*20),
+    };
+    sig.aiScore = aiScore(sig);
+    all.push(sig);
+  });
+
+  // Sort by AI score descending
+  return all.sort((a, b) => b.aiScore - a.aiScore);
 }
 
 let SIGS = genSignals();
 const COIN_MAP = Object.fromEntries(COINS.map(c=>[c.sym,c]));
 
+// ── SIGNAL REFRESH ENGINE ──────────────────────────────
+// Simulates WebSocket updates: partial refresh every 500ms
+let _updateCycle = 0;
+function hftUpdate() {
+  _updateCycle++;
+  // Update prices in cache (simulate incoming WS data)
+  Object.keys(BASE_PRICES).forEach(sym => {
+    Object.keys(EX_FEES).forEach(ex => {
+      if ((EX_COINS[ex]||[]).includes(sym)) simPrice(sym, ex);
+    });
+  });
+  // Regenerate signals every 3.5s, partial update every 500ms
+  if (_updateCycle % 7 === 0) {
+    SIGS = genSignals();
+  } else {
+    // Micro-update: adjust spreads by ±0.05%
+    SIGS = SIGS.map(s => ({
+      ...s,
+      spread: Math.max(0.01, +(s.spread + (Math.random()-.5)*.06).toFixed(3)),
+    }));
+  }
+}
+
 function getCoinIco(sym) {
   const base = sym.split('/')[0].split('→')[0].split(' ')[0];
   return (COIN_MAP[base]||{ico:'◈'}).ico;
 }
+
 
 // ========================================================
 // NETWORK → COINS MAP
@@ -1295,17 +1658,47 @@ function flt(f) {
   renderSigs();
 }
 
+// ── TYPE LABELS & ICONS ────────────────────────────────
+const TYPE_META = {
+  cex:    { label:'CEX▸CEX',     icon:'🔄', color:'var(--cyan)' },
+  tri:    { label:'Треугольный', icon:'🔺', color:'var(--purple)' },
+  fund:   { label:'Фандинг',     icon:'💰', color:'var(--gold)' },
+  dex:    { label:'DEX',         icon:'🦄', color:'#a855f7' },
+  stat:   { label:'Стат.Арб',    icon:'📊', color:'#3b82f6' },
+  xchain: { label:'Cross-Chain', icon:'⛓', color:'#06b6d4' },
+  vol:    { label:'Vol Арб',     icon:'⚡', color:'#f97316' },
+  spread: { label:'Spread',      icon:'↔️', color:'#10b981' },
+};
+
+function aiBar(score) {
+  const w = score;
+  const col = score >= 70 ? 'var(--green)' : score >= 50 ? 'var(--gold)' : 'var(--red)';
+  return `<div style="display:flex;align-items:center;gap:4px">
+    <div style="flex:1;height:3px;background:var(--bg3);border-radius:2px;overflow:hidden">
+      <div style="width:${w}%;height:100%;background:${col};border-radius:2px"></div>
+    </div>
+    <span style="font-size:9px;font-family:var(--mono);color:${col};min-width:20px">${score}</span>
+  </div>`;
+}
+
 function renderSigs() {
   const f = S.sigFilter;
   const net = S.netFilter;
   const allowedCoins = NET_COINS[net];
   let list = SIGS;
+
+  // Apply type filter
   if(f==='cex') list = list.filter(s=>s.type==='cex');
   else if(f==='dex') list = list.filter(s=>s.type==='dex');
   else if(f==='tri') list = list.filter(s=>s.type==='tri');
   else if(f==='fund') list = list.filter(s=>s.type==='fund');
+  else if(f==='stat') list = list.filter(s=>s.type==='stat');
+  else if(f==='xchain') list = list.filter(s=>s.type==='xchain');
+  else if(f==='vol') list = list.filter(s=>s.type==='vol');
+  else if(f==='spread') list = list.filter(s=>s.type==='spread');
   else if(f==='hot') list = list.filter(s=>s.hot);
   else if(f==='viponly') list = list.filter(s=>s.vip);
+
   // Apply network filter
   if (allowedCoins) {
     list = list.filter(s => {
@@ -1314,44 +1707,59 @@ function renderSigs() {
     });
   }
 
-  document.getElementById('sigCount').textContent = list.length + ' сигналов';
-
   const feeR = S.vip ? S.vipFee : S.freeFee;
   const conn = S.connected;
+
+  // Stats header
+  const totalSigs = SIGS.length;
+  const hotSigs = SIGS.filter(s=>s.hot).length;
+  document.getElementById('sigCount').textContent = `${list.length} / ${totalSigs} · 🔥${hotSigs}`;
+
   document.getElementById('sigList').innerHTML = list.map(sig => {
     const locked = sig.vip && !S.vip;
-    const bConn = conn.has(sig.bx.toLowerCase()) || sig.type==='tri'||sig.type==='dex'||sig.type==='fund';
-    const sConn = conn.has(sig.sx.toLowerCase()) || sig.type==='tri'||sig.type==='dex'||sig.type==='fund';
+    const tm = TYPE_META[sig.type] || { label: sig.type, icon:'◈', color:'var(--text2)' };
+    const bConn = conn.has(sig.bx.toLowerCase()) || !['cex'].includes(sig.type);
+    const sConn = conn.has(sig.sx.toLowerCase()) || !['cex'].includes(sig.type);
     const canTrade = bConn && sConn;
     const limitHit = !S.vip && S.trades >= S.maxFree;
-    // Чистый профит = спред − комиссия биржи (0.2% × 2 стороны) − комиссия платформы
-    const exchFeePct = 0.2; // ~0.1% buy + 0.1% sell
+
+    // Net profit calculation
+    const exchFeePct = sig.exchFee || 0.2;
     const platFeePct = feeR * 100;
-    const netPct = +(sig.spread - exchFeePct - platFeePct).toFixed(2);
-    // Скрываем сигналы где профит <= 0
+    const netPct = +(sig.spread - exchFeePct - platFeePct).toFixed(3);
     if (!locked && netPct <= 0) return '';
-    const typeLabel = {cex:'CEX▸CEX',dex:'DEX',tri:'Треугольный',fund:'Фандинг'}[sig.type];
-    const ico = getCoinIco(sig.sym);
+
+    // Latency badge
+    const latMs = sig.latency || 0;
+    const latCol = latMs < 30 ? 'var(--green)' : latMs < 100 ? 'var(--gold)' : 'var(--red)';
+    const latLabel = latMs < 30 ? `${latMs}ms ⚡` : latMs < 100 ? `${latMs}ms` : `${latMs}ms`;
+
+    // Funding display
+    const isFunding = sig.type === 'fund';
+    const displaySpread = isFunding
+      ? `${(sig.displaySpread*100||sig.spread).toFixed(3)}%`
+      : `+${sig.spread}%`;
+
+    const ico = getCoinIco(sig.sym.split('/')[0].split(' ')[0].split('→')[0]);
 
     return `<div class="ac ${sig.hot&&!locked?'hot':''} ${locked?'locked':''}" onclick="${locked?`showPg('vip')`:`openTrade('${sig.id}')`}">
       <div class="ac-top">
         <div class="ac-pair">
           <div class="ac-icons">
             <div class="ci">${ico}</div>
-            <div class="ci">💵</div>
           </div>
           <div>
-            <div class="ac-pname">${sig.sym}${locked?' 🔒':''}</div>
-            <div class="ac-ptype">${typeLabel}</div>
+            <div class="ac-pname">${sig.sym.length > 18 ? sig.sym.slice(0,18)+'…' : sig.sym}${locked?' 🔒':''}</div>
+            <div class="ac-ptype" style="color:${tm.color}">${tm.icon} ${tm.label} · ${sig.strategy||tm.label}</div>
           </div>
         </div>
         <div class="ac-profit">
           <div class="pct ${netPct<0.3?'warn':''} ${locked?'blurred':''}">${locked?'??.?':'+'+netPct.toFixed(2)}%</div>
-          <div class="pct-sub">${locked?'VIP Only':'после всех комиссий'}</div>
+          <div class="pct-sub">${locked?'VIP Only':'чистый профит'}</div>
         </div>
       </div>
       ${locked ? `<div style="text-align:center;padding:10px 14px 12px;color:var(--text2);font-size:11px">
-        👑 Доступно в VIP · <button onclick="event.stopPropagation();showPg('vip')" style="background:none;border:1px solid rgba(245,166,35,.4);border-radius:5px;padding:3px 9px;color:var(--gold);font-size:10px;font-weight:700;cursor:pointer;font-family:var(--font)">Получить VIP →</button>
+        👑 Стратегия доступна в VIP · <button onclick="event.stopPropagation();showPg('vip')" style="background:none;border:1px solid rgba(245,166,35,.4);border-radius:5px;padding:3px 9px;color:var(--gold);font-size:10px;font-weight:700;cursor:pointer;font-family:var(--font)">Получить VIP →</button>
       </div>` : `
       <div class="ac-route">
         <div class="rs"><span class="rs-ex">${sig.bx}</span>${sig.bprice?`<span class="rs-pr">$${fmtP(sig.bprice)}</span>`:''}</div>
@@ -1359,14 +1767,28 @@ function renderSigs() {
         <div class="rs"><span class="rs-ex">${sig.sx}</span>${sig.sprice?`<span class="rs-pr">$${fmtP(sig.sprice)}</span>`:''}</div>
       </div>
       <div class="ac-meta">
-        <div class="mi"><div class="mi-k">Спред (gross)</div><div class="mi-v g">+${sig.spread}%</div></div>
-        <div class="mi"><div class="mi-k">Биржа ~0.2%</div><div class="mi-v r">−${exchFeePct}%</div></div>
+        <div class="mi"><div class="mi-k">Спред</div><div class="mi-v g">${displaySpread}${isFunding?`<span style="font-size:8px;color:var(--muted);margin-left:3px">/8ч</span>`:''}</div></div>
+        <div class="mi"><div class="mi-k">Биржа</div><div class="mi-v r">−${exchFeePct}%</div></div>
         <div class="mi"><div class="mi-k">Платформа</div><div class="mi-v r">−${platFeePct.toFixed(1)}%</div></div>
-        <div class="mi"><div class="mi-k">Риск</div><div class="mi-v go">${{low:'Низкий',med:'Средний',high:'Высокий'}[sig.risk]}</div></div>
+        <div class="mi"><div class="mi-k">Риск</div><div class="mi-v go">${{low:'🟢 Низкий',med:'🟡 Средний',high:'🔴 Высокий'}[sig.risk]}</div></div>
+      </div>
+      <div style="padding:4px 12px 6px;display:flex;align-items:center;gap:8px">
+        <div style="flex:1">
+          <div style="font-size:9px;color:var(--muted);margin-bottom:2px">AI Score</div>
+          ${aiBar(sig.aiScore)}
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:9px;color:var(--muted)">Latency</div>
+          <div style="font-size:10px;font-family:var(--mono);color:${latCol}">${latLabel}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:9px;color:var(--muted)">Объём</div>
+          <div style="font-size:10px;font-family:var(--mono);color:var(--text2)">${sig.vol}</div>
+        </div>
       </div>
       <div class="ac-foot">
         <button class="btn-ex" ${(!canTrade||limitHit)?'disabled':''} onclick="event.stopPropagation();openTrade('${sig.id}')">
-          ${limitHit?'⚠️ Лимит FREE 5/д':!canTrade?`🔗 Подключи ${sig.bx}/${sig.sx}`:'⚡ Исполнить 1 кнопкой'}
+          ${limitHit?'⚠️ Лимит FREE 5/д':!canTrade?`🔗 Подключи ${sig.bx}`:sig.type==='fund'?'💰 Войти в позицию':'⚡ Исполнить'}
         </button>
         <div class="btn-wl" onclick="event.stopPropagation();toggleWL(this)">⭐</div>
       </div>
@@ -1384,36 +1806,7 @@ function fmtP(p) {
   return p.toLocaleString('en',{maximumFractionDigits:2});
 }
 
-// ========================================================
-// SCANNER
-// ========================================================
-const SCAN_PAIRS = [
-  {sym:'BTC',b:'Binance',s:'OKX',bp:67842,sp:68214,spread:0.55},
-  {sym:'ETH',b:'Bybit',s:'Binance',bp:3541.2,sp:3558.9,spread:0.50},
-  {sym:'SOL',b:'KuCoin',s:'Gate.io',bp:147.82,sp:149.24,spread:0.96},
-  {sym:'BNB',b:'HTX',s:'Binance',bp:578.1,sp:580.9,spread:0.48},
-  {sym:'XRP',b:'MEXC',s:'Bybit',bp:0.5021,sp:0.5098,spread:1.53},
-  {sym:'DOGE',b:'Gate.io',s:'Coinbase',bp:0.1621,sp:0.1652,spread:1.91},
-  {sym:'ADA',b:'KuCoin',s:'OKX',bp:0.4412,sp:0.4461,spread:1.11},
-  {sym:'AVAX',b:'Gate.io',s:'Binance',bp:34.12,sp:34.52,spread:1.17},
-  {sym:'NEAR',b:'KuCoin',s:'MEXC',bp:6.841,sp:6.921,spread:1.17},
-  {sym:'ARB',b:'Binance',s:'Bitget',bp:1.021,sp:1.039,spread:1.76},
-  {sym:'PEPE',b:'MEXC',s:'Binance',bp:0.00001211,sp:0.00001259,spread:3.96},
-  {sym:'SHIB',b:'LBank',s:'Gate.io',bp:0.00002481,sp:0.00002534,spread:2.14},
-  {sym:'TON',b:'OKX',s:'Bybit',bp:5.421,sp:5.511,spread:1.66},
-  {sym:'SUI',b:'Bybit',s:'MEXC',bp:3.214,sp:3.281,spread:2.08},
-  {sym:'BONK',b:'MEXC',s:'Bybit',bp:0.0000320,sp:0.0000331,spread:3.44},
-  {sym:'WIF',b:'BitMart',s:'Binance',bp:2.841,sp:2.912,spread:2.50},
-  {sym:'INJ',b:'KuCoin',s:'Bybit',bp:28.41,sp:29.12,spread:2.50},
-  {sym:'TAO',b:'Bybit',s:'Gate.io',bp:481.2,sp:492.4,spread:2.33},
-  {sym:'DOT',b:'HTX',s:'KuCoin',bp:7.812,sp:7.921,spread:1.39},
-  {sym:'LINK',b:'Kraken',s:'Binance',bp:14.82,sp:15.01,spread:1.28},
-  {sym:'APT',b:'Binance',s:'KuCoin',bp:9.812,sp:9.941,spread:1.31},
-  {sym:'MATIC',b:'OKX',s:'MEXC',bp:0.8812,sp:0.8964,spread:1.72},
-  {sym:'RENDER',b:'MEXC',s:'Binance',bp:8.211,sp:8.392,spread:2.20},
-  {sym:'FLOKI',b:'LBank',s:'MEXC',bp:0.000182,sp:0.000189,spread:3.85},
-];
-
+// ── HFT SCANNER — Reads from live price cache ──────────
 function updScanner() {
   const thr = parseFloat(document.getElementById('spreadSlider').value);
   document.getElementById('spreadLbl').textContent = thr.toFixed(1)+'%';
@@ -1423,24 +1816,60 @@ function updScanner() {
 function renderScanner(thr=0.3) {
   const now = new Date();
   document.getElementById('scanTime').textContent = now.toLocaleTimeString('ru');
-  const rows = SCAN_PAIRS
-    .map(r=>({...r,spread:+(r.spread+(Math.random()-.5)*.1).toFixed(2)}))
-    .filter(r=>r.spread>=thr)
-    .sort((a,b)=>b.spread-a.spread);
-  const ico = sym => getCoinIco(sym);
-  document.getElementById('scanBody').innerHTML = rows.map(r=>{
+
+  // Build scanner rows from live PRICE_CACHE
+  const rows = [];
+  const topCoins = ['BTC','ETH','SOL','BNB','XRP','DOGE','ADA','AVAX','TON','NEAR',
+    'ARB','PEPE','SHIB','BONK','WIF','DOT','LINK','INJ','TAO','SUI',
+    'OP','APT','MATIC','RENDER','TIA','SEI','FLOKI','MEME','ORDI','ENA'];
+  const exList = Object.keys(EX_FEES);
+
+  topCoins.forEach(sym => {
+    // Get best bid/ask across all exchanges
+    let bestBid = 0, bestAsk = Infinity, bestBidEx = '', bestAskEx = '';
+    exList.forEach(ex => {
+      if (!(EX_COINS[ex]||[]).includes(sym)) return;
+      const p = simPrice(sym, ex);
+      if (p.bid > bestBid) { bestBid = p.bid; bestBidEx = ex; }
+      if (p.ask < bestAsk) { bestAsk = p.ask; bestAskEx = ex; }
+    });
+    if (!bestBid || !bestAsk || bestBidEx === bestAskEx) return;
+    const spread = +((bestBid - bestAsk) / bestAsk * 100).toFixed(3);
+    if (spread >= thr) {
+      rows.push({ sym, b: bestAskEx, s: bestBidEx,
+        bp: bestAsk, sp: bestBid, spread });
+    }
+  });
+
+  rows.sort((a,b) => b.spread - a.spread);
+
+  // Also add some triangular opportunities
+  const triRows = SIGS.filter(s=>s.type==='tri'&&s.spread>=thr).slice(0,5).map(s=>({
+    sym: s.sym, b: s.bx+'(TRI)', s: s.sx+'(TRI)',
+    bp: null, sp: null, spread: s.spread, tri: true
+  }));
+
+  const allRows = [...rows, ...triRows];
+
+  const ico = sym => getCoinIco(sym.split('→')[0].split('/')[0].split(' ')[0]);
+  document.getElementById('scanBody').innerHTML = allRows.map(r=>{
     const pct = Math.min(100,(r.spread/5)*100);
     const cls = r.spread>=2?'hi':r.spread>=1?'mid':'lo';
+    const spreadColor = r.spread>=2?'var(--green)':r.spread>=1?'var(--gold)':'var(--text2)';
     return `<tr>
-      <td><span style="font-size:14px">${ico(r.sym)}</span> <strong>${r.sym}</strong></td>
-      <td class="mono c">${fmtP(r.bp)}<br><span style="font-size:8px;color:var(--muted)">${r.b}</span></td>
-      <td class="mono g">${fmtP(r.sp)}<br><span style="font-size:8px;color:var(--muted)">${r.s}</span></td>
-      <td class="mono ${r.spread>=1?'g':'go'}">+${r.spread}%
+      <td><span style="font-size:13px">${ico(r.sym)}</span> <strong style="font-size:11px">${r.sym.length>12?r.sym.slice(0,12)+'…':r.sym}</strong></td>
+      <td class="mono c" style="font-size:10px">${r.bp?fmtP(r.bp):'—'}<br><span style="font-size:8px;color:var(--muted)">${r.b}</span></td>
+      <td class="mono g" style="font-size:10px">${r.sp?fmtP(r.sp):'—'}<br><span style="font-size:8px;color:var(--muted)">${r.s}</span></td>
+      <td class="mono" style="color:${spreadColor};font-size:11px">+${r.spread}%
         <div class="sbar-wrap"><div class="sbar ${cls}" style="width:${pct}%"></div></div>
       </td>
-      <td><button class="btn-t" onclick="openScanTrade('${r.sym}','${r.b}','${r.s}',${r.spread})">Торговать</button></td>
+      <td><button class="btn-t" onclick="openScanTrade('${r.sym}','${r.b}','${r.s}',${r.spread})">⚡</button></td>
     </tr>`;
   }).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">Нет пар с таким спредом</td></tr>';
+
+  // Update scan stats
+  const el = document.getElementById('scanStats');
+  if (el) el.innerHTML = `<span style="color:var(--cyan)">${allRows.length}</span> пар · <span style="color:var(--green)">${rows.filter(r=>r.spread>1).length}</span> горячих`;
 }
 
 // ========================================================
@@ -1493,18 +1922,21 @@ function renderHistory() {
   const h = S.history;
   const wins = h.filter(x=>x.profit>0).length;
   const total = h.reduce((a,x)=>a+x.profit,0);
+  const avgLatency = h.filter(x=>x.latency).length
+    ? Math.round(h.filter(x=>x.latency).reduce((a,x)=>a+(x.latency||0),0)/h.filter(x=>x.latency).length) : 0;
   document.getElementById('histSum').innerHTML = `
     <div><div class="hs-lbl">Сделок</div><div class="hs-val">${h.length}</div></div>
-    <div><div class="hs-lbl">Общий профит</div><div class="hs-val g" style="color:${total>=0?'var(--green)':'var(--red)'}">${total>=0?'+':''}$${total.toFixed(2)}</div></div>
+    <div><div class="hs-lbl">Профит</div><div class="hs-val g" style="color:${total>=0?'var(--green)':'var(--red)'}">${total>=0?'+':''}$${total.toFixed(2)}</div></div>
     <div><div class="hs-lbl">Win Rate</div><div class="hs-val go">${h.length?Math.round(wins/h.length*100):0}%</div></div>
   `;
+  const typeIco = {cex:'🔄',tri:'🔺',fund:'💰',dex:'🦄',stat:'📊',xchain:'⛓',vol:'⚡',spread:'↔️'};
   document.getElementById('histList').innerHTML = h.length
     ? [...h].reverse().map(x=>`
         <div class="hist-item">
-          <div class="hist-ico ${x.profit>0?'ok':'fail'}">${x.profit>0?'✅':'❌'}</div>
+          <div class="hist-ico ${x.profit>0?'ok':'fail'}">${x.auto?'🤖':x.profit>0?'✅':'❌'}</div>
           <div class="hist-body">
-            <div class="hist-pair">${x.sym} · ${x.bx}→${x.sx}</div>
-            <div class="hist-detail">$${x.amount} · Комиссия платф.: $${x.fee.toFixed(3)} · Спред: +${x.spread}%</div>
+            <div class="hist-pair">${typeIco[x.type]||'◈'} ${x.sym} · ${x.bx}→${x.sx}${x.auto?' <span style="font-size:8px;background:rgba(0,207,255,.15);color:var(--cyan);padding:1px 5px;border-radius:3px">AUTO</span>':''}</div>
+            <div class="hist-detail">$${x.amount} · Спред: +${x.spread}%${x.latency?` · ⚡${x.latency}ms`:''}${x.aiScore?` · AI:${x.aiScore}`:''}</div>
           </div>
           <div class="hist-right">
             <div class="hist-profit ${x.profit<=0?'neg':''}">${x.profit>0?'+':''}$${x.profit.toFixed(3)}</div>
@@ -1524,17 +1956,19 @@ const PLANS=[
   {id:'year',name:'1 Год',price:'$149',per:'/год',save:'ЭКОНОМИЯ 27%',badge:'ЛУЧШАЯ ЦЕНА'},
 ];
 const FEATS=[
-  {ico:'📡',name:'Сигналов в день',free:'10',vip:'∞'},
-  {ico:'⚡',name:'Скорость сигналов',free:'+8 сек',vip:'Realtime'},
+  {ico:'📡',name:'Сигналов в день',free:'~30',vip:'300-1000+'},
+  {ico:'⚡',name:'HFT Engine скорость',free:'3.5с',vip:'< 500ms'},
   {ico:'💱',name:'Сделок в день',free:'5',vip:'∞'},
   {ico:'🏦',name:'Подключённых бирж',free:'2',vip:'∞ (15)'},
-  {ico:'🤖',name:'Авто-торговля',free:'❌',vip:'✅'},
-  {ico:'📐',name:'Треугольный арбитраж',free:'❌',vip:'✅'},
-  {ico:'🔀',name:'DEX арбитраж',free:'❌',vip:'✅'},
-  {ico:'💹',name:'Фандинг арбитраж',free:'❌',vip:'✅'},
-  {ico:'⏰',name:'TG алерты',free:'❌',vip:'✅'},
+  {ico:'🤖',name:'AI Score фильтр',free:'❌',vip:'✅ 0-100'},
+  {ico:'🤖',name:'Авто-торговля 24/7',free:'❌',vip:'✅'},
+  {ico:'🔺',name:'Треугольный арбитраж',free:'❌',vip:'✅'},
+  {ico:'🦄',name:'DEX арбитраж',free:'❌',vip:'✅'},
+  {ico:'💰',name:'Фандинг арбитраж',free:'❌',vip:'✅'},
+  {ico:'📊',name:'Стат. арбитраж',free:'❌',vip:'✅'},
+  {ico:'⛓',name:'Cross-Chain арбитраж',free:'❌',vip:'✅'},
+  {ico:'⚡',name:'Volatility арбитраж',free:'❌',vip:'✅'},
   {ico:'🎯',name:'Комиссия платформы',free:'0.8%',vip:'0.3%'},
-  {ico:'📊',name:'Расширенная аналитика',free:'❌',vip:'✅'},
   {ico:'🛡',name:'Приоритетная поддержка',free:'❌',vip:'✅'},
 ];
 
@@ -1638,45 +2072,66 @@ function calcTrade() {
   const sig=S.currentSig; if(!sig)return;
   const amt=parseFloat(document.getElementById('tAmt').value)||0;
   const feeR=S.vip?S.vipFee:S.freeFee;
-  const exchFee=amt*0.002;
-  const platFee=amt*feeR;
-  const gross=amt*sig.spread/100;
-  const net=+(gross-exchFee-platFee).toFixed(4);
+  const exchFee=+(amt*(sig.exchFee||0.002)/100*100/100).toFixed(4); // exchange fees
+  const exchFeeAmt=+(amt*(sig.exchFee||0.2)/100).toFixed(4);
+  const platFee=+(amt*feeR).toFixed(4);
+  const gross=+(amt*sig.spread/100).toFixed(4);
+  const net=+(gross-exchFeeAmt-platFee).toFixed(4);
   const roi=amt>0?(net/amt*100).toFixed(3):0;
+  const aiSc = sig.aiScore || aiScore(sig);
+  const aiCol = aiSc>=70?'var(--green)':aiSc>=50?'var(--gold)':'var(--red)';
+  const latMs = sig.latency || 50;
   document.getElementById('tCalc').innerHTML=`
-    <div class="tc-row"><span class="tc-k">Сумма</span><span class="tc-v">$${amt.toFixed(2)}</span></div>
-    <div class="tc-row"><span class="tc-k">Валовой спред (+${sig.spread}%)</span><span class="tc-v g">+$${gross.toFixed(4)}</span></div>
-    <div class="tc-row"><span class="tc-k">Комиссия биржи (~0.2%)</span><span class="tc-v r">-$${exchFee.toFixed(4)}</span></div>
-    <div class="tc-row"><span class="tc-k">Комиссия платформы (${(feeR*100).toFixed(1)}%)</span><span class="tc-v go">-$${platFee.toFixed(4)}</span></div>
-    <div class="tc-row"><span class="tc-k" style="font-weight:700;font-size:13px">ЧИСТЫЙ ПРОФИТ</span><span class="tc-v ${net>=0?'g':'r'} BIG">${net>=0?'+':''}$${net.toFixed(4)}</span></div>
+    <div class="tc-row"><span class="tc-k">Сумма инвестиций</span><span class="tc-v">$${amt.toFixed(2)}</span></div>
+    <div class="tc-row"><span class="tc-k">Спред (gross +${sig.spread}%)</span><span class="tc-v g">+$${gross}</span></div>
+    <div class="tc-row"><span class="tc-k">Комиссия биржи (${(sig.exchFee||0.2)}%)</span><span class="tc-v r">-$${exchFeeAmt}</span></div>
+    <div class="tc-row"><span class="tc-k">Платформа (${(feeR*100).toFixed(1)}%)</span><span class="tc-v go">-$${platFee}</span></div>
+    <div class="tc-row" style="border-top:1px solid var(--border);margin-top:4px;padding-top:6px"><span class="tc-k" style="font-weight:700;font-size:13px">ЧИСТЫЙ ПРОФИТ</span><span class="tc-v ${net>=0?'g':'r'} BIG">${net>=0?'+':''}$${net}</span></div>
     <div class="tc-row"><span class="tc-k">ROI сделки</span><span class="tc-v ${net>=0?'g':'r'}">${net>=0?'+':''}${roi}%</span></div>
+    <div class="tc-row"><span class="tc-k">⚡ Latency исполнения</span><span class="tc-v" style="color:${latMs<50?'var(--green)':'var(--gold)'}">&lt;${latMs}ms</span></div>
+    <div class="tc-row"><span class="tc-k">🤖 AI Score</span><span class="tc-v" style="color:${aiCol}">${aiSc}/100 ${aiSc>=70?'✅':'⚠️'}</span></div>
   `;
   document.getElementById('tCommInfo').innerHTML=`
-    💰 <strong>$${platFee.toFixed(4)}</strong> (${(feeR*100).toFixed(1)}%) уйдёт на кошелёк владельца платформы.<br>
-    ${S.vip?'✅ VIP тариф: скидка на комиссию 62.5%':'⚡ FREE тариф: обновись до VIP для комиссии 0.3%'}
+    💰 <strong>$${platFee}</strong> (${(feeR*100).toFixed(1)}%) → кошелёк платформы.<br>
+    ${S.vip?'✅ VIP: комиссия 0.3% · приоритетное исполнение':'⚡ FREE: 0.8% комиссия → VIP даёт скидку 62.5%'}
   `;
 }
+
 function execTrade() {
   const sig=S.currentSig; if(!sig)return;
   if(!S.vip&&S.trades>=S.maxFree){toastMsg('❌ Лимит 5 сделок/день FREE. Upgrade VIP!','err');closeModal('tradeModal');setTimeout(()=>showPg('vip'),400);return;}
   const amt=parseFloat(document.getElementById('tAmt').value)||0;
   const feeR=S.vip?S.vipFee:S.freeFee;
-  const exchFee=amt*0.002;
+  const exchFeeAmt=+(amt*(sig.exchFee||0.2)/100).toFixed(4);
   const platFee=+(amt*feeR).toFixed(4);
-  const gross=amt*sig.spread/100;
-  const net=+(gross-exchFee-platFee).toFixed(4);
+  const gross=+(amt*sig.spread/100).toFixed(4);
+  const net=+(gross-exchFeeAmt-platFee).toFixed(4);
   closeModal('tradeModal');
+
+  // Simulate HFT execution pipeline
+  const latMs = sig.latency || 50;
+  toastMsg(`⚡ Исполнение... <${latMs}ms`,'ok');
+
   setTimeout(()=>{
-    const ok=Math.random()>.08;
+    // AI win rate: base on score + some randomness
+    const aiSc = sig.aiScore || 70;
+    const winProb = 0.5 + (aiSc / 200); // 0.5-1.0 based on AI score
+    const ok = Math.random() < winProb;
     S.trades++; S.ownerEarned+=platFee;
     if(ok){S.balance=+(S.balance+net).toFixed(2);S.profit=+(S.profit+net).toFixed(4);}
     document.getElementById('hBalancе').textContent='$'+S.balance.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
     document.getElementById('hProfit').textContent=(S.profit>=0?'+':'')+`$${S.profit.toFixed(2)}`;
-    S.history.push({sym:sig.sym,bx:sig.bx,sx:sig.sx,amount:amt,fee:platFee,profit:ok?net:-(exchFee*2),spread:sig.spread,time:new Date().toLocaleTimeString('ru')});
+    S.history.push({
+      sym:sig.sym,bx:sig.bx,sx:sig.sx,amount:amt,fee:platFee,
+      profit:ok?net:-(exchFeeAmt*2),spread:sig.spread,
+      type:sig.type,aiScore:sig.aiScore,latency:latMs,
+      time:new Date().toLocaleTimeString('ru')
+    });
+    saveStorage();
     if(document.getElementById('pg-history').classList.contains('on'))renderHistory();
     renderSigs();
-    toastMsg(ok?`✅ Профит: +$${net.toFixed(4)}`:'❌ Сделка сорвалась: слиппаж',ok?'ok':'err');
-  },1600);
+    toastMsg(ok?`✅ +$${net.toFixed(4)} · ${latMs}ms ⚡`:'❌ Слиппаж / цена изменилась',ok?'ok':'err');
+  }, Math.min(latMs * 4, 1800));
 }
 
 // ========================================================
@@ -1728,7 +2183,7 @@ function toastMsg(msg,type=''){
 // LIVE UPDATES
 // ========================================================
 function liveUpdate(){
-  SIGS=SIGS.map(s=>({...s,spread:Math.max(.1,+(s.spread+(Math.random()-.5)*.25).toFixed(2))}));
+  hftUpdate(); // HFT engine: update price cache + signals
   if(document.getElementById('pg-signals').classList.contains('on'))renderSigs();
   if(document.getElementById('pg-scanner').classList.contains('on'))renderScanner(parseFloat(document.getElementById('spreadSlider').value));
 }
@@ -1862,7 +2317,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   // Restore header
   document.getElementById('hBalancе').textContent = '$'+S.balance.toLocaleString('en',{minimumFractionDigits:2});
   document.getElementById('hProfit').textContent = (S.profit>=0?'+':'')+`$${S.profit.toFixed(2)}`;
-  document.getElementById('hFee').textContent = S.vip?'0.3%':'0.8%';
+  if(document.getElementById('hFee')) document.getElementById('hFee').textContent = S.vip?'0.3%':'0.8%';
   updateHeaderVip();
 
   initDragScroll(document.getElementById('netChips'));
@@ -1875,9 +2330,13 @@ document.addEventListener('DOMContentLoaded',()=>{
   renderHistory();
   renderVip();
   renderVipAutoSettings();
-  setInterval(liveUpdate,3500);
+  setInterval(liveUpdate, 500); // HFT: 500ms update cycle (WebSocket sim)
+  setInterval(() => { // Update header sig count every 2s
+    const el = document.getElementById('hSigCount');
+    if (el) el.textContent = SIGS.length + ' сигн.';
+  }, 2000);
   setTimeout(()=>toastMsg('🔥 BTC/USDT: новый арбитраж +0.55% на Binance→OKX','ok'),2000);
-  setTimeout(()=>toastMsg('📡 Сканер обновлён: 24 активных спреда','ok'),6000);
+  setTimeout(()=>toastMsg(`⚡ HFT Engine: ${SIGS.length} сигналов найдено`,'ok'),5000);
 });
 </script>
 </body>

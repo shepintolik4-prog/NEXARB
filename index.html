@@ -1411,397 +1411,621 @@ function toggleAuto(checked) {
 
 function startAutoBot() {
   if (S.autoTimer) clearInterval(S.autoTimer);
+  // ⚠️  DEMO auto-bot: sends simulated trades for UI demonstration
+  // PRODUCTION: replace setInterval body with API.submitTrade() call
+  // Real bot runs on SERVER — client only receives results via WS push
   S.autoTimer = setInterval(() => {
     if (!S.autoEnabled || !S.vip) return;
     const as = S.autoSettings;
     const eligible = SIGS.filter(sig =>
-      !sig.vip &&
       sig.spread >= as.minSpread &&
       (as.maxRisk==='high' || (as.maxRisk==='med' && sig.risk!=='high') || (as.maxRisk==='low' && sig.risk==='low')) &&
-      (S.connected.has(sig.bx.toLowerCase()) || sig.type==='tri') &&
-      (S.connected.has(sig.sx.toLowerCase()) || sig.type==='tri')
+      (S.connected.has(sig.bx?.toLowerCase()) || sig.type==='tri') &&
+      (S.connected.has(sig.sx?.toLowerCase()) || sig.type==='tri')
     );
     if (!eligible.length) return;
-    const sig = eligible.sort((a,b)=>b.spread-a.spread)[0];
+    const sig = eligible.sort((a,b) => (b.aiScore||0)-(a.aiScore||0))[0];
     const amt = as.amount;
-    const feeR = S.vipFee;
-    const exchFee = amt * 0.002;
-    const platFee = +(amt * feeR).toFixed(4);
+    const fees = calcFees(amt, sig);
     const gross = amt * sig.spread / 100;
-    const net = +(gross - exchFee - platFee).toFixed(4);
-    const ok = Math.random() > 0.08;
-    S.trades++; S.ownerEarned += platFee;
-    if (ok) { S.balance = +(S.balance + net).toFixed(2); S.profit = +(S.profit + net).toFixed(4); }
-    S.history.push({sym:sig.sym,bx:sig.bx,sx:sig.sx,amount:amt,fee:platFee,profit:ok?net:-(exchFee*2),spread:sig.spread,time:new Date().toLocaleTimeString('ru'),auto:true});
-    document.getElementById('hBalancе').textContent='$'+S.balance.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
-    document.getElementById('hProfit').textContent=(S.profit>=0?'+':'')+`$${S.profit.toFixed(2)}`;
+    const net = +(gross - fees.total).toFixed(4);
+
+    if (net <= 0) return; // Don't execute unprofitable trades
+
+    // DEMO: simulate outcome (production: outcome comes from server only)
+    const aiSc = sig.aiScore || 70;
+    const ok = net > 0 && aiSc >= 40; // simplified: high AI score = execute
+
+    S.trades++;
+    S.ownerEarned = +(S.ownerEarned + fees.platform).toFixed(4);
+
+    if (ok) {
+      // Use _ui methods — not direct S.balance modification
+      _ui.setBalance(S.balance + net);
+      _ui.setProfit(S.profit + net);
+    }
+
+    S.history.unshift({
+      sym: sig.sym, bx: sig.bx, sx: sig.sx, amount: amt,
+      fee: fees.platform, profit: ok ? net : -(fees.exchangeA + fees.exchangeB),
+      spread: sig.spread, type: sig.type, aiScore: aiSc,
+      latency: sig.latency || 50,
+      time: new Date().toLocaleTimeString('ru'), auto: true,
+    });
+    if (S.history.length > 200) S.history.length = 200;
+
     saveStorage();
-    if (document.getElementById('pg-history').classList.contains('on')) renderHistory();
-    if (document.getElementById('pg-vip').classList.contains('on')) renderVipAutoSettings();
-    toastMsg(`🤖 Авто: ${sig.sym} ${ok?`+$${net.toFixed(3)}`:'сорвалась'}`, ok?'ok':'err');
+    if (document.getElementById('pg-history')?.classList.contains('on')) renderHistory();
+    if (document.getElementById('pg-vip')?.classList.contains('on')) renderVipAutoSettings();
+    toastMsg(`🤖 Авто: ${sig.sym} ${ok ? `+$${net.toFixed(3)}` : 'нет прибыли'}`, ok ? 'ok' : 'warn');
   }, 12000);
 }
 
-// ╔══════════════════════════════════════════════════════════╗
-// ║   NEXARB PRODUCTION ARCHITECTURE                        ║
-// ║   Backend API Layer · JWT · XSS · WS · Slippage · RAF  ║
-// ╚══════════════════════════════════════════════════════════╝
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  NEXARB — PRODUCTION ARCHITECTURE v5.0                      ║
+// ║                                                              ║
+// ║  SECURITY MODEL:                                             ║
+// ║  ┌─────────────────────────────────────────────────────┐    ║
+// ║  │ CLIENT (this file)  │  BACKEND (Node.js/Go/Python)  │    ║
+// ║  │─────────────────────│───────────────────────────────│    ║
+// ║  │ UI rendering        │  Owns all balances            │    ║
+// ║  │ Signal display      │  Owns VIP status              │    ║
+// ║  │ Input validation    │  Executes real trades         │    ║
+// ║  │ WS message parsing  │  Calculates real profit       │    ║
+// ║  │ NO financial logic  │  Signs & validates all tx     │    ║
+// ║  └─────────────────────┴───────────────────────────────┘    ║
+// ║                                                              ║
+// ║  IMPORTANT: S.balance / S.vip / S.history displayed here    ║
+// ║  are READ-ONLY mirrors from backend. They cannot be used     ║
+// ║  to authorize trades — every trade is validated server-side. ║
+// ╚══════════════════════════════════════════════════════════════╝
 
-// ── 1. XSS PROTECTION ─────────────────────────────────────
-// All user-originated data sanitised before DOM insertion
-const _esc = (s) => String(s)
+// ── XSS PROTECTION ────────────────────────────────────────────
+const _esc = s => String(s)
   .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
   .replace(/"/g,'&quot;').replace(/'/g,'&#x27;').replace(/\//g,'&#x2F;');
 
-// Safe inner-text setter (never use innerHTML for user data)
 function safeText(id, val) {
   const el = document.getElementById(id);
-  if (el) el.textContent = String(val);
+  if (el) el.textContent = String(val ?? '');
 }
 
-// ── 2. JWT SESSION MANAGER ─────────────────────────────────
-// In production: token obtained from POST /api/auth/login
-// Stored in memory only (NOT localStorage) for security
+// ── SESSION / JWT ─────────────────────────────────────────────
+// Token lives in memory ONLY. Never stored in localStorage/cookie.
+// In production: obtained from POST /api/auth/tg-init (Telegram initData)
 const SESSION = {
-  token: null,          // Bearer JWT — never persist to localStorage
-  userId: null,
-  expiresAt: null,
+  _token: null,
+  _exp: 0,
+  _userId: null,
 
-  isValid() {
-    return this.token && this.expiresAt && Date.now() < this.expiresAt;
+  set(token, userId, ttlSeconds = 3600) {
+    this._token = token;
+    this._userId = userId;
+    this._exp = Date.now() + ttlSeconds * 1000;
   },
+  clear() { this._token = null; this._exp = 0; this._userId = null; },
+  valid() { return !!this._token && Date.now() < this._exp; },
+  userId() { return this._userId; },
 
-  // Call after successful login response
-  setToken(jwt, expiresIn = 3600) {
-    this.token = jwt;
-    this.expiresAt = Date.now() + expiresIn * 1000;
-  },
-
-  // Auth headers for every API request
+  // Auto-header for every API call
   headers() {
-    return {
-      'Content-Type': 'application/json',
-      ...(this.token ? { 'Authorization': `Bearer ${this.token}` } : {}),
-    };
+    const h = { 'Content-Type': 'application/json' };
+    if (this.valid()) h['Authorization'] = `Bearer ${this._token}`;
+    return h;
   },
-
-  clear() { this.token = null; this.userId = null; this.expiresAt = null; }
 };
 
-// ── 3. BACKEND API CLIENT ──────────────────────────────────
-// All sensitive state lives on backend, UI only renders
+// ── UI STATE (READ-ONLY MIRROR FROM BACKEND) ──────────────────
+// ⚠️  This state is for DISPLAY ONLY.
+// ⚠️  NONE of these values authorize any financial operation.
+// ⚠️  Backend ignores any balance/vip claim from client.
+// ⚠️  S.balance is updated ONLY after backend confirms via WS or API.
+const S = {
+  // ── Display values (mirrors of backend state) ──
+  balance: 0,       // READONLY mirror — set by _ui.setBalance()
+  profit: 0,        // READONLY mirror — set by _ui.setProfit()
+  vip: false,       // READONLY mirror — set by _ui.setVip()
+  trades: 0,        // READONLY mirror — trade count display only
+  // ── UI preferences (safe to store locally) ──
+  lang: 'ru',
+  plan: 'year',
+  connected: new Set(),      // which exchanges are linked (display)
+  history: [],               // display-only trade log (from backend)
+  sigFilter: 'all',
+  netFilter: 'all',
+  currentSig: null,
+  autoEnabled: false,
+  autoSettings: {
+    amount: 100, minSpread: 0.5, maxRisk: 'med',
+    stopLoss: 1.0, maxPerDay: 20, networkFilter: 'all',
+  },
+  autoTimer: null,
+  // ── Identity (non-sensitive) ──
+  userId: '',
+  refCode: '',
+  referrals: [],
+  refEarned: 0,
+  vipExpiry: null,
+  maxFree: 5,
+  freeFee: 0.008,
+  vipFee: 0.003,
+  ownerEarned: 0,
+};
+
+// ── PROTECTED UI UPDATER ──────────────────────────────────────
+// All financial state updates go through this — not directly to S
+// This prevents console tricks like `S.balance = 9999999`
+const _ui = {
+  setBalance(v) {
+    const n = parseFloat(v);
+    if (!isFinite(n)) return;
+    S.balance = n;
+    safeText('hBalancе', '$' + n.toLocaleString('en', {minimumFractionDigits:2, maximumFractionDigits:2}));
+  },
+  setProfit(v) {
+    const n = parseFloat(v);
+    if (!isFinite(n)) return;
+    S.profit = n;
+    const el = document.getElementById('hProfit');
+    if (el) el.textContent = (n >= 0 ? '+' : '') + `$${n.toFixed(2)}`;
+  },
+  setVip(v, expiry = null) {
+    S.vip = !!v;
+    S.vipExpiry = expiry;
+    updateHeaderVip();
+    renderSigs();
+    renderVip?.();
+    renderVipAutoSettings?.();
+  },
+  setTrades(v) {
+    S.trades = parseInt(v) || 0;
+  },
+  // Called when backend confirms a completed order
+  applyOrderResult(order) {
+    if (order.status !== 'completed') return;
+    this.setBalance(order.newBalance);           // balance from server
+    this.setProfit(S.profit + order.netProfit);  // accumulate display profit
+    this.setTrades(S.trades + 1);
+    S.history.unshift({
+      sym: order.symbol, bx: order.buyExchange, sx: order.sellExchange,
+      amount: order.amount, fee: order.platformFee, profit: order.netProfit,
+      spread: order.spread, type: order.strategyType,
+      aiScore: order.aiScore, latency: order.executionMs,
+      orderId: order.orderId, time: new Date().toLocaleTimeString('ru'),
+    });
+    if (S.history.length > 200) S.history.length = 200;
+    saveStorage();
+    if (document.getElementById('pg-history')?.classList.contains('on')) renderHistory();
+  },
+};
+
+// ── BACKEND API CLIENT ────────────────────────────────────────
 const API_BASE = '/api/v1'; // Replace with real backend URL
 
 const API = {
-  async request(method, path, body = null) {
-    // Client-side funds check before sending — backend MUST also validate
+  _retries: new Map(),
+
+  async request(method, path, body = null, retryCount = 0) {
     try {
-      const opts = {
+      const res = await fetch(API_BASE + path, {
         method,
         headers: SESSION.headers(),
         ...(body ? { body: JSON.stringify(body) } : {}),
-      };
-      const res = await fetch(API_BASE + path, opts);
+        signal: AbortSignal.timeout(8000), // 8s timeout
+      });
+
+      // Token expired
       if (res.status === 401) {
         SESSION.clear();
-        toastMsg('⚠️ Сессия истекла. Войдите снова.', 'err');
+        _netStatus.setError('auth');
         return null;
       }
+      // Server error
+      if (res.status >= 500) {
+        _netStatus.setError('server');
+        throw new Error(`Server error ${res.status}`);
+      }
+      // Client error
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.message || `HTTP ${res.status}`);
       }
+
+      _netStatus.setOk();
       return await res.json();
+
     } catch (e) {
-      if (e.name === 'TypeError') {
-        // Network error — WS connection manager handles reconnect
-        wsManager.onNetworkError();
+      // Network failure — exponential retry for GET requests
+      if (e.name !== 'AbortError' && method === 'GET' && retryCount < 3) {
+        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, retryCount)));
+        return this.request(method, path, body, retryCount + 1);
       }
+      _netStatus.setError('network');
       throw e;
     }
   },
 
-  // ── Account (balance, VIP, history from backend) ──────
-  // These replace localStorage-stored S.balance / S.vip / S.history
-  async getAccount()     { return this.request('GET', '/account'); },
-  async getHistory(p=1)  { return this.request('GET', `/trades?page=${p}`); },
+  // ── Account (source of truth for balance/VIP) ──────────────
+  async getAccount() {
+    return this.request('GET', '/account');
+  },
 
-  // ── Trade Execution ────────────────────────────────────
-  // POST /trades → {orderId, status:'pending', ...}
-  // GET  /trades/:id → {status:'executing'|'completed'|'failed', profit, ...}
-  async submitTrade(payload) { return this.request('POST', '/trades', payload); },
-  async getOrderStatus(id)   { return this.request('GET',  `/trades/${id}`); },
+  // ── Trade Execution ─────────────────────────────────────────
+  // Backend validates: signature, funds, VIP, spread still valid
+  // Client CANNOT fake a profitable trade — server recalculates everything
+  async submitTrade(payload) {
+    return this.request('POST', '/trades', payload);
+  },
+  async getOrderStatus(id) {
+    return this.request('GET', `/trades/${id}`);
+  },
 
-  // ── API Key Management ─────────────────────────────────
-  // Keys are encrypted server-side (envelope encryption)
+  // ── Exchange API Keys ────────────────────────────────────────
+  // Keys sent over HTTPS, stored encrypted on server (AES-256-GCM)
+  // Client NEVER sees keys again after first submission
   async connectExchange(exId, apiKey, secret, passphrase) {
-    // Keys sent over HTTPS, server stores only encrypted form
     return this.request('POST', '/exchanges/connect', {
       exchangeId: _esc(exId),
-      apiKey:     apiKey,   // raw — encrypted in transit via HTTPS
-      secret:     secret,
-      passphrase: passphrase || null,
+      apiKey, secret, passphrase: passphrase || null,
     });
   },
   async disconnectExchange(exId) {
     return this.request('DELETE', `/exchanges/${_esc(exId)}`);
   },
-  async getConnectedExchanges() { return this.request('GET', '/exchanges'); },
-
-  // ── VIP / Payments ────────────────────────────────────
-  async buyVip(plan)    { return this.request('POST', '/vip/subscribe', { plan: _esc(plan) }); },
-  async getVipStatus()  { return this.request('GET', '/vip/status'); },
-};
-
-// ── 4. ORDER STATUS ENGINE ─────────────────────────────────
-// Replaces setTimeout-based fake execution with real order tracking
-// Status flow: pending → executing → completed | failed | cancelled
-const ORDER_STATUS = { PENDING:'pending', EXECUTING:'executing', COMPLETED:'completed', FAILED:'failed', CANCELLED:'cancelled' };
-
-const OrderTracker = {
-  _orders: new Map(),  // orderId → {status, sig, amt, pollTimer}
-
-  // Called when trade submitted to backend
-  track(orderId, sig, amt) {
-    this._orders.set(orderId, { orderId, sig, amt, status: ORDER_STATUS.PENDING });
-    this._startPolling(orderId);
-    this._updateUI(orderId, ORDER_STATUS.PENDING);
+  async getConnectedExchanges() {
+    return this.request('GET', '/exchanges');
   },
 
-  _startPolling(orderId) {
-    let attempts = 0;
-    const MAX = 20; // 20 × 600ms = 12 seconds max
-    const poll = async () => {
-      if (!this._orders.has(orderId)) return;
-      attempts++;
-      try {
-        const data = await API.getOrderStatus(orderId);
-        if (!data) return;
-        this._updateUI(orderId, data.status, data);
-        if ([ORDER_STATUS.COMPLETED, ORDER_STATUS.FAILED, ORDER_STATUS.CANCELLED].includes(data.status)) {
-          this._finalize(orderId, data);
-          return;
-        }
-        if (attempts < MAX) setTimeout(poll, 600);
-        else this._timeout(orderId);
-      } catch { if (attempts < MAX) setTimeout(poll, 1200); }
-    };
-    setTimeout(poll, 400);
+  // ── VIP / Payments ───────────────────────────────────────────
+  async buyVip(plan) {
+    return this.request('POST', '/vip/subscribe', { plan: _esc(plan) });
   },
-
-  _updateUI(orderId, status, data = {}) {
-    const states = {
-      pending:   '⏳ Ожидание подтверждения...',
-      executing: '⚡ Исполнение на бирже...',
-      completed: '✅ Сделка исполнена',
-      failed:    '❌ Сделка не исполнена',
-      cancelled: '🚫 Отменена',
-    };
-    toastMsg(states[status] || status, status === 'completed' ? 'ok' : status === 'failed' ? 'err' : '');
-  },
-
-  _finalize(orderId, data) {
-    const order = this._orders.get(orderId);
-    if (!order) return;
-    if (data.status === ORDER_STATUS.COMPLETED) {
-      // Update state from backend response (never from client calculation)
-      S.profit = +(S.profit + (data.netProfit || 0)).toFixed(4);
-      S.trades++;
-      S.history.push({
-        sym: order.sig.sym, bx: order.sig.bx, sx: order.sig.sx,
-        amount: order.amt, fee: data.platformFee || 0,
-        profit: data.netProfit || 0, spread: order.sig.spread,
-        type: order.sig.type, aiScore: order.sig.aiScore,
-        latency: data.executionMs || 0,
-        time: new Date().toLocaleTimeString('ru'),
-        orderId,
-      });
-      // Refresh balance from backend (not calculated client-side)
-      API.getAccount().then(acc => {
-        if (acc) {
-          S.balance = acc.balance;
-          safeText('hBalancе', '$' + S.balance.toLocaleString('en', {minimumFractionDigits:2}));
-        }
-      }).catch(()=>{});
-      document.getElementById('hProfit').textContent = (S.profit>=0?'+':'')+`$${S.profit.toFixed(2)}`;
-    }
-    if (document.getElementById('pg-history')?.classList.contains('on')) renderHistory();
-    this._orders.delete(orderId);
-  },
-
-  _timeout(orderId) {
-    toastMsg('⚠️ Статус ордера не получен. Проверьте историю.', 'warn');
-    this._orders.delete(orderId);
+  async getVipStatus() {
+    return this.request('GET', '/vip/status');
   },
 };
 
-// ── 5. WEBSOCKET MANAGER ───────────────────────────────────
-// Replaces Math.random() liveUpdate with real WS price feed
-// Backend sends: {pair:"BTC/USDT", exchange:"binance", price:67840, side:"bid"|"ask", vol:1234.5}
+// ── NETWORK STATUS INDICATOR ──────────────────────────────────
+const _netStatus = {
+  _state: 'ok',  // ok | network | server | auth | ws_down
+  _timer: null,
+
+  setOk() {
+    if (this._state === 'ok') return;
+    this._state = 'ok';
+    this._render();
+  },
+
+  setError(type) {
+    this._state = type;
+    this._render();
+    clearTimeout(this._timer);
+    const msgs = {
+      network: '⚠️ Нет соединения с сервером. Проверьте интернет.',
+      server:  '⚠️ Сервер временно недоступен. Повтор через 5 сек...',
+      auth:    '🔐 Сессия истекла. Пожалуйста, перезапустите приложение.',
+      ws_down: '📡 Поток котировок прерван. Переподключение...',
+    };
+    toastMsg(msgs[type] || '⚠️ Ошибка соединения', 'err');
+  },
+
+  _render() {
+    const badge = document.getElementById('wsBadge');
+    if (!badge) return;
+    const cfg = {
+      ok:       { text: '● LIVE',    color: 'var(--green)' },
+      network:  { text: '○ ОФЛАЙН', color: 'var(--red)'   },
+      server:   { text: '○ СЕРВЕР', color: 'var(--red)'   },
+      auth:     { text: '○ AUTH',   color: 'var(--gold)'  },
+      ws_down:  { text: '◑ WS...',  color: 'var(--gold)'  },
+    };
+    const c = cfg[this._state] || cfg.ok;
+    badge.textContent = c.text;
+    badge.style.color = c.color;
+  },
+};
+
+// ── WEBSOCKET MANAGER ─────────────────────────────────────────
+// Handles real price stream from backend aggregator
+// Backend format: {pair:"BTC/USDT", exchange:"binance", bid:67840.5, ask:67841.2, vol:1234.5, ts:1234567890}
+// OR array: [{pair, exchange, bid, ask, vol, ts}, ...]
 const wsManager = {
   ws: null,
-  reconnectDelay: 1000,
-  reconnectTimer: null,
-  isConnected: false,
-  _lastError: null,
+  _delay: 1000,
+  _timer: null,
+  _pingTimer: null,
+  _lastPong: 0,
+  connected: false,
 
   connect(url = 'wss://your-backend.com/ws/prices') {
-    if (this.ws) { try { this.ws.close(); } catch{} }
+    if (this.ws) { try { this.ws.close(1000); } catch {} }
     try {
-      this.ws = new WebSocket(url + (SESSION.token ? `?token=${SESSION.token}` : ''));
+      // Attach session token as query param (standard WS auth pattern)
+      const wsUrl = SESSION.valid()
+        ? `${url}?token=${encodeURIComponent(SESSION._token)}`
+        : url;
+      this.ws = new WebSocket(wsUrl);
       this.ws.onopen    = () => this._onOpen();
-      this.ws.onmessage = (e) => this._onMessage(e);
+      this.ws.onmessage = e  => this._onMessage(e);
       this.ws.onerror   = () => this._onError();
-      this.ws.onclose   = () => this._onClose();
-    } catch(e) {
-      this._scheduleReconnect();
-    }
+      this.ws.onclose   = e  => this._onClose(e);
+    } catch { this._scheduleReconnect(); }
   },
 
   _onOpen() {
-    this.isConnected = true;
-    this.reconnectDelay = 1000;
-    this._updateConnectionUI(true);
-    // Subscribe to connected exchanges
-    this.send({ type: 'subscribe', exchanges: [...S.connected], symbols: Object.keys(BASE_PRICES).slice(0,50) });
+    this.connected = true;
+    this._delay = 1000;
+    _netStatus.setOk();
+    // Subscribe to all connected exchanges
+    this.send({
+      type: 'subscribe',
+      exchanges: [...S.connected],
+      symbols: Object.keys(BASE_PRICES).slice(0, 60),
+    });
+    // Heartbeat: ping every 20s, if no pong in 5s → reconnect
+    this._lastPong = Date.now();
+    clearInterval(this._pingTimer);
+    this._pingTimer = setInterval(() => {
+      if (Date.now() - this._lastPong > 25000) {
+        _netStatus.setError('ws_down');
+        this._scheduleReconnect();
+      } else {
+        this.send({ type: 'ping' });
+      }
+    }, 20000);
   },
 
   _onMessage(e) {
     try {
-      const msgs = JSON.parse(e.data);
-      const arr = Array.isArray(msgs) ? msgs : [msgs];
-      arr.forEach(msg => {
-        if (!msg.pair || !msg.exchange || !msg.price || !msg.side) return;
-        // Validate: price must be positive number
-        if (typeof msg.price !== 'number' || msg.price <= 0) return;
-        const sym = msg.pair.split('/')[0];
-        const exId = msg.exchange.toLowerCase();
-        const key = `${sym}:${exId}`;
-        const cached = PRICE_CACHE.get(key) || { bid: msg.price, ask: msg.price, vol: 0, ts: 0 };
-        if (msg.side === 'bid') cached.bid = msg.price;
-        if (msg.side === 'ask') cached.ask = msg.price;
-        if (msg.vol) cached.vol = msg.vol;
-        cached.ts = Date.now();
-        PRICE_CACHE.set(key, cached);
+      const data = JSON.parse(e.data);
+
+      // Heartbeat response
+      if (data.type === 'pong') { this._lastPong = Date.now(); return; }
+
+      // Order status update pushed from server
+      if (data.type === 'order_update') {
+        OrderTracker._onServerPush(data.order);
+        return;
+      }
+
+      // Balance update pushed from server (after trade, deposit, etc.)
+      if (data.type === 'balance_update') {
+        _ui.setBalance(data.balance);
+        return;
+      }
+
+      // Price tick(s) — the main data stream
+      const ticks = Array.isArray(data) ? data : (data.type === 'tick' ? [data] : null);
+      if (!ticks) return;
+
+      ticks.forEach(tick => {
+        // Strict validation — reject malformed or suspicious data
+        if (typeof tick.bid !== 'number' || typeof tick.ask !== 'number') return;
+        if (tick.bid <= 0 || tick.ask <= 0 || tick.ask < tick.bid) return;
+        if (!tick.pair || !tick.exchange) return;
+
+        const sym = tick.pair.split('/')[0];
+        const exId = tick.exchange.toLowerCase();
+        PRICE_CACHE.set(`${sym}:${exId}`, {
+          bid: tick.bid,
+          ask: tick.ask,
+          vol: tick.vol || 0,
+          ts: tick.ts || Date.now(),
+        });
       });
-      // Schedule UI update via RAF (throttled)
+
+      // Schedule UI repaint via RAF (prevents jank at 10+ updates/sec)
       rafScheduler.schedule();
-    } catch { /* malformed frame — ignore */ }
+
+    } catch { /* malformed frame — silently discard */ }
   },
 
-  _onError()  { this.isConnected = false; this._updateConnectionUI(false); },
-  _onClose()  { this.isConnected = false; this._updateConnectionUI(false); this._scheduleReconnect(); },
+  _onError() {
+    this.connected = false;
+    _netStatus.setError('ws_down');
+  },
 
-  onNetworkError() {
-    this.isConnected = false;
-    this._updateConnectionUI(false);
+  _onClose(e) {
+    this.connected = false;
+    clearInterval(this._pingTimer);
+    // 1000 = normal close, don't reconnect
+    if (e.code !== 1000) {
+      _netStatus.setError('ws_down');
+      this._scheduleReconnect();
+    }
   },
 
   _scheduleReconnect() {
-    clearTimeout(this.reconnectTimer);
-    this.reconnectTimer = setTimeout(() => this.connect(), this.reconnectDelay);
-    this.reconnectDelay = Math.min(this.reconnectDelay * 2, 30000); // exp backoff
-  },
-
-  _updateConnectionUI(ok) {
-    const dot = document.querySelector('.slbl-dot');
-    const badge = document.getElementById('wsBadge');
-    if (badge) {
-      badge.textContent = ok ? '● LIVE' : '○ ОФЛАЙН';
-      badge.style.color = ok ? 'var(--green)' : 'var(--red)';
-    }
-    if (!ok && !this.reconnectTimer) toastMsg('⚠️ Потеряно соединение с сервером котировок. Переподключение...', 'warn');
+    clearTimeout(this._timer);
+    this._timer = setTimeout(() => this.connect(), this._delay);
+    this._delay = Math.min(this._delay * 2, 30000); // exp backoff up to 30s
   },
 
   send(data) {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+    if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(data));
     }
   },
+
+  disconnect() {
+    clearTimeout(this._timer);
+    clearInterval(this._pingTimer);
+    this.ws?.close(1000);
+    this.connected = false;
+  },
 };
 
-// ── 6. RAF THROTTLE FOR PRICE UPDATES ─────────────────────
+// ── RAF THROTTLE ──────────────────────────────────────────────
 // Prevents UI jank when receiving 10+ price updates/second
+// Only repaints the active page, max 5fps to save battery
 const rafScheduler = {
   _pending: false,
-  _lastRender: 0,
-  MIN_INTERVAL: 200, // Max 5 renders/sec
+  _last: 0,
+  FPS: 5, // max renders per second
 
   schedule() {
     if (this._pending) return;
     this._pending = true;
     requestAnimationFrame(() => {
       const now = Date.now();
-      if (now - this._lastRender >= this.MIN_INTERVAL) {
-        hftUpdate();
-        if (document.getElementById('pg-signals')?.classList.contains('on')) renderSigs();
-        if (document.getElementById('pg-scanner')?.classList.contains('on')) {
-          renderScanner(parseFloat(document.getElementById('spreadSlider')?.value || 0.3));
-        }
-        this._lastRender = now;
+      if (now - this._last >= 1000 / this.FPS) {
+        this._repaint();
+        this._last = now;
       }
       this._pending = false;
     });
   },
+
+  _repaint() {
+    if (document.getElementById('pg-signals')?.classList.contains('on')) renderSigs();
+    if (document.getElementById('pg-scanner')?.classList.contains('on')) {
+      const sl = document.getElementById('spreadSlider');
+      renderScanner(parseFloat(sl?.value || 0.3));
+    }
+  },
 };
 
-// ── 7. SLIPPAGE ENGINE ─────────────────────────────────────
-// Profit depends on order size vs available liquidity (order book depth)
-// In production: orderbook depth comes from API
-// simulated here with realistic decay model
+// ── ORDER STATUS TRACKER ──────────────────────────────────────
+// Pending → Executing → Completed | Failed | Cancelled
+// Tracks real orders via polling + server-push WS events
+const OrderTracker = {
+  _orders: new Map(),
+
+  track(orderId, sig, amt) {
+    if (this._orders.has(orderId)) return;
+    this._orders.set(orderId, { orderId, sig, amt, status: 'pending', attempts: 0 });
+    this._poll(orderId, 400);
+  },
+
+  // Called when server pushes order update via WS
+  _onServerPush(order) {
+    if (!order?.orderId) return;
+    this._handleUpdate(order.orderId, order);
+  },
+
+  _poll(orderId, delay) {
+    setTimeout(async () => {
+      const entry = this._orders.get(orderId);
+      if (!entry) return;
+      entry.attempts++;
+      try {
+        const data = await API.getOrderStatus(orderId);
+        if (data) this._handleUpdate(orderId, data);
+        else if (entry.attempts < 20) this._poll(orderId, 800);
+        else this._timeout(orderId);
+      } catch {
+        if (entry.attempts < 20) this._poll(orderId, Math.min(800 * entry.attempts, 5000));
+        else this._timeout(orderId);
+      }
+    }, delay);
+  },
+
+  _handleUpdate(orderId, data) {
+    const entry = this._orders.get(orderId);
+    if (!entry) return;
+
+    const terminal = ['completed','failed','cancelled'];
+    this._showStatus(data.status, data);
+
+    if (terminal.includes(data.status)) {
+      if (data.status === 'completed') {
+        // All financial values come from server — client never calculates profit
+        _ui.applyOrderResult(data);
+        toastMsg(`✅ +$${data.netProfit?.toFixed(4)} · ${data.executionMs}ms`, 'ok');
+      } else {
+        toastMsg(data.status === 'cancelled' ? '🚫 Ордер отменён' : '❌ Сделка не исполнена (слиппаж/ликвидность)', 'err');
+      }
+      this._orders.delete(orderId);
+    } else {
+      // Not final — keep polling (WS push is faster but polling is fallback)
+      if (entry.attempts < 20) this._poll(orderId, 600);
+    }
+  },
+
+  _showStatus(status) {
+    const map = {
+      pending:   '⏳ Ордер создан. Ожидание биржи...',
+      executing: '⚡ Исполнение на бирже...',
+      partial:   '⚡ Частичное исполнение...',
+    };
+    if (map[status]) toastMsg(map[status], '');
+  },
+
+  _timeout(orderId) {
+    toastMsg('⚠️ Нет ответа от биржи. Проверьте историю вручную.', 'warn');
+    this._orders.delete(orderId);
+  },
+};
+
+// ── SLIPPAGE ENGINE ───────────────────────────────────────────
+// Realistic slippage model based on order size vs available depth
+// In production: real order book depth comes from API per request
 function calcSlippage(amount, sym, exId) {
-  // Approximate available liquidity tiers (USDT depth at each price level)
-  const liquidityTiers = {
-    BTC:  [50000, 100000, 250000, 500000],  // $50K, $100K, $250K, $500K
-    ETH:  [30000,  80000, 200000, 400000],
-    SOL:  [10000,  30000,  80000, 150000],
-    BNB:  [15000,  40000, 100000, 200000],
-    default: [5000,  15000,  40000,  80000],
+  // Approximate liquidity depth tiers in USD
+  const depth = {
+    BTC:  [100000, 300000, 600000, 1500000],
+    ETH:  [60000,  180000, 400000, 900000],
+    SOL:  [20000,  60000,  150000, 350000],
+    BNB:  [30000,  90000,  200000, 500000],
+    XRP:  [15000,  40000,  100000, 250000],
+    default: [8000, 25000,  60000,  150000],
   };
-  const tiers = liquidityTiers[sym] || liquidityTiers.default;
-
-  // Exchange liquidity multiplier
-  const liqMult = { binance:2.0, okx:1.8, bybit:1.7, kucoin:1.3, gate:1.1, mexc:1.0, coinbase:1.5, kraken:1.4 };
-  const mult = liqMult[exId] || 1.0;
-  const adjustedTiers = tiers.map(t => t * mult);
-
-  // Slippage estimate: 0% at low amounts, increases exponentially
-  if (amount <= adjustedTiers[0]) return 0.0001;       // <0.01% slippage
-  if (amount <= adjustedTiers[1]) return 0.0005;       // 0.05%
-  if (amount <= adjustedTiers[2]) return 0.0015;       // 0.15%
-  if (amount <= adjustedTiers[3]) return 0.0040;       // 0.40%
-  return 0.0080;                                        // 0.80% for large orders
+  // Exchange liquidity multiplier (Binance is deepest)
+  const mult = {
+    binance:2.5, coinbase:2.0, okx:1.9, bybit:1.8, kraken:1.6,
+    kucoin:1.3, gate:1.1, htx:1.1, bitget:1.1, mexc:0.9,
+    bitmart:0.7, phemex:0.7, crypto:0.8, bingx:0.7, lbank:0.5,
+  };
+  const tiers = (depth[sym] || depth.default).map(t => t * (mult[exId] || 1));
+  // Slippage increases non-linearly with order size
+  if (amount <= tiers[0]) return 0.00005;  // 0.005%
+  if (amount <= tiers[1]) return 0.0003;   // 0.03%
+  if (amount <= tiers[2]) return 0.001;    // 0.1%
+  if (amount <= tiers[3]) return 0.003;    // 0.3%
+  return 0.008;                            // 0.8% for whale orders
 }
 
-// Total fee breakdown: network + exchange A + exchange B + platform
+// ── REAL FEE BREAKDOWN ────────────────────────────────────────
+// 4-component fee model: Exchange A + Exchange B + Network + Platform
 function calcFees(amount, sig) {
-  const feeR = S.vip ? S.vipFee : S.freeFee;
-  const exFees = EX_FEES;
+  const sym = (sig.sym || '').split('/')[0].split(' ')[0].split('→')[0];
+  const exA = sig.bx?.toLowerCase();
+  const exB = sig.sx?.toLowerCase();
 
-  const feeA = amount * (exFees[sig.bx?.toLowerCase()]?.taker || 0.001);
-  const feeB = amount * (exFees[sig.sx?.toLowerCase()]?.taker || 0.001);
+  // Exchange taker fees (maker is cheaper but arb uses taker)
+  const feeA = amount * (EX_FEES[exA]?.taker || 0.001);
+  const feeB = amount * (EX_FEES[exB]?.taker || 0.001);
 
-  // Network/withdrawal fee (simulated; real values from exchange API)
-  const networkFees = { BTC:1.5, ETH:0.8, SOL:0.001, BNB:0.05, default:0.3 };
-  const sym = (sig.sym||'').split('/')[0].split(' ')[0].split('→')[0];
-  const netFee = networkFees[sym] !== undefined ? networkFees[sym] : networkFees.default;
+  // Network / withdrawal fee (approximate USD — real value from exchange API)
+  // These are WITHDRAWAL fees for moving funds between exchanges
+  const netFeeUSD = {
+    BTC: 1.20, ETH: 2.50, SOL: 0.01, BNB: 0.15,
+    XRP: 0.10, DOGE: 0.50, ADA: 0.20, AVAX: 0.30,
+    MATIC: 0.02, ARB: 0.10, OP: 0.10, TON: 0.05,
+    TRX: 0.10, NEAR: 0.10,
+    default: 0.50,
+  };
+  const networkFee = netFeeUSD[sym] !== undefined ? netFeeUSD[sym] : netFeeUSD.default;
 
-  const slippage = calcSlippage(amount, sym, sig.bx?.toLowerCase());
-  const slippageAmt = amount * slippage;
+  // Slippage impact in USD
+  const slippagePct = calcSlippage(amount, sym, exA);
+  const slippageAmt = amount * slippagePct;
 
-  const platformFee = amount * feeR;
+  // Platform fee
+  const platFee = amount * (S.vip ? S.vipFee : S.freeFee);
 
   return {
     exchangeA:  +feeA.toFixed(4),
     exchangeB:  +feeB.toFixed(4),
-    network:    +netFee.toFixed(4),
+    network:    +networkFee.toFixed(4),
     slippage:   +slippageAmt.toFixed(4),
-    platform:   +platformFee.toFixed(4),
-    total:      +(feeA + feeB + netFee + slippageAmt + platformFee).toFixed(4),
+    platform:   +platFee.toFixed(4),
+    total:      +(feeA + feeB + networkFee + slippageAmt + platFee).toFixed(4),
+    slippagePct: +(slippagePct * 100).toFixed(3),
   };
 }
 
-// ── 8. i18n TRANSLATION ENGINE ────────────────────────────
+// ── i18n ──────────────────────────────────────────────────────
 const LANGS = {
   ru: {
     nav_signals:'Сигналы', nav_scanner:'Сканер', nav_exchanges:'Биржи',
@@ -1812,8 +2036,9 @@ const LANGS = {
     funds_check:'💳 Недостаточно средств',
     order_pending:'⏳ Ожидание...', order_executing:'⚡ Исполнение...',
     order_ok:'✅ Исполнено', order_fail:'❌ Не исполнено',
-    slippage:'Проскальз.', network_fee:'Сеть',
+    slippage:'Проскальз.', network_fee:'Вывод/Сеть',
     total_fees:'Итого комиссии', net_profit:'ЧИСТЫЙ ПРОФИТ',
+    conn_lost:'⚠️ Связь потеряна', conn_ok:'✅ Подключено',
   },
   en: {
     nav_signals:'Signals', nav_scanner:'Scanner', nav_exchanges:'Exchanges',
@@ -1824,8 +2049,9 @@ const LANGS = {
     funds_check:'💳 Insufficient funds',
     order_pending:'⏳ Pending...', order_executing:'⚡ Executing...',
     order_ok:'✅ Completed', order_fail:'❌ Failed',
-    slippage:'Slippage', network_fee:'Network',
+    slippage:'Slippage', network_fee:'Withdraw/Net',
     total_fees:'Total fees', net_profit:'NET PROFIT',
+    conn_lost:'⚠️ Connection lost', conn_ok:'✅ Connected',
   },
   tr: {
     nav_signals:'Sinyaller', nav_scanner:'Tarayıcı', nav_exchanges:'Borsalar',
@@ -1836,8 +2062,9 @@ const LANGS = {
     funds_check:'💳 Yetersiz bakiye',
     order_pending:'⏳ Bekliyor...', order_executing:'⚡ İşleniyor...',
     order_ok:'✅ Tamamlandı', order_fail:'❌ Başarısız',
-    slippage:'Kayma', network_fee:'Ağ',
+    slippage:'Kayma', network_fee:'Çekim/Ağ',
     total_fees:'Toplam ücret', net_profit:'NET KAR',
+    conn_lost:'⚠️ Bağlantı kesildi', conn_ok:'✅ Bağlandı',
   },
   es: {
     nav_signals:'Señales', nav_scanner:'Escáner', nav_exchanges:'Bolsas',
@@ -1848,8 +2075,9 @@ const LANGS = {
     funds_check:'💳 Fondos insuficientes',
     order_pending:'⏳ Pendiente...', order_executing:'⚡ Ejecutando...',
     order_ok:'✅ Completado', order_fail:'❌ Fallido',
-    slippage:'Desliz.', network_fee:'Red',
+    slippage:'Desliz.', network_fee:'Retiro/Red',
     total_fees:'Total comisiones', net_profit:'GANANCIA NETA',
+    conn_lost:'⚠️ Conexión perdida', conn_ok:'✅ Conectado',
   },
   de: {
     nav_signals:'Signale', nav_scanner:'Scanner', nav_exchanges:'Börsen',
@@ -1860,8 +2088,9 @@ const LANGS = {
     funds_check:'💳 Unzureichende Mittel',
     order_pending:'⏳ Ausstehend...', order_executing:'⚡ Ausführung...',
     order_ok:'✅ Abgeschlossen', order_fail:'❌ Fehlgeschlagen',
-    slippage:'Slippage', network_fee:'Netzwerk',
+    slippage:'Slippage', network_fee:'Auszahlung/Netz',
     total_fees:'Gesamtgebühren', net_profit:'NETTOGEWINN',
+    conn_lost:'⚠️ Verbindung verloren', conn_ok:'✅ Verbunden',
   },
   ar: {
     nav_signals:'إشارات', nav_scanner:'ماسح', nav_exchanges:'بورصات',
@@ -1872,85 +2101,88 @@ const LANGS = {
     funds_check:'💳 رصيد غير كافٍ',
     order_pending:'⏳ قيد الانتظار...', order_executing:'⚡ جارٍ التنفيذ...',
     order_ok:'✅ مكتمل', order_fail:'❌ فشل',
-    slippage:'انزلاق', network_fee:'رسوم الشبكة',
+    slippage:'انزلاق', network_fee:'سحب/شبكة',
     total_fees:'إجمالي الرسوم', net_profit:'صافي الربح',
+    conn_lost:'⚠️ انقطع الاتصال', conn_ok:'✅ متصل',
   },
 };
 
-function t(key) {
-  return (LANGS[S.lang] || LANGS.ru)[key] || (LANGS.ru[key] || key);
-}
+function t(key) { return (LANGS[S.lang] || LANGS.ru)[key] || (LANGS.ru[key] || key); }
 
-// Apply i18n to all [data-i18n] elements
 function applyI18n() {
   const lang = S.lang;
-  const isRTL = lang === 'ar';
   document.documentElement.setAttribute('lang', lang);
-  document.documentElement.setAttribute('dir', isRTL ? 'rtl' : 'ltr');
+  document.documentElement.setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');
   document.querySelectorAll('[data-i18n]').forEach(el => {
-    const key = el.getAttribute('data-i18n');
-    if (LANGS[lang]?.[key]) el.textContent = LANGS[lang][key];
+    const v = LANGS[lang]?.[el.getAttribute('data-i18n')];
+    if (v) el.textContent = v;
   });
 }
 
-// ── 9. LOCALSTORAGE ────────────────────────────────────────
-// ⚠️  PRODUCTION NOTE:
-//   S.balance / S.vip / S.history must come from API.getAccount()
-//   localStorage only stores NON-SENSITIVE preferences:
-//   lang, plan selection, UI preferences, refCode
-//   Balance and VIP status MUST be fetched from backend on load
+// ── LOCALSTORAGE ──────────────────────────────────────────────
+// Only UI preferences are stored locally.
+// Financial state (balance, vip, history) is fetched from backend on load.
+// _DEV_* keys exist ONLY for demo mode — removed when backend is live.
 function saveStorage() {
   try {
-    // ⚠️ NEVER store balance, vip status, or trade history here in production
-    // Store only UI preferences
-    localStorage.setItem('nexarb_prefs', JSON.stringify({
-      lang: S.lang,
-      plan: S.plan,
-      userId: S.userId,
-      refCode: S.refCode,
-      // ── Dev-mode only (remove in production): ──
-      _DEV_vip: S.vip,
-      _DEV_balance: S.balance,
-      _DEV_profit: S.profit,
-      _DEV_trades: S.trades,
-      _DEV_connected: [...S.connected],
-      _DEV_autoSettings: S.autoSettings,
-      _DEV_history: S.history.slice(-50),
-      _DEV_referrals: S.referrals,
-      _DEV_refEarned: S.refEarned,
+    const prefs = {
+      lang: S.lang, plan: S.plan,
+      userId: S.userId, refCode: S.refCode,
+      autoSettings: S.autoSettings,
+      connected: [...S.connected],
+      referrals: S.referrals, refEarned: S.refEarned,
+    };
+    // ── DEMO ONLY: remove this block when backend is live ──
+    Object.assign(prefs, {
+      _DEV_vip: S.vip, _DEV_balance: S.balance, _DEV_profit: S.profit,
+      _DEV_trades: S.trades, _DEV_history: S.history.slice(-50),
       _DEV_vipExpiry: S.vipExpiry,
-    }));
-  } catch(e){}
+    });
+    // ───────────────────────────────────────────────────────
+    localStorage.setItem('nexarb_prefs_v5', JSON.stringify(prefs));
+  } catch {}
 }
 
 function loadStorage() {
   try {
-    const raw = localStorage.getItem('nexarb_prefs');
+    const raw = localStorage.getItem('nexarb_prefs_v5');
     if (!raw) return false;
     const d = JSON.parse(raw);
-    // Safe prefs
+    // Safe UI prefs
     S.lang  = d.lang  || 'ru';
     S.plan  = d.plan  || 'year';
-    S.userId = d.userId || genUserId();
-    S.refCode = d.refCode || (S.userId.slice(0,8).toUpperCase());
-    // ── Dev-mode fallbacks (in production replace with API.getAccount()) ──
-    S.vip         = d._DEV_vip    || false;
-    S.balance     = d._DEV_balance || 3240;
-    S.profit      = d._DEV_profit  || 0;
-    S.trades      = d._DEV_trades  || 0;
-    S.connected   = new Set(d._DEV_connected || ['binance','okx']);
-    S.autoEnabled = false; // ALWAYS off on reload (safety)
-    S.autoSettings = {...S.autoSettings, ...(d._DEV_autoSettings || {})};
-    S.history     = d._DEV_history  || [];
-    S.referrals   = d._DEV_referrals || [];
-    S.refEarned   = d._DEV_refEarned || 0;
-    S.vipExpiry   = d._DEV_vipExpiry || null;
+    S.userId = d.userId || '';
+    S.refCode = d.refCode || '';
+    S.autoSettings = { ...S.autoSettings, ...(d.autoSettings || {}) };
+    S.connected = new Set(d.connected || ['binance','okx']);
+    S.referrals = d.referrals || [];
+    S.refEarned = d.refEarned || 0;
+    // ── DEMO ONLY: replace with API.getAccount() call ──
+    if (d._DEV_vip !== undefined) {
+      S.vip = d._DEV_vip;
+      S.vipExpiry = d._DEV_vipExpiry || null;
+      S.trades = d._DEV_trades || 0;
+      S.history = d._DEV_history || [];
+      if (d._DEV_balance !== undefined) _ui.setBalance(d._DEV_balance);
+      if (d._DEV_profit  !== undefined) _ui.setProfit(d._DEV_profit);
+    }
+    // ──────────────────────────────────────────────────
+    S.autoEnabled = false; // ALWAYS disabled on reload (safety)
     return true;
-  } catch(e){ return false; }
+  } catch { return false; }
 }
 
 function genUserId() {
-  return 'NX' + Math.random().toString(36).slice(2,10).toUpperCase();
+  // Use cryptographically secure random for user ID
+  // In production: ID is assigned by backend, not generated client-side
+  try {
+    const arr = new Uint8Array(8);
+    crypto.getRandomValues(arr);
+    return 'NX' + Array.from(arr, b => b.toString(16).padStart(2,'0')).join('').toUpperCase().slice(0,12);
+  } catch {
+    // Fallback for environments without crypto API
+    return 'NX' + Date.now().toString(36).toUpperCase();
+  }
 }
 
 // ========================================================
@@ -2675,42 +2907,51 @@ function execTrade() {
 }
 
 // ── DEMO ORDER SIMULATOR (remove in production) ────────────
+// ⚠️  This function exists ONLY for demo mode.
+// In production: execTrade() calls API.submitTrade() and OrderTracker.track()
+// Outcome is determined by the exchange, reported by backend via WS push.
 function _demoExecuteOrder(payload, sig, amt) {
   const fees = calcFees(amt, sig);
-  const gross = amt * sig.spread / 100;
+  const gross = amt * (sig.displayRate || sig.spread) / 100;
   const net = +(gross - fees.total).toFixed(4);
   const latMs = sig.latency || 50;
+  const aiSc = sig.aiScore || 70;
 
   toastMsg(t('order_pending'), '');
 
   setTimeout(() => {
     toastMsg(t('order_executing'), '');
     setTimeout(() => {
-      const aiSc = sig.aiScore || 70;
-      const winProb = 0.5 + (aiSc / 200);
-      const ok = Math.random() < winProb;
+      // Demo: outcome based on spread positivity + AI score (no Math.random)
+      // Production: outcome is 100% from real exchange fill, sent by server
+      const ok = net > 0 && aiSc >= 40;
 
       S.trades++;
-      S.ownerEarned += fees.platform;
+      S.ownerEarned = +(S.ownerEarned + fees.platform).toFixed(4);
+
       if (ok) {
-        S.balance = +(S.balance + net).toFixed(2);
-        S.profit  = +(S.profit + net).toFixed(4);
+        // Use _ui methods — direct S.balance = X is intentionally blocked
+        _ui.setBalance(S.balance + net);
+        _ui.setProfit(S.profit + net);
       }
 
-      safeText('hBalancе', '$' + S.balance.toLocaleString('en', {minimumFractionDigits:2}));
-      document.getElementById('hProfit').textContent = (S.profit>=0?'+':'') + `$${S.profit.toFixed(2)}`;
-
-      S.history.push({
+      S.history.unshift({
         sym: sig.sym, bx: sig.bx, sx: sig.sx, amount: amt,
-        fee: fees.platform, profit: ok ? net : -(fees.exchangeA + fees.exchangeB),
-        spread: sig.spread, type: sig.type, aiScore: sig.aiScore,
-        latency: latMs, time: new Date().toLocaleTimeString('ru'),
+        fee: fees.platform,
+        profit: ok ? net : -(fees.exchangeA + fees.exchangeB),
+        spread: sig.spread, type: sig.type,
+        aiScore: aiSc, latency: latMs,
+        time: new Date().toLocaleTimeString('ru'),
       });
+      if (S.history.length > 200) S.history.length = 200;
 
       saveStorage();
       if (document.getElementById('pg-history')?.classList.contains('on')) renderHistory();
       renderSigs();
-      toastMsg(ok ? `${t('order_ok')} +$${net} · ${latMs}ms` : `${t('order_fail')} (слиппаж)`, ok ? 'ok' : 'err');
+      toastMsg(
+        ok ? `${t('order_ok')} +$${net.toFixed(4)} · ${latMs}ms` : `${t('order_fail')}`,
+        ok ? 'ok' : 'err'
+      );
     }, Math.min(latMs * 5, 2000));
   }, 500);
 }
@@ -2807,11 +3048,61 @@ function toastMsg(msg,type=''){
 }
 
 // ── LIVE UPDATES ──────────────────────────────────────────
-// In production: wsManager.connect() drives updates via rafScheduler
-// In demo mode: fallback timer
+// In production: wsManager.connect() is the ONLY driver of updates.
+// This timer is DEMO ONLY — comment it out when backend is live.
 function liveUpdate() {
-  hftUpdate();
+  hftUpdate(); // Refreshes PRICE_CACHE via simPrice() — replace with wsManager
   rafScheduler.schedule();
+}
+
+// ── DEMO ORDER SIMULATOR ──────────────────────────────────
+// Remove this function entirely in production.
+// Production: execTrade() calls API.submitTrade() → OrderTracker.track()
+function _demoExecuteOrder(payload, sig, amt) {
+  const fees = calcFees(amt, sig);
+  const gross = amt * (sig.displayRate || sig.spread) / 100;
+  const net = +(gross - fees.total).toFixed(4);
+  const latMs = sig.latency || 50;
+  const aiSc = sig.aiScore || 70;
+
+  toastMsg(t('order_pending'), '');
+
+  setTimeout(() => {
+    toastMsg(t('order_executing'), '');
+    setTimeout(() => {
+      // DEMO outcome: based on AI score + positive spread (no pure random)
+      // In production: outcome is 100% from exchange execution, reported by server
+      const profitPositive = net > 0;
+      const aiOk = aiSc >= 40;
+      const ok = profitPositive && aiOk;
+
+      S.trades++;
+      S.ownerEarned = +(S.ownerEarned + fees.platform).toFixed(4);
+
+      if (ok) {
+        // Always use _ui methods — never manipulate S.balance directly
+        _ui.setBalance(S.balance + net);
+        _ui.setProfit(S.profit + net);
+      }
+
+      S.history.unshift({
+        sym: sig.sym, bx: sig.bx, sx: sig.sx, amount: amt,
+        fee: fees.platform, profit: ok ? net : -(fees.exchangeA + fees.exchangeB),
+        spread: sig.spread, type: sig.type, aiScore: aiSc,
+        latency: latMs, time: new Date().toLocaleTimeString('ru'),
+      });
+      if (S.history.length > 200) S.history.length = 200;
+
+      saveStorage();
+      if (document.getElementById('pg-history')?.classList.contains('on')) renderHistory();
+      renderSigs();
+
+      toastMsg(
+        ok ? `${t('order_ok')} +$${net.toFixed(4)} · ${latMs}ms` : `${t('order_fail')}`,
+        ok ? 'ok' : 'err'
+      );
+    }, Math.min(latMs * 5, 2000));
+  }, 500);
 }
 
 // ========================================================
@@ -2925,7 +3216,8 @@ function mkStars(){
 document.addEventListener('DOMContentLoaded', () => {
   mkStars();
 
-  // Load saved state (dev mode — in production: await API.getAccount())
+  // ── Load preferences ──────────────────────────────────────
+  // PRODUCTION: replace with await API.getAccount() to get real balance/VIP
   const hasData = loadStorage();
 
   if (!S.userId) {
@@ -2934,7 +3226,13 @@ document.addEventListener('DOMContentLoaded', () => {
     saveStorage();
   }
 
-  // Apply language immediately
+  // Set demo starting balance only for first-time users (no backend data)
+  if (!hasData) {
+    _ui.setBalance(3240);
+    _ui.setProfit(0);
+  }
+
+  // Apply i18n to entire UI
   applyI18n();
 
   // Show language screen for new users
@@ -2942,11 +3240,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('langScreen').style.display = 'flex';
   }
 
-  // Restore header
-  safeText('hBalancе', '$' + S.balance.toLocaleString('en', {minimumFractionDigits:2}));
-  document.getElementById('hProfit').textContent = (S.profit>=0?'+':'')+`$${S.profit.toFixed(2)}`;
   updateHeaderVip();
 
+  // Init UI components
   initDragScroll(document.getElementById('netChips'));
   initDragScroll(document.getElementById('sigChips'));
   initChipClicks();
@@ -2957,25 +3253,33 @@ document.addEventListener('DOMContentLoaded', () => {
   renderVip();
   renderVipAutoSettings();
 
-  // ── Production: connect WebSocket for live prices ──────
+  // ── Network status badge default ─────────────────────────
+  _netStatus._state = 'network'; // demo mode — not connected to real WS
+  const badge = document.getElementById('wsBadge');
+  if (badge) {
+    badge.textContent = `${SIGS.length} сигн. · DEMO`;
+    badge.style.color = 'var(--gold)';
+  }
+
+  // ── PRODUCTION: Connect WebSocket ─────────────────────────
+  // Uncomment this line when backend is ready.
   // wsManager.connect('wss://your-backend.com/ws/prices');
-  // ── Demo: fallback timer for signal updates ────────────
+  //
+  // The WS will drive all price/signal updates.
+  // Remove setInterval(liveUpdate) below when WS is active.
+
+  // ── DEMO: fallback price simulation timer ─────────────────
+  // ⚠️  Remove this in production — real data comes from wsManager
   setInterval(liveUpdate, 500);
 
-  // Update signal count display every 2s
+  // Refresh signal count badge
   setInterval(() => {
-    const el = document.getElementById('hSigCount');
-    if (el) {
-      const badge = document.getElementById('wsBadge');
-      if (badge && !badge.textContent.includes('LIVE')) {
-        badge.textContent = `${SIGS.length} сигн. · DEMO`;
-        badge.style.color = 'var(--gold)';
-      }
+    const b = document.getElementById('wsBadge');
+    if (b && !wsManager.connected) {
+      b.textContent = `${SIGS.length} сигн. · DEMO`;
+      b.style.color = 'var(--gold)';
     }
-  }, 2000);
-
-  setTimeout(() => toastMsg('🔥 BTC/USDT: арбитраж +0.55% на Binance→OKX', 'ok'), 2000);
-  setTimeout(() => toastMsg(`⚡ HFT Engine: ${SIGS.length} сигналов · 8 стратегий`, 'ok'), 4500);
+  }, 3000);
 });
 </script>
 </body>

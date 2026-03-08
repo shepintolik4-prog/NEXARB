@@ -119,11 +119,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);overflow:hid
   flex-shrink:0;display:grid;grid-template-columns:repeat(6,1fr);
   background:rgba(6,13,24,0.97);backdrop-filter:blur(20px);
   border-top:1px solid var(--border);
-  padding:6px 2px calc(6px + env(safe-area-inset-bottom,0px));
+  padding:6px 0 calc(6px + env(safe-area-inset-bottom,0px));
 }
-.nb{display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:none;cursor:pointer;padding:4px 2px;border-radius:8px;transition:all .2s}
-.nb .ni{font-size:19px;line-height:1;transition:transform .2s}
-.nb .nl{font-size:8px;font-family:var(--font);font-weight:600;letter-spacing:.5px;color:var(--muted);text-transform:uppercase;transition:color .2s}
+.nb{display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:none;cursor:pointer;padding:4px 1px;border-radius:8px;transition:all .2s;min-width:0}
+.nb .ni{font-size:18px;line-height:1;transition:transform .2s}
+.nb .nl{font-size:7.5px;font-family:var(--font);font-weight:600;letter-spacing:.3px;color:var(--muted);text-transform:uppercase;transition:color .2s;white-space:nowrap}
 .nb.on .ni{transform:scale(1.15);filter:drop-shadow(0 0 5px var(--cyan))}
 .nb.on .nl{color:var(--cyan)}
 
@@ -613,10 +613,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);overflow:hid
 
   </div><!-- /scroll -->
 
-  <!-- BOTTOM NAV: 5 tabs — Signals, Scanner, Exchanges, History, VIP -->
+  <!-- BOTTOM NAV: 6 tabs -->
   <nav class="bnav">
     <button class="nb on" id="nb-signals"   onclick="showPg('signals')">  <span class="ni">⚡</span><span class="nl" data-i18n="nav_signals">Сигналы</span></button>
     <button class="nb"    id="nb-scanner"   onclick="showPg('scanner')">  <span class="ni">📡</span><span class="nl" data-i18n="nav_scanner">Сканер</span></button>
+    <button class="nb"    id="nb-auto"      onclick="showPg('auto')">     <span class="ni">🤖</span><span class="nl" data-i18n="auto_nav">Авто</span></button>
     <button class="nb"    id="nb-exchanges" onclick="showPg('exchanges')"><span class="ni">🔗</span><span class="nl" data-i18n="nav_exchanges">Биржи</span></button>
     <button class="nb"    id="nb-history"   onclick="showPg('history')">  <span class="ni">📜</span><span class="nl" data-i18n="nav_history">История</span></button>
     <button class="nb"    id="nb-vip"       onclick="showPg('vip')">      <span class="ni">👑</span><span class="nl">VIP</span></button>
@@ -1804,7 +1805,7 @@ function calcFees(amount, sig) {
 const LANGS = {
   ru: {
     nav_signals:'Сигналы', nav_scanner:'Сканер', nav_exchanges:'Биржи',
-    nav_history:'История', auto_title:'Авто-Торговля 24/7',
+    nav_history:'История', auto_title:'Авто-Торговля 24/7', auto_nav:'Авто',
     lang_changed:'🌐 Язык изменён',
     balance:'Баланс', profit_today:'Профит / сегодня', signals_count:'Сигналов',
     execute:'⚡ Исполнить', enter_pos:'💰 Открыть позицию',
@@ -1816,7 +1817,7 @@ const LANGS = {
   },
   en: {
     nav_signals:'Signals', nav_scanner:'Scanner', nav_exchanges:'Exchanges',
-    nav_history:'History', auto_title:'Auto-Trade 24/7',
+    nav_history:'History', auto_title:'Auto-Trade 24/7', auto_nav:'Auto',
     lang_changed:'🌐 Language changed',
     balance:'Balance', profit_today:'Profit / today', signals_count:'Signals',
     execute:'⚡ Execute', enter_pos:'💰 Open Position',
@@ -1828,7 +1829,7 @@ const LANGS = {
   },
   tr: {
     nav_signals:'Sinyaller', nav_scanner:'Tarayıcı', nav_exchanges:'Borsalar',
-    nav_history:'Geçmiş', auto_title:'Otomatik 24/7',
+    nav_history:'Geçmiş', auto_title:'Otomatik 24/7', auto_nav:'Oto',
     lang_changed:'🌐 Dil değiştirildi',
     balance:'Bakiye', profit_today:'Kar / bugün', signals_count:'Sinyal',
     execute:'⚡ Uygula', enter_pos:'💰 Pozisyon Aç',
@@ -1840,7 +1841,7 @@ const LANGS = {
   },
   es: {
     nav_signals:'Señales', nav_scanner:'Escáner', nav_exchanges:'Bolsas',
-    nav_history:'Historial', auto_title:'Auto-Trade 24/7',
+    nav_history:'Historial', auto_title:'Auto-Trade 24/7', auto_nav:'Auto',
     lang_changed:'🌐 Idioma cambiado',
     balance:'Balance', profit_today:'Ganancia / hoy', signals_count:'Señales',
     execute:'⚡ Ejecutar', enter_pos:'💰 Abrir Posición',
@@ -1852,7 +1853,7 @@ const LANGS = {
   },
   de: {
     nav_signals:'Signale', nav_scanner:'Scanner', nav_exchanges:'Börsen',
-    nav_history:'Verlauf', auto_title:'Auto-Handel 24/7',
+    nav_history:'Verlauf', auto_title:'Auto-Handel 24/7', auto_nav:'Auto',
     lang_changed:'🌐 Sprache geändert',
     balance:'Guthaben', profit_today:'Gewinn / heute', signals_count:'Signale',
     execute:'⚡ Ausführen', enter_pos:'💰 Position öffnen',
@@ -1864,7 +1865,7 @@ const LANGS = {
   },
   ar: {
     nav_signals:'إشارات', nav_scanner:'ماسح', nav_exchanges:'بورصات',
-    nav_history:'السجل', auto_title:'تداول آلي 24/7',
+    nav_history:'السجل', auto_title:'تداول آلي 24/7', auto_nav:'آلي',
     lang_changed:'🌐 تم تغيير اللغة',
     balance:'الرصيد', profit_today:'ربح اليوم', signals_count:'إشارات',
     execute:'⚡ تنفيذ', enter_pos:'💰 فتح مركز',
@@ -2515,17 +2516,15 @@ function doBuy() {
   toastMsg('💳 Переход к оплате...','ok');
   setTimeout(()=>{
     S.vip = true;
-    // Set VIP expiry based on plan
     const days = S.plan==='week'?7:S.plan==='month'?30:365;
     S.vipExpiry = new Date(Date.now()+days*86400000).toISOString();
-    document.getElementById('hFee').textContent='0.3%';
     updateHeaderVip();
     addDemoReferrals();
     renderSigs(); renderExchanges(); renderVip();
     renderAutoPanel(); renderVipAutoSettings();
     saveStorage();
     toastMsg('🎉 VIP активирован! Добро пожаловать!','ok');
-    setTimeout(()=>toastMsg('🤖 Авто-торговля доступна → Кабинет','ok'),1500);
+    setTimeout(()=>toastMsg('🤖 Авто-торговля доступна в меню','ok'),1500);
     showPg('signals');
   },1400);
 }

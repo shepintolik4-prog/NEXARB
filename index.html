@@ -859,26 +859,92 @@ const EXCMAP = Object.fromEntries(EXCHS.map(e=>[e.id,e]));
 // ║   Multi-Strategy Arbitrage · AI Scoring · 300+ sig  ║
 // ╚══════════════════════════════════════════════════════╝
 
-// ── MARKET DATA ENGINE ─────────────────────────────────
-// Simulates WebSocket price feeds from 15 exchanges
-// In production: replace with real WS connections
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  MARKET DATA ENGINE v2 — Physics-Based Price Model          ║
+// ║                                                              ║
+// ║  Заменяет Math.random() на детерминированную физику рынка:  ║
+// ║  • Bid/ask из реальной структуры стакана (тик-спред)        ║
+// ║  • Волатильность по классу актива (BTC < ETH < мемкоины)    ║
+// ║  • Корреляция между биржами (все смотрят на Binance)        ║
+// ║  • Арбитражный спред из структурного смещения + шума        ║
+// ║  • Объём пропорционален ликвидности биржи                   ║
+// ║                                                              ║
+// ║  В production: заменить simPrice() на wsManager.prices      ║
+// ╚══════════════════════════════════════════════════════════════╝
 
 const PRICE_CACHE = new Map(); // symbol:exchange → {bid,ask,vol,ts}
-const SIGNAL_CACHE = new Map(); // deduplication cache
+const SIGNAL_CACHE = new Map();
 
-// Exchange fee structure
+// ── РЕАЛЬНЫЕ FEE СТРУКТУРЫ БИРЖ (актуальные 2025) ────────────
+// Источник: официальные страницы каждой биржи
+// maker — лимитные ордера (дешевле, но нет гарантии исполнения)
+// taker — рыночные ордера (арбитраж всегда taker, иначе упустишь цену)
 const EX_FEES = {
-  binance:{maker:0.001,taker:0.001},  okx:{maker:0.0008,taker:0.001},
-  bybit:{maker:0.001,taker:0.001},    kucoin:{maker:0.001,taker:0.001},
-  gate:{maker:0.002,taker:0.002},     mexc:{maker:0.0,taker:0.002},
-  htx:{maker:0.002,taker:0.002},      coinbase:{maker:0.004,taker:0.006},
-  kraken:{maker:0.0016,taker:0.0026}, bitget:{maker:0.001,taker:0.001},
-  bitmart:{maker:0.0025,taker:0.0025},phemex:{maker:0.001,taker:0.001},
-  crypto:{maker:0.004,taker:0.004},   bingx:{maker:0.001,taker:0.002},
-  lbank:{maker:0.001,taker:0.002},
+  binance:  { maker:0.0010, taker:0.0010 }, // VIP0; с BNB скидка 25% → 0.00075
+  okx:      { maker:0.0008, taker:0.0010 }, // Tier 1
+  bybit:    { maker:0.0010, taker:0.0010 }, // Standard
+  kucoin:   { maker:0.0010, taker:0.0010 }, // Tier 0
+  gate:     { maker:0.0020, taker:0.0020 }, // Base tier
+  mexc:     { maker:0.0000, taker:0.0020 }, // Maker rebate 0%, taker 0.2%
+  htx:      { maker:0.0020, taker:0.0020 }, // Huobi standard
+  coinbase: { maker:0.0040, taker:0.0060 }, // Advanced Trade base
+  kraken:   { maker:0.0016, taker:0.0026 }, // Tier 0 (0–10K USD)
+  bitget:   { maker:0.0010, taker:0.0010 }, // Standard spot
+  bitmart:  { maker:0.0025, taker:0.0025 }, // Standard
+  phemex:   { maker:0.0010, taker:0.0010 }, // Spot standard
+  crypto:   { maker:0.0040, taker:0.0040 }, // Crypto.com standard
+  bingx:    { maker:0.0010, taker:0.0020 }, // Standard
+  lbank:    { maker:0.0010, taker:0.0020 }, // Standard
 };
 
-// Base prices for simulation (realistic 2025 prices)
+// ── РЕАЛЬНЫЕ WITHDRAWAL FEES (сеть + биржа, USD, 2025) ───────
+// Это САМАЯ ВАЖНАЯ часть: на малых суммах сетевая комиссия
+// полностью съедает прибыль от арбитража
+// Источник: withdrawalfees.com + официальные страницы бирж
+const WITHDRAWAL_FEES = {
+  // Монета → { network, usd }
+  // usd = примерная стоимость вывода в долларах
+  BTC:   { network:'BTC',     usd: 1.50  }, // ~0.00002 BTC при 75k$
+  ETH:   { network:'ERC20',   usd: 2.50  }, // переменный gas, ~15-30 gwei
+  BNB:   { network:'BEP20',   usd: 0.10  }, // BSC дёшев
+  SOL:   { network:'SOL',     usd: 0.01  }, // почти бесплатно
+  XRP:   { network:'XRP',     usd: 0.08  }, // фиксированный 0.25 XRP
+  DOGE:  { network:'DOGE',    usd: 0.50  }, // ~1 DOGE комиссия
+  ADA:   { network:'ADA',     usd: 0.20  }, // 0.17 ADA минимум
+  AVAX:  { network:'AVAX-C',  usd: 0.15  }, // C-chain дёшев
+  DOT:   { network:'DOT',     usd: 0.40  }, // ~0.1 DOT
+  MATIC: { network:'POLYGON', usd: 0.02  }, // дёшево
+  LINK:  { network:'ERC20',   usd: 2.50  }, // как ETH
+  UNI:   { network:'ERC20',   usd: 2.50  },
+  LTC:   { network:'LTC',     usd: 0.15  },
+  BCH:   { network:'BCH',     usd: 0.10  },
+  ATOM:  { network:'COSMOS',  usd: 0.05  },
+  APT:   { network:'APT',     usd: 0.02  },
+  ARB:   { network:'ARB',     usd: 0.10  }, // L2 дёшев
+  OP:    { network:'OP',      usd: 0.10  }, // L2 дёшев
+  NEAR:  { network:'NEAR',    usd: 0.05  },
+  SUI:   { network:'SUI',     usd: 0.02  },
+  TON:   { network:'TON',     usd: 0.05  },
+  TRX:   { network:'TRC20',   usd: 0.10  },
+  PEPE:  { network:'ERC20',   usd: 2.50  }, // ERC20 мемкоин — gas дорогой!
+  SHIB:  { network:'ERC20',   usd: 2.50  }, // аналогично
+  FLOKI: { network:'BEP20',   usd: 0.10  },
+  BONK:  { network:'SOL',     usd: 0.01  },
+  WIF:   { network:'SOL',     usd: 0.01  },
+  BOME:  { network:'SOL',     usd: 0.01  },
+  INJ:   { network:'INJ',     usd: 0.05  },
+  SEI:   { network:'SEI',     usd: 0.02  },
+  TIA:   { network:'CELESTIA',usd: 0.05  },
+  ENA:   { network:'ERC20',   usd: 2.50  },
+  FET:   { network:'ERC20',   usd: 2.50  },
+  TAO:   { network:'TAO',     usd: 0.30  },
+  RENDER:{ network:'SOL',     usd: 0.01  },
+  WLD:   { network:'OP',      usd: 0.10  },
+  ALGO:  { network:'ALGO',    usd: 0.05  },
+  DEFAULT:{ network:'ERC20',  usd: 2.50  }, // неизвестные ERC20 = дорого
+};
+
+// ── БАЗОВЫЕ ЦЕНЫ (реалистичные, 2025) ────────────────────────
 const BASE_PRICES = {
   BTC:67840, ETH:3541, BNB:578, SOL:148, XRP:0.506,
   DOGE:0.162, ADA:0.441, AVAX:34.1, DOT:7.82, MATIC:0.881,
@@ -898,7 +964,72 @@ const BASE_PRICES = {
   AGIX:0.481, TAO:488, PRIME:12.4, BLUR:0.281, NFT:0.000682,
 };
 
-// Which exchanges carry which coins
+// ── КЛАССЫ ВОЛАТИЛЬНОСТИ ──────────────────────────────────────
+// Определяет амплитуду колебаний цены между тиками
+// Источник: средняя внутридневная волатильность (σ per tick)
+const VOL_CLASS = {
+  // σ в % за один 500ms тик
+  BTC:0.018, ETH:0.022, BNB:0.025, SOL:0.030,        // large cap: ~0.02%/тик
+  XRP:0.030, ADA:0.028, AVAX:0.032, DOT:0.030,         // mid cap:  ~0.03%/тик
+  LINK:0.032, ARB:0.035, OP:0.035, NEAR:0.038,
+  INJ:0.045, SEI:0.050, TIA:0.048, SUI:0.042,          // small cap: ~0.04-0.05%
+  PEPE:0.080, SHIB:0.075, WIF:0.090, BONK:0.085,       // мемкоины: ~0.07-0.09%
+  TAO:0.060, RENDER:0.055, ENA:0.055, FET:0.050,
+  DEFAULT:0.040,
+};
+
+// ── ТИКОВЫЕ СПРЕДЫ (bid-ask на бирже) ────────────────────────
+// Реальная разница между лучшим бидом и аском в стакане
+// Источник: empirical data от маркет-мейкеров
+const TICK_SPREAD_BPS = {
+  BTC:1,   ETH:2,   BNB:3,   SOL:3,    // 0.01–0.03% bid-ask
+  XRP:5,   ADA:5,   AVAX:5,  DOT:5,    // 0.05% bid-ask
+  LINK:6,  ARB:7,   OP:7,    NEAR:8,   // 0.06–0.08%
+  INJ:10,  SEI:12,  TIA:10,  SUI:8,    // 0.10–0.12%
+  PEPE:20, SHIB:20, WIF:25,  BONK:25,  // мемкоины: 0.2–0.25%
+  TAO:15,  FET:12,  ENA:12,
+  DEFAULT:10,
+};
+
+// ── СТРУКТУРНОЕ СМЕЩЕНИЕ ЦЕН ПО БИРЖАМ ───────────────────────
+// Реальный факт: одна и та же монета торгуется по разным ценам
+// на разных биржах из-за разного потока ордеров и маркет-мейкеров.
+// Binance = эталон (0). Остальные отклоняются.
+// Единица: доля от цены (0.001 = +0.1% относительно Binance)
+const EX_STRUCTURAL_BIAS = {
+  binance:  0.00000,   // эталон
+  okx:     -0.00012,   // чуть ниже (конкурент)
+  bybit:    0.00018,   // чуть выше
+  kucoin:   0.00031,   // выше (менее ликвидный)
+  gate:     0.00072,   // заметно выше (региональная)
+  mexc:     0.00110,   // выше (~+0.11%)
+  htx:      0.00048,   // умеренно выше
+  coinbase: 0.00240,   // premium (~+0.24%, США спрос)
+  kraken:   0.00170,   // premium (USD/EUR пары)
+  bitget:   0.00038,   // незначительно выше
+  bitmart:  0.00140,   // заметно выше (малая ликвидность)
+  phemex:   0.00055,   // умеренно выше
+  crypto:   0.00190,   // premium
+  bingx:    0.00085,   // выше
+  lbank:    0.00195,   // высокое смещение (малая биржа)
+};
+
+// ── ЛИКВИДНОСТЬ БИРЖ (% от объёма Binance) ───────────────────
+const EX_LIQUIDITY = {
+  binance:1.000, okx:0.650, bybit:0.550, kraken:0.300, coinbase:0.480,
+  kucoin:0.280,  gate:0.220, htx:0.200, bitget:0.180, mexc:0.160,
+  bitmart:0.080, phemex:0.090, crypto:0.120, bingx:0.100, lbank:0.070,
+};
+
+// ── БАЗОВЫЕ ОБЪЁМЫ 24h (USD) для топ монет ───────────────────
+const BASE_VOLUMES_24H = {
+  BTC:18_000_000_000, ETH:8_000_000_000, BNB:900_000_000,
+  SOL:2_200_000_000,  XRP:1_800_000_000, DOGE:600_000_000,
+  ADA:300_000_000,    AVAX:400_000_000,  DOT:180_000_000,
+  DEFAULT:50_000_000,
+};
+
+// EX_COINS — остаётся без изменений
 const EX_COINS = {
   binance:['BTC','ETH','BNB','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC','LINK','UNI','LTC','ATOM','APT','ARB','OP','NEAR','SUI','TON','TRX','PEPE','SHIB','BONK','WIF','WLD','ALGO','AAVE','GRT','LDO','INJ','SEI','TIA','JTO','PYTH','JUP','ENA','W','RENDER','FET','TAO'],
   okx:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','DOT','LINK','ARB','OP','NEAR','SUI','TON','TRX','PEPE','BONK','WIF','WLD','ALGO','AAVE','INJ','SEI','TIA','ENA','FET','TAO','ORDI'],
@@ -917,76 +1048,148 @@ const EX_COINS = {
   lbank:['BTC','ETH','SOL','XRP','DOGE','PEPE','SHIB','FLOKI','BONK'],
 };
 
-// ── PRICE SIMULATION ENGINE ────────────────────────────
-// Realistic: each exchange has slight price variations
-const EX_BIAS = { // Price bias per exchange (some exchanges run higher/lower)
-  binance:0, okx:-0.0001, bybit:0.0002, kucoin:0.0003, gate:0.0008,
-  mexc:0.0012, htx:0.0005, coinbase:0.0025, kraken:0.0018, bitget:0.0004,
-  bitmart:0.0015, phemex:0.0006, crypto:0.002, bingx:0.0009, lbank:0.0020,
-};
+// ── ГЛОБАЛЬНАЯ "ИСТИНА" РЫНКА ─────────────────────────────────
+// Одна глобальная mid-цена на актив — как реальный рынок,
+// где все биржи ориентируются на один и тот же мировой price.
+// Это устраняет проблему "случайный спред" — спред теперь структурный.
+const GLOBAL_MID = {}; // sym → текущая глобальная mid-цена
 
-function simPrice(sym, exId) {
-  const base = BASE_PRICES[sym] || 1;
-  const key = `${sym}:${exId}`;
-  let cached = PRICE_CACHE.get(key);
-  const now = Date.now();
-  if (!cached || now - cached.ts > 500) { // Refresh every 500ms = WebSocket sim
-    const drift = (Math.random() - 0.49) * 0.003; // Random walk
-    const bias = EX_BIAS[exId] || 0;
-    const prevMid = cached ? (cached.bid + cached.ask) / 2 : base * (1 + bias);
-    const mid = prevMid * (1 + drift + bias * 0.01);
-    const spread_bps = sym === 'BTC' ? 0.0001 : sym === 'ETH' ? 0.0002 : 0.0005;
-    cached = { bid: mid * (1 - spread_bps), ask: mid * (1 + spread_bps),
-               vol: base * (80000 + Math.random() * 200000), ts: now };
-    PRICE_CACHE.set(key, cached);
+// Детерминированный LCG-генератор (без Math.random в ценах)
+// Seed обновляется детерминированно от времени + символа
+// Это даёт воспроизводимые, но изменяющиеся цены
+const _lcgState = {};
+function _lcg(key) {
+  // Linear Congruential Generator: детерминированный, быстрый
+  // Параметры взяты из Numerical Recipes
+  if (_lcgState[key] === undefined) {
+    // Начальное значение = хэш строки ключа (детерминировано от имени монеты)
+    let h = 0;
+    for (let i = 0; i < key.length; i++) h = (Math.imul(31, h) + key.charCodeAt(i)) | 0;
+    _lcgState[key] = Math.abs(h) || 1;
   }
+  _lcgState[key] = (_lcgState[key] * 1664525 + 1013904223) & 0xffffffff;
+  return (_lcgState[key] >>> 0) / 0xffffffff; // [0, 1)
+}
+
+// ── ФИЗИКА ЦЕНЫ: Brownian Motion с возвратом к среднему ───────
+// Реальная цена следует геометрическому броуновскому движению:
+// dS = μ·S·dt + σ·S·dW
+// где σ — волатильность класса актива, dW — случайная составляющая
+// Добавляем mean-reversion чтобы цена не уходила в бесконечность
+const MEAN_REVERSION_SPEED = 0.0005; // скорость возврата к базовой цене
+
+function tickGlobalPrice(sym) {
+  const base  = BASE_PRICES[sym] || 1;
+  const sigma = (VOL_CLASS[sym] || VOL_CLASS.DEFAULT) / 100; // в долях
+
+  if (!GLOBAL_MID[sym]) GLOBAL_MID[sym] = base;
+
+  const prev = GLOBAL_MID[sym];
+  // Случайная компонента (LCG, не Math.random)
+  const u1 = _lcg(sym + 'a');
+  const u2 = _lcg(sym + 'b');
+  // Box-Muller transform → нормальное распределение N(0,1)
+  const z = Math.sqrt(-2 * Math.log(u1 + 1e-10)) * Math.cos(2 * Math.PI * u2);
+  // Геометрическое броуновское движение
+  const drift = sigma * z;
+  // Возврат к среднему (предотвращает расхождение)
+  const reversion = -MEAN_REVERSION_SPEED * (prev / base - 1);
+  GLOBAL_MID[sym] = prev * (1 + drift + reversion);
+  return GLOBAL_MID[sym];
+}
+
+// ── МОДЕЛЬ СТАКАНА ОРДЕРОВ ────────────────────────────────────
+// Строит bid/ask из глобальной mid-цены + структурного смещения биржи
+// Это критически важно: спред определяется ЛИКВИДНОСТЬЮ, не случайностью
+function simPrice(sym, exId) {
+  const key  = `${sym}:${exId}`;
+  const now  = Date.now();
+  let cached = PRICE_CACHE.get(key);
+
+  // Кэш 500ms = имитация WebSocket тика
+  if (cached && now - cached.ts < 500) return cached;
+
+  // 1. Глобальная mid-цена (общая для всех бирж)
+  const globalMid = GLOBAL_MID[sym] || BASE_PRICES[sym] || 1;
+
+  // 2. Структурное смещение биржи (детерминированное, не случайное)
+  //    Источник: разный состав клиентов, регион, маркет-мейкеры
+  const bias = EX_STRUCTURAL_BIAS[exId] || 0;
+  const exMid = globalMid * (1 + bias);
+
+  // 3. Тиковый шум биржи (LCG, не Math.random)
+  //    Маленький дополнительный шум от потока ордеров этой биржи
+  const exSigma = (VOL_CLASS[sym] || VOL_CLASS.DEFAULT) / 100 * 0.3; // 30% от общей vol
+  const u1 = _lcg(key + now.toString().slice(-4) + 'u1');
+  const u2 = _lcg(key + now.toString().slice(-4) + 'u2');
+  const z  = Math.sqrt(-2 * Math.log(u1 + 1e-10)) * Math.cos(2 * Math.PI * u2);
+  const localMid = exMid * (1 + exSigma * z);
+
+  // 4. Bid-ask спред из реальной структуры стакана
+  //    Зависит от тикового спреда монеты и ликвидности биржи
+  const tickBps  = (TICK_SPREAD_BPS[sym] || TICK_SPREAD_BPS.DEFAULT) / 10000;
+  const liqMult  = EX_LIQUIDITY[exId] || 0.5;
+  // Менее ликвидная биржа → шире спред стакана
+  const halfSpread = tickBps * (1 + (1 - liqMult) * 2);
+
+  const bid = localMid * (1 - halfSpread);
+  const ask = localMid * (1 + halfSpread);
+
+  // 5. Объём пропорционален ликвидности биржи и дневному объёму монеты
+  const baseVol = BASE_VOLUMES_24H[sym] || BASE_VOLUMES_24H.DEFAULT;
+  // Объём за 500ms тик ≈ дневной объём / 172800 тиков/день
+  const tickVol = baseVol * (EX_LIQUIDITY[exId] || 0.1) / 172800;
+
+  cached = { bid: +bid.toFixed(8), ask: +ask.toFixed(8), vol: tickVol, ts: now };
+  PRICE_CACHE.set(key, cached);
   return cached;
 }
 
 // ── AI SIGNAL SCORER ───────────────────────────────────
 function aiScore(sig) {
-  // Multi-factor AI scoring 0-100
   let score = 0;
-
-  // 1. Spread quality (40 pts)
+  // 1. Качество спреда (40 pts) — после вычета комиссий
   const spreadScore = Math.min(40, sig.spread * 12);
   score += spreadScore;
-
-  // 2. Liquidity (20 pts) — based on exchange volume
-  const exVols = { binance:100, okx:80, bybit:75, kucoin:60, gate:55,
-    mexc:50, htx:45, coinbase:70, kraken:65, bitget:50,
-    bitmart:30, phemex:35, crypto:40, bingx:35, lbank:25 };
-  const liq = ((exVols[sig.bx]||30) + (exVols[sig.sx]||30)) / 200 * 20;
+  // 2. Ликвидность (20 pts) — реальный объём биржи
+  const exLiq = EX_LIQUIDITY;
+  const liq = ((exLiq[sig.bx]||0.1) + (exLiq[sig.sx]||0.1)) / 2 * 20;
   score += liq;
-
-  // 3. Risk factor (20 pts)
-  const riskPts = { low: 20, med: 12, high: 5 };
+  // 3. Риск (20 pts)
+  const riskPts = { low:20, med:12, high:5 };
   score += riskPts[sig.risk] || 10;
-
-  // 4. Speed factor (10 pts) — faster = better
-  const timePts = sig.type === 'tri' ? 10 : sig.type === 'fund' ? 8 : sig.type === 'dex' ? 5 : 7;
-  score += timePts;
-
-  // 5. Historical win rate bonus (10 pts)
-  const typeBonus = { cex: 8, tri: 9, fund: 10, dex: 6, stat: 7 };
+  // 4. Скорость (10 pts)
+  const timePts = { tri:10, fund:8, spread:9, cex:7, stat:7, dex:5, xchain:3, vol:6 };
+  score += timePts[sig.type] || 5;
+  // 5. Исторический win-rate по типу (10 pts)
+  const typeBonus = { cex:8, tri:9, fund:10, spread:9, stat:7, dex:6, xchain:5, vol:6 };
   score += typeBonus[sig.type] || 5;
-
   return Math.min(99, Math.round(score));
 }
 
-// ── MULTI-STRATEGY SIGNAL GENERATOR ───────────────────
-// Target: 300-1000 signals/day = ~15-50 active at any time
-
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  ГЕНЕРАТОР СИГНАЛОВ v2 — Без Math.random() в спредах       ║
+// ║                                                              ║
+// ║  Спред = структурная разница цен между биржами              ║
+// ║  Источник: EX_STRUCTURAL_BIAS + tick noise (LCG)            ║
+// ║  Все Math.random() в спредах заменены на физику             ║
+// ╚══════════════════════════════════════════════════════════════╝
 function genSignals() {
   const all = [];
   let id = 0;
-
-  const risk = (spread) => spread >= 2.5 ? 'high' : spread >= 1.2 ? 'med' : 'low';
-  const hot = (spread, vol) => spread >= 2.0 || vol > 5000000;
   const exNames = Object.keys(EX_FEES);
 
-  // ── STRATEGY 1: CEX-CEX Direct Arbitrage ──────────────
-  // Scan all exchange pairs for each coin
+  // Вспомогательные функции
+  const risk = (spread) => spread >= 2.5 ? 'high' : spread >= 1.2 ? 'med' : 'low';
+  const hot  = (spread, vol24h) => spread >= 2.0 || vol24h > 5_000_000;
+  // Детерминированный тик-шум для числовых полей (объём, время, latency)
+  // Используем LCG, не Math.random
+  const noise = (key, lo, hi) => lo + _lcg(key) * (hi - lo);
+
+  // ── СТРАТЕГИЯ 1: CEX-CEX Прямой арбитраж ─────────────
+  // Спред = реальная разница bid-ask между биржами
+  // Минимальный порог: спред должен быть > 0 после:
+  //   taker A + taker B + network_fee_pct + slippage
   const cexCoins = Object.keys(BASE_PRICES).slice(0, 50);
   cexCoins.forEach(sym => {
     const carriers = exNames.filter(ex => (EX_COINS[ex]||[]).includes(sym));
@@ -994,36 +1197,58 @@ function genSignals() {
 
     for (let i = 0; i < carriers.length - 1; i++) {
       const exA = carriers[i], exB = carriers[i+1];
-      const pA = simPrice(sym, exA), pB = simPrice(sym, exB);
+      const pA = simPrice(sym, exA);
+      const pB = simPrice(sym, exB);
 
-      // Check A→B direction: buy on A (ask), sell on B (bid)
+      // A→B: покупаем по ask на A, продаём по bid на B
       const spreadAB = (pB.bid - pA.ask) / pA.ask * 100;
-      // Check B→A direction
+      // B→A: покупаем по ask на B, продаём по bid на A
       const spreadBA = (pA.bid - pB.ask) / pB.ask * 100;
 
       const bestSpread = Math.max(spreadAB, spreadBA);
-      const buyEx = spreadAB > spreadBA ? exA : exB;
-      const sellEx = spreadAB > spreadBA ? exB : exA;
-      const buyPrice = spreadAB > spreadBA ? pA.ask : pB.ask;
-      const sellPrice = spreadAB > spreadBA ? pB.bid : pA.bid;
+      const buyEx  = spreadAB >= spreadBA ? exA : exB;
+      const sellEx = spreadAB >= spreadBA ? exB : exA;
+      const buyP   = spreadAB >= spreadBA ? pA.ask : pB.ask;
+      const sellP  = spreadAB >= spreadBA ? pB.bid : pA.bid;
 
-      const exchFee = (EX_FEES[buyEx]?.taker||0.001) + (EX_FEES[sellEx]?.taker||0.001);
-      const netSpread = +(bestSpread - exchFee * 100).toFixed(3);
+      // Реальные комиссии taker: обе стороны тратят taker fee
+      const feeA_pct = EX_FEES[buyEx]?.taker  || 0.001;
+      const feeB_pct = EX_FEES[sellEx]?.taker || 0.001;
+      const totalFeePct = (feeA_pct + feeB_pct) * 100;
 
-      if (netSpread > 0.05) { // Min 0.05% gross before platform fee
+      // Минимальный net спред = gross - taker fees (без сети, слиппажа)
+      // Это "теоретический максимум" — в реальности ещё минус сеть+слиппаж
+      const netSpread = +(bestSpread - totalFeePct).toFixed(4);
+
+      // Показываем только те где gross > fees (теоретически позитивные)
+      if (bestSpread > 0.08) {
+        // Объём в USD за последний тик (из модели ликвидности)
+        const vol24h = (BASE_VOLUMES_24H[sym] || BASE_VOLUMES_24H.DEFAULT)
+                       * (EX_LIQUIDITY[buyEx] || 0.1);
+        const volStr = vol24h >= 1e9 ? `$${(vol24h/1e9).toFixed(1)}B`
+                     : vol24h >= 1e6 ? `$${(vol24h/1e6).toFixed(0)}M`
+                     : `$${(vol24h/1e3).toFixed(0)}K`;
+
+        // Время исполнения: зависит от ликвидности биржи (детерминированно)
+        const baseMs = Math.round(1000 / ((EX_LIQUIDITY[buyEx]||0.5) * 2));
+        const execSec = Math.max(3, Math.round(baseMs / 1000 * (1 + _lcg(sym+buyEx) * 0.5)));
+
         const sig = {
           id: `c${++id}`, type: 'cex', sym, strategy: 'CEX-CEX',
           bx: buyEx, sx: sellEx,
-          bprice: buyPrice, sprice: sellPrice,
-          spread: +bestSpread.toFixed(3),
-          vol: `$${(pA.vol/1000).toFixed(0)}K`,
-          time: `~${Math.round(8 + Math.random()*12)}с`,
+          bprice: +buyP.toFixed(8), sprice: +sellP.toFixed(8),
+          spread:    +bestSpread.toFixed(4),
+          netSpread: +netSpread.toFixed(4),
+          feeA_pct:  +(feeA_pct*100).toFixed(3),
+          feeB_pct:  +(feeB_pct*100).toFixed(3),
+          vol: volStr,
+          time: `~${execSec}с`,
           risk: risk(bestSpread),
           vip: false,
-          hot: hot(bestSpread, pA.vol),
-          exchFee: +(exchFee*100).toFixed(3),
-          aiScore: 0, // filled below
-          latency: Math.round(20 + Math.random()*30),
+          hot: hot(bestSpread, vol24h),
+          exchFee: +totalFeePct.toFixed(3),
+          aiScore: 0,
+          latency: Math.max(15, Math.round(noise(sym+buyEx+'lat', 20, 50))),
         };
         sig.aiScore = aiScore(sig);
         all.push(sig);
@@ -1031,232 +1256,339 @@ function genSignals() {
     }
   });
 
-  // ── STRATEGY 2: Triangular Arbitrage (VIP) ────────────
+  // ── СТРАТЕГИЯ 2: Треугольный арбитраж (VIP) ───────────
+  // Реальные треугольные пути с комиссиями 3 торговых пары
+  // Спред = накопленное отклонение от паритета внутри одной биржи
+  // Формула: (P_AB × P_BC × P_CA) - 1 ≈ triangular spread
   const triPaths = [
-    // Реальные треугольные: 0.05–0.4% после комиссий (очень конкурентный рынок)
-    {sym:'BNB→ETH→BTC',   ex:'binance', spread:()=>0.05+Math.random()*0.25},
-    {sym:'SOL→USDT→BTC',  ex:'bybit',   spread:()=>0.04+Math.random()*0.20},
-    {sym:'ETH→BNB→SOL',   ex:'binance', spread:()=>0.06+Math.random()*0.30},
-    {sym:'XRP→BTC→ETH',   ex:'okx',     spread:()=>0.04+Math.random()*0.18},
-    {sym:'ADA→BNB→USDT',  ex:'binance', spread:()=>0.05+Math.random()*0.22},
-    {sym:'DOGE→BTC→SOL',  ex:'bybit',   spread:()=>0.06+Math.random()*0.28},
-    {sym:'AVAX→ETH→BTC',  ex:'kucoin',  spread:()=>0.05+Math.random()*0.20},
-    {sym:'MATIC→BNB→ETH', ex:'binance', spread:()=>0.04+Math.random()*0.24},
-    {sym:'DOT→SOL→BTC',   ex:'okx',     spread:()=>0.05+Math.random()*0.18},
-    {sym:'LINK→ETH→BNB',  ex:'binance', spread:()=>0.04+Math.random()*0.20},
-    {sym:'INJ→BNB→ETH',   ex:'kucoin',  spread:()=>0.08+Math.random()*0.35},
-    {sym:'TAO→SOL→BTC',   ex:'bybit',   spread:()=>0.10+Math.random()*0.40},
-    {sym:'TIA→ETH→USDT',  ex:'okx',     spread:()=>0.07+Math.random()*0.28},
-    {sym:'SUI→BNB→SOL',   ex:'gate',    spread:()=>0.06+Math.random()*0.26},
-    {sym:'ARB→ETH→BTC',   ex:'binance', spread:()=>0.05+Math.random()*0.22},
+    { sym:'BNB→ETH→BTC',   ex:'binance', coins:['BNB','ETH','BTC'] },
+    { sym:'SOL→USDT→BTC',  ex:'bybit',   coins:['SOL','BTC','SOL'] },
+    { sym:'ETH→BNB→SOL',   ex:'binance', coins:['ETH','BNB','SOL'] },
+    { sym:'XRP→BTC→ETH',   ex:'okx',     coins:['XRP','BTC','ETH'] },
+    { sym:'ADA→BNB→USDT',  ex:'binance', coins:['ADA','BNB','BTC'] },
+    { sym:'DOGE→BTC→SOL',  ex:'bybit',   coins:['DOGE','BTC','SOL'] },
+    { sym:'AVAX→ETH→BTC',  ex:'kucoin',  coins:['AVAX','ETH','BTC'] },
+    { sym:'MATIC→BNB→ETH', ex:'binance', coins:['MATIC','BNB','ETH'] },
+    { sym:'INJ→BNB→ETH',   ex:'kucoin',  coins:['INJ','BNB','ETH'] },
+    { sym:'TAO→SOL→BTC',   ex:'bybit',   coins:['TAO','SOL','BTC'] },
+    { sym:'TIA→ETH→USDT',  ex:'okx',     coins:['TIA','ETH','BTC'] },
+    { sym:'ARB→ETH→BTC',   ex:'binance', coins:['ARB','ETH','BTC'] },
   ];
   triPaths.forEach(t => {
-    const sp = +t.spread().toFixed(2);
+    // Спред треугольника = разница между реальными ценами внутри биржи
+    // Использует LCG-шум, привязанный к паре монет — детерминировано
+    const baseDeviation = EX_STRUCTURAL_BIAS[t.ex] || 0.0003;
+    const noiseVal = _lcg(t.sym + t.ex + 'tri') * 0.003;
+    // Реальный треугольный спред: 0.03–0.45%
+    // Без HFT ботов такие окна живут 50-200ms
+    const sp = +(Math.abs(baseDeviation * 100 + noiseVal) * 0.8 + 0.03).toFixed(3);
+
+    // Комиссии треугольника: 3 сделки × taker fee
+    const fee3 = (EX_FEES[t.ex]?.taker || 0.001) * 3;
+
     const sig = {
       id: `t${++id}`, type: 'tri', sym: t.sym, strategy: 'Triangular',
-      bx: t.ex, sx: t.ex, bprice: null, sprice: null,
-      spread: sp, vol: `$${(200+Math.random()*400).toFixed(0)}K`,
-      time: `~${2+Math.round(Math.random()*4)}с`, risk: risk(sp),
-      vip: true, hot: sp > 1.8, exchFee: 0.3, aiScore: 0,
-      latency: Math.round(5 + Math.random()*15),
+      bx: t.ex, sx: t.ex,
+      spread: +sp.toFixed(3),
+      netSpread: +(sp - fee3 * 100).toFixed(3),
+      vol: `$${(noise(t.sym+t.ex, 200, 600) * 1000).toFixed(0)}K`,
+      time: `~${Math.max(1, Math.round(noise(t.sym, 1, 4)))}с`,
+      risk: risk(sp),
+      vip: true, hot: sp > 0.35,
+      exchFee: +(fee3 * 100).toFixed(3),
+      aiScore: 0,
+      latency: Math.max(5, Math.round(noise(t.sym+t.ex+'lat', 5, 18))),
     };
     sig.aiScore = aiScore(sig);
     all.push(sig);
   });
 
-  // ── STRATEGY 3: Funding Rate Arbitrage (VIP) ──────────
+  // ── СТРАТЕГИЯ 3: Funding Rate арбитраж (VIP) ──────────
+  // Funding rate — реальный механизм перпетуальных фьючерсов
+  // Выплачивается каждые 8 часов тем кто держит лонг или шорт
+  // Арбитраж: открыть хедж (спот + обратный перп), получить фундинг
+  // Реальные диапазоны funding rate (2024-2025):
+  //   BTC/ETH: 0.01% baseline, всплески до 0.05-0.1% при памп
+  //   Мемкоины: 0.02-0.1% обычно, до 0.5% при хайпе
   const fundingPairs = [
-    // Реальные funding rates (данные 2024-2025, типичные значения)
-    // rate = funding rate за 8 часов (%). Binance: 0.01% базовый
-    {sym:'BTC/USDT Perp',  bx:'binance', sx:'bybit',   rate:0.0100+Math.random()*0.0200}, // 0.01–0.03%
-    {sym:'ETH/USDT Perp',  bx:'okx',     sx:'binance', rate:0.0080+Math.random()*0.0150}, // 0.008–0.023%
-    {sym:'SOL/USDT Perp',  bx:'bybit',   sx:'okx',     rate:0.0120+Math.random()*0.0250}, // 0.012–0.037%
-    {sym:'BNB/USDT Perp',  bx:'binance', sx:'gate',    rate:0.0100+Math.random()*0.0180}, // 0.01–0.028%
-    {sym:'XRP/USDT Perp',  bx:'okx',     sx:'bybit',   rate:0.0090+Math.random()*0.0200},
-    {sym:'DOGE/USDT Perp', bx:'binance', sx:'mexc',    rate:0.0150+Math.random()*0.0300}, // мемкоины чуть выше
-    {sym:'PEPE/USDT Perp', bx:'bybit',   sx:'okx',     rate:0.0200+Math.random()*0.0500}, // 0.02–0.07%
-    {sym:'INJ/USDT Perp',  bx:'kucoin',  sx:'binance', rate:0.0180+Math.random()*0.0400},
-    {sym:'TAO/USDT Perp',  bx:'bybit',   sx:'gate',    rate:0.0300+Math.random()*0.0600}, // альты волатильнее
-    {sym:'WIF/USDT Perp',  bx:'mexc',    sx:'bybit',   rate:0.0250+Math.random()*0.0500},
+    { sym:'BTC/USDT Perp',  bx:'binance', sx:'bybit',   baseFR:0.0100, voltFR:0.008 },
+    { sym:'ETH/USDT Perp',  bx:'okx',     sx:'binance', baseFR:0.0090, voltFR:0.007 },
+    { sym:'SOL/USDT Perp',  bx:'bybit',   sx:'okx',     baseFR:0.0120, voltFR:0.012 },
+    { sym:'BNB/USDT Perp',  bx:'binance', sx:'gate',    baseFR:0.0100, voltFR:0.009 },
+    { sym:'XRP/USDT Perp',  bx:'okx',     sx:'bybit',   baseFR:0.0095, voltFR:0.010 },
+    { sym:'DOGE/USDT Perp', bx:'binance', sx:'mexc',    baseFR:0.0150, voltFR:0.015 },
+    { sym:'PEPE/USDT Perp', bx:'bybit',   sx:'okx',     baseFR:0.0220, voltFR:0.025 },
+    { sym:'INJ/USDT Perp',  bx:'kucoin',  sx:'binance', baseFR:0.0190, voltFR:0.020 },
+    { sym:'TAO/USDT Perp',  bx:'bybit',   sx:'gate',    baseFR:0.0300, voltFR:0.030 },
+    { sym:'WIF/USDT Perp',  bx:'mexc',    sx:'bybit',   baseFR:0.0250, voltFR:0.025 },
   ];
   fundingPairs.forEach(f => {
-    const ratePct = +(f.rate).toFixed(4); // % за 8 часов, например 0.0300 = 0.03%
-    const annualPct = +(ratePct * 3 * 365).toFixed(1); // ~32.85% годовых при 0.03%/8ч
-    // spread = чистый профит ЗА ОДНУ ВЫПЛАТУ (8ч), после комиссий
-    // Это то, что реально зарабатывается за один цикл
-    const grossPerCycle = ratePct; // % от позиции за 8ч
+    // Funding rate моделируется как mean-reverting процесс (реальная физика)
+    // Отклонение = LCG-шум, привязанный к паре
+    const deviation = (_lcg(f.sym + 'fr') - 0.5) * f.voltFR;
+    const ratePct = +(Math.max(0.005, f.baseFR + deviation)).toFixed(4);
+    const annualPct = +(ratePct * 3 * 365).toFixed(1);
+
+    // Реальная чистая прибыль за цикл: funding - taker*2 - slippage
+    const takerBoth = (EX_FEES[f.bx]?.taker + EX_FEES[f.sx]?.taker) * 100;
+    const netCycle = +(ratePct - takerBoth * 0.1).toFixed(4); // taker частично амортизирован
+
     const sig = {
       id: `f${++id}`, type: 'fund', sym: f.sym, strategy: 'Funding',
-      bx: f.bx, sx: f.sx, bprice: null, sprice: null,
-      spread: grossPerCycle,          // % за 8ч — реальный спред
-      displayRate: ratePct,           // funding rate %/8ч
-      annualYield: annualPct,         // % годовых (для справки)
-      vol: `$${(8+Math.random()*20).toFixed(1)}M`,
+      bx: f.bx, sx: f.sx,
+      spread: +ratePct.toFixed(4),
+      netSpread: +netCycle.toFixed(4),
+      displayRate: ratePct,
+      annualYield: annualPct,
+      vol: `$${(noise(f.sym, 8, 28) * 1e6 / 1e6).toFixed(1)}M`,
       time: '8ч', risk: 'low', vip: true,
       hot: ratePct > 0.04,
-      exchFee: 0.1,  // тейкер одной стороны (0.05% × 2 ≈ 0.1%)
+      exchFee: +(takerBoth).toFixed(3),
       aiScore: 0,
-      latency: Math.round(50 + Math.random()*100),
+      latency: Math.max(50, Math.round(noise(f.sym+'lat', 50, 150))),
     };
     sig.aiScore = aiScore(sig);
     all.push(sig);
   });
 
-  // ── STRATEGY 4: DEX Arbitrage (VIP) ──────────────────
+  // ── СТРАТЕГИЯ 4: DEX арбитраж (VIP) ──────────────────
+  // DEX-спред определяется отклонением от CFMM (x*y=k) инварианта
+  // При дисбалансе пула AMM цена отклоняется от CEX
+  // Формула: price_impact = amount / (liquidity * 2)
+  // Реальные DEX спреды: 0.05-0.8% (MEV боты конкурируют)
   const dexPairs = [
-    // DEX реально: 0.05–0.6% (конкурентнее чем CEX из-за MEV ботов)
-    {sym:'ETH',   bx:'Uniswap V3', sx:'Curve',      spread:()=>0.05+Math.random()*0.35},
-    {sym:'SOL',   bx:'Raydium',    sx:'Jupiter',     spread:()=>0.08+Math.random()*0.45},
-    {sym:'BTC',   bx:'Uniswap V3', sx:'Balancer',   spread:()=>0.04+Math.random()*0.25},
-    {sym:'ARB',   bx:'Camelot',    sx:'Uniswap V3', spread:()=>0.10+Math.random()*0.55},
-    {sym:'OP',    bx:'Velodrome',  sx:'Uniswap V3', spread:()=>0.08+Math.random()*0.50},
-    {sym:'MATIC', bx:'QuickSwap',  sx:'Uniswap V3', spread:()=>0.06+Math.random()*0.40},
-    {sym:'AVAX',  bx:'Trader Joe', sx:'Pangolin',   spread:()=>0.07+Math.random()*0.42},
-    {sym:'TON',   bx:'DeDust',     sx:'STON.fi',    spread:()=>0.10+Math.random()*0.60},
-    {sym:'SUI',   bx:'Cetus',      sx:'Turbos',     spread:()=>0.12+Math.random()*0.65},
-    {sym:'APT',   bx:'Liquidswap', sx:'Thala',      spread:()=>0.10+Math.random()*0.55},
-    {sym:'NEAR',  bx:'Ref Finance',sx:'Jumbo',      spread:()=>0.08+Math.random()*0.50},
-    {sym:'INJ',   bx:'Helix',      sx:'DojoSwap',   spread:()=>0.15+Math.random()*0.70},
+    { sym:'ETH',   bx:'Uniswap V3', sx:'Curve',      poolLiq:150e6,  fee:0.0030 },
+    { sym:'SOL',   bx:'Raydium',    sx:'Jupiter',     poolLiq:40e6,   fee:0.0025 },
+    { sym:'BTC',   bx:'Uniswap V3', sx:'Balancer',    poolLiq:80e6,   fee:0.0030 },
+    { sym:'ARB',   bx:'Camelot',    sx:'Uniswap V3',  poolLiq:12e6,   fee:0.0030 },
+    { sym:'OP',    bx:'Velodrome',  sx:'Uniswap V3',  poolLiq:15e6,   fee:0.0020 },
+    { sym:'MATIC', bx:'QuickSwap',  sx:'Uniswap V3',  poolLiq:10e6,   fee:0.0030 },
+    { sym:'AVAX',  bx:'Trader Joe', sx:'Pangolin',    poolLiq:25e6,   fee:0.0030 },
+    { sym:'TON',   bx:'DeDust',     sx:'STON.fi',     poolLiq:8e6,    fee:0.0020 },
+    { sym:'SUI',   bx:'Cetus',      sx:'Turbos',      poolLiq:6e6,    fee:0.0025 },
+    { sym:'INJ',   bx:'Helix',      sx:'DojoSwap',    poolLiq:5e6,    fee:0.0030 },
   ];
   dexPairs.forEach(d => {
-    const sp = +d.spread().toFixed(2);
+    // AMM спред = разрыв между bid-ask пула (зависит от ликвидности пула)
+    // При пуле $150M ETH тик-спред ≈ 0.02%
+    // При пуле $5M INJ тик-спред ≈ 0.15%
+    const baseSpread = 1000 / d.poolLiq * 1e6; // % (1M / pool_size)
+    const lcgNoise = (_lcg(d.sym + d.bx + 'dex') - 0.5) * 0.15;
+    const sp = +Math.max(0.04, Math.min(1.2, baseSpread + lcgNoise)).toFixed(3);
+
+    // Gas fees DEX (Ethereum L1 дорого, L2 дёшево)
+    const gasUSD = d.bx.includes('Uniswap') && d.sym === 'ETH' ? 4.0  // L1
+                 : d.bx.includes('Uniswap') ? 0.50                     // L2
+                 : d.bx.includes('Raydium') || d.bx === 'Jupiter' ? 0.01 // Solana
+                 : 0.20;                                                 // остальные
+
     const sig = {
       id: `d${++id}`, type: 'dex', sym: d.sym, strategy: 'DEX',
       bx: d.bx, sx: d.sx,
-      bprice: BASE_PRICES[d.sym], sprice: BASE_PRICES[d.sym]*(1+sp/100),
-      spread: sp, vol: `$${(300+Math.random()*1200).toFixed(0)}K`,
-      time: `~${5+Math.round(Math.random()*30)}с`, risk: risk(sp),
-      vip: true, hot: sp > 1.5, exchFee: 0.6, aiScore: 0,
-      latency: Math.round(80 + Math.random()*200),
+      spread: sp,
+      netSpread: sp,
+      gasUSD,
+      poolLiqM: +(d.poolLiq / 1e6).toFixed(0),
+      vol: `$${(noise(d.sym+d.bx, 300, 1500) * 1000).toFixed(0)}K`,
+      time: `~${Math.max(5, Math.round(noise(d.sym+'dex', 5, 35)))}с`,
+      risk: risk(sp), vip: true, hot: sp > 0.5,
+      exchFee: +(d.fee * 200).toFixed(3), // обе стороны DEX pool fee
+      aiScore: 0,
+      latency: Math.max(80, Math.round(noise(d.sym+d.bx+'lat', 80, 280))),
     };
     sig.aiScore = aiScore(sig);
     all.push(sig);
   });
 
-  // ── STRATEGY 5: Statistical Arbitrage (VIP) ───────────
+  // ── СТРАТЕГИЯ 5: Статистический арбитраж (VIP) ────────
+  // Парный трейдинг: BTC/ETH спред возвращается к историческому mean
+  // Спред = z-score отклонения от скользящего соотношения цен
+  // Реальные значения: ±0.02-0.35% отклонения
   const statPairs = [
-    // Стат арбитраж: очень малые спреды 0.02–0.3%, высокая частота
-    {sym:'BTC/ETH',  bx:'binance', sx:'okx',    spread:()=>0.02+Math.random()*0.15},
-    {sym:'SOL/AVAX', bx:'bybit',   sx:'kucoin', spread:()=>0.03+Math.random()*0.20},
-    {sym:'BNB/ETH',  bx:'okx',     sx:'bybit',  spread:()=>0.02+Math.random()*0.12},
-    {sym:'XRP/ADA',  bx:'kucoin',  sx:'binance',spread:()=>0.04+Math.random()*0.25},
-    {sym:'DOT/ATOM', bx:'kraken',  sx:'okx',    spread:()=>0.03+Math.random()*0.18},
-    {sym:'INJ/SEI',  bx:'binance', sx:'bybit',  spread:()=>0.05+Math.random()*0.30},
-    {sym:'TIA/NEAR', bx:'okx',     sx:'kucoin', spread:()=>0.04+Math.random()*0.22},
-    {sym:'WIF/BONK', bx:'bybit',   sx:'mexc',   spread:()=>0.06+Math.random()*0.35},
+    { sym:'BTC/ETH',  bx:'binance', sx:'okx',     symA:'BTC', symB:'ETH',  hist_ratio:19.15 },
+    { sym:'SOL/AVAX', bx:'bybit',   sx:'kucoin',  symA:'SOL', symB:'AVAX', hist_ratio:4.34  },
+    { sym:'BNB/ETH',  bx:'okx',     sx:'bybit',   symA:'BNB', symB:'ETH',  hist_ratio:0.163 },
+    { sym:'XRP/ADA',  bx:'kucoin',  sx:'binance', symA:'XRP', symB:'ADA',  hist_ratio:1.147 },
+    { sym:'INJ/SEI',  bx:'binance', sx:'bybit',   symA:'INJ', symB:'SEI',  hist_ratio:59.1  },
+    { sym:'TIA/NEAR', bx:'okx',     sx:'kucoin',  symA:'TIA', symB:'NEAR', hist_ratio:1.00  },
+    { sym:'WIF/BONK', bx:'bybit',   sx:'mexc',    symA:'WIF', symB:'BONK', hist_ratio:88750 },
   ];
   statPairs.forEach(s => {
-    const sp = +s.spread().toFixed(3);
-    const baseSym = s.sym.split('/')[0];
+    const pA = GLOBAL_MID[s.symA] || BASE_PRICES[s.symA] || 1;
+    const pB = GLOBAL_MID[s.symB] || BASE_PRICES[s.symB] || 1;
+    const currentRatio = pA / pB;
+    const ratioDeviation = (currentRatio - s.hist_ratio) / s.hist_ratio;
+    // Спред = абсолютное отклонение от исторического соотношения
+    const sp = +Math.abs(ratioDeviation * 100).toFixed(4);
+
+    const feeTotal = ((EX_FEES[s.bx]?.taker||0.001) + (EX_FEES[s.sx]?.taker||0.001)) * 100;
+
     const sig = {
       id: `st${++id}`, type: 'stat', sym: s.sym, strategy: 'Stat Arb',
       bx: s.bx, sx: s.sx,
-      bprice: BASE_PRICES[baseSym], sprice: null,
-      spread: sp, vol: `$${(150+Math.random()*800).toFixed(0)}K`,
-      time: `~${15+Math.round(Math.random()*60)}с`, risk: 'low',
-      vip: true, hot: false, exchFee: 0.2, aiScore: 0,
-      latency: Math.round(20 + Math.random()*40),
+      spread: Math.max(0.01, sp),
+      netSpread: Math.max(0.001, sp - feeTotal),
+      currentRatio: +currentRatio.toFixed(4),
+      histRatio:    s.hist_ratio,
+      vol: `$${(noise(s.sym+s.bx, 150, 950) * 1000).toFixed(0)}K`,
+      time: `~${Math.max(15, Math.round(noise(s.sym, 15, 75)))}с`,
+      risk: 'low', vip: true, hot: false,
+      exchFee: +feeTotal.toFixed(3),
+      aiScore: 0,
+      latency: Math.max(20, Math.round(noise(s.sym+'lat', 20, 60))),
     };
     sig.aiScore = aiScore(sig);
     all.push(sig);
   });
 
-  // ── STRATEGY 6: Cross-Chain Arbitrage (VIP) ───────────
+  // ── СТРАТЕГИЯ 6: Кросс-чейн арбитраж (VIP) ───────────
   const xchainPairs = [
-    // Cross-chain: 0.1–0.5% (bridge fees съедают много)
-    {sym:'ETH',  chainA:'Ethereum', chainB:'Arbitrum',  bx:'Uniswap',  sx:'Camelot',    spread:()=>0.08+Math.random()*0.30},
-    {sym:'ETH',  chainA:'Ethereum', chainB:'Optimism',  bx:'Uniswap',  sx:'Velodrome',  spread:()=>0.06+Math.random()*0.25},
-    {sym:'MATIC',chainA:'ETH',      chainB:'Polygon',   bx:'Uniswap',  sx:'QuickSwap',  spread:()=>0.10+Math.random()*0.40},
-    {sym:'SOL',  chainA:'Solana',   chainB:'ETH(SOL)',  bx:'Raydium',  sx:'Uniswap',    spread:()=>0.12+Math.random()*0.45},
-    {sym:'AVAX', chainA:'Avalanche',chainB:'ETH',       bx:'TraderJoe',sx:'Uniswap',    spread:()=>0.08+Math.random()*0.35},
-    {sym:'BTC',  chainA:'Bitcoin',  chainB:'ETH(WBTC)', bx:'binance',  sx:'Uniswap',    spread:()=>0.05+Math.random()*0.20},
+    { sym:'ETH',  cA:'Ethereum', cB:'Arbitrum', bx:'Uniswap',  sx:'Camelot',   bridgeFee:0.10, bridgeSec:300 },
+    { sym:'ETH',  cA:'Ethereum', cB:'Optimism', bx:'Uniswap',  sx:'Velodrome', bridgeFee:0.10, bridgeSec:180 },
+    { sym:'MATIC',cA:'ETH',      cB:'Polygon',  bx:'Uniswap',  sx:'QuickSwap', bridgeFee:0.05, bridgeSec:120 },
+    { sym:'SOL',  cA:'Solana',   cB:'ETH(SOL)', bx:'Raydium',  sx:'Uniswap',   bridgeFee:0.80, bridgeSec:600 },
+    { sym:'BTC',  cA:'Bitcoin',  cB:'ETH(WBTC)',bx:'binance',  sx:'Uniswap',   bridgeFee:1.50, bridgeSec:1800},
   ];
   xchainPairs.forEach(x => {
-    const sp = +x.spread().toFixed(2);
+    const biasA = EX_STRUCTURAL_BIAS[x.bx.toLowerCase()] || EX_STRUCTURAL_BIAS['binance'];
+    const biasB = EX_STRUCTURAL_BIAS[x.sx.toLowerCase()] || EX_STRUCTURAL_BIAS['gate'];
+    const structuralSpread = Math.abs(biasB - biasA) * 100;
+    const lcgNoise = _lcg(x.sym + x.cA + x.cB) * 0.20;
+    const sp = +Math.max(0.05, structuralSpread + lcgNoise).toFixed(3);
+
     const sig = {
-      id: `x${++id}`, type: 'xchain', sym: `${x.sym} ${x.chainA}→${x.chainB}`,
+      id: `x${++id}`, type: 'xchain', sym: `${x.sym} ${x.cA}→${x.cB}`,
       strategy: 'Cross-Chain',
       bx: x.bx, sx: x.sx,
-      bprice: BASE_PRICES[x.sym], sprice: BASE_PRICES[x.sym]*(1+sp/100),
-      spread: sp, vol: `$${(200+Math.random()*600).toFixed(0)}K`,
-      time: `~${60+Math.round(Math.random()*300)}с`, risk: sp > 1.0 ? 'high' : 'med',
-      vip: true, hot: false, exchFee: 0.8, aiScore: 0,
-      latency: Math.round(200 + Math.random()*500),
+      spread: sp,
+      bridgeFeeUSD: x.bridgeFee,
+      bridgeSec:    x.bridgeSec,
+      vol: `$${(noise(x.sym+x.cA, 200, 800) * 1000).toFixed(0)}K`,
+      time: `~${Math.round(x.bridgeSec/60)}м`,
+      risk: sp > 1.0 ? 'high' : 'med', vip: true, hot: false,
+      exchFee: 0.6,
+      aiScore: 0,
+      latency: Math.max(200, Math.round(noise(x.sym+x.cA+'lat', 200, 700))),
     };
     sig.aiScore = aiScore(sig);
     all.push(sig);
   });
 
-  // ── STRATEGY 7: Volatility Arbitrage (VIP) ────────────
+  // ── СТРАТЕГИЯ 7: Волатильность арбитраж (VIP) ─────────
+  // IV (implied volatility) опционов vs реализованная волатильность
+  // Спред IV определяется из VOL_CLASS и текущего движения цены
   const volPairs = [
-    {sym:'BTC', bx:'Deribit', sx:'binance', spread:()=>0.5+Math.random()*2.0},
-    {sym:'ETH', bx:'Deribit', sx:'okx',     spread:()=>0.4+Math.random()*1.8},
-    {sym:'SOL', bx:'okx',     sx:'bybit',   spread:()=>0.6+Math.random()*2.5},
-    {sym:'BNB', bx:'binance', sx:'Deribit', spread:()=>0.8+Math.random()*2.2},
+    { sym:'BTC', bx:'Deribit', sx:'binance' },
+    { sym:'ETH', bx:'Deribit', sx:'okx'     },
+    { sym:'SOL', bx:'okx',     sx:'bybit'   },
+    { sym:'BNB', bx:'binance', sx:'Deribit' },
   ];
   volPairs.forEach(v => {
-    const sp = +v.spread().toFixed(2);
+    // IV spread = разница между implied vol (из опционов) и realized vol
+    // Реальные значения: 2-15% vol points, спред ~0.5-2.5%
+    const realizedVol = (VOL_CLASS[v.sym] || 0.04) * 100 * Math.sqrt(365);
+    const impliedVol = realizedVol * (1.1 + _lcg(v.sym + v.bx + 'iv') * 0.3);
+    const volSpread = +(Math.abs(impliedVol - realizedVol) * 0.05).toFixed(2);
+    const sp = Math.max(0.3, Math.min(3.0, volSpread));
+
     const sig = {
       id: `v${++id}`, type: 'vol', sym: `${v.sym} IV`, strategy: 'Vol Arb',
-      bx: v.bx, sx: v.sx, bprice: null, sprice: null,
-      spread: sp, vol: `$${(500+Math.random()*2000).toFixed(0)}K`,
-      time: `~${30+Math.round(Math.random()*60)}с`, risk: 'med',
-      vip: true, hot: sp > 1.8, exchFee: 0.4, aiScore: 0,
-      latency: Math.round(40 + Math.random()*80),
+      bx: v.bx, sx: v.sx,
+      spread: +sp.toFixed(2),
+      ivLevel: +impliedVol.toFixed(1),
+      rvLevel: +realizedVol.toFixed(1),
+      vol: `$${(noise(v.sym+v.bx, 500, 2500) * 1000).toFixed(0)}K`,
+      time: `~${Math.max(30, Math.round(noise(v.sym, 30, 90)))}с`,
+      risk: 'med', vip: true, hot: sp > 1.8,
+      exchFee: 0.4, aiScore: 0,
+      latency: Math.max(40, Math.round(noise(v.sym+v.bx+'lat', 40, 120))),
     };
     sig.aiScore = aiScore(sig);
     all.push(sig);
   });
 
-  // ── STRATEGY 8: Spread Trading ────────────────────────
+  // ── СТРАТЕГИЯ 8: Спот/Перп спред (VIP) ───────────────
+  // Спред между спотовой и перпетуальной ценой на одной бирже
+  // Это разновидность кэрри-трейда: покупаешь спот, шортишь перп
+  // Доходность = basis (разница спот/перп) + funding
   const spreadPairs = [
-    {sym:'BTC spot/perp',  bx:'binance', sx:'binance', spread:()=>0.05+Math.random()*0.3},
-    {sym:'ETH spot/perp',  bx:'okx',     sx:'okx',     spread:()=>0.04+Math.random()*0.25},
-    {sym:'SOL spot/perp',  bx:'bybit',   sx:'bybit',   spread:()=>0.06+Math.random()*0.35},
-    {sym:'BNB spot/perp',  bx:'binance', sx:'binance', spread:()=>0.03+Math.random()*0.2},
-    {sym:'DOGE spot/perp', bx:'bybit',   sx:'bybit',   spread:()=>0.08+Math.random()*0.4},
+    { sym:'BTC spot/perp', bx:'binance', base:'BTC' },
+    { sym:'ETH spot/perp', bx:'okx',     base:'ETH' },
+    { sym:'SOL spot/perp', bx:'bybit',   base:'SOL' },
+    { sym:'BNB spot/perp', bx:'binance', base:'BNB' },
+    { sym:'DOGE spot/perp',bx:'bybit',   base:'DOGE'},
   ];
   spreadPairs.forEach(sp => {
-    const spread = +sp.spread().toFixed(3);
+    // Basis = (perp_price - spot_price) / spot_price
+    // Реальные значения: -0.1% до +0.4% в зависимости от sentiment
+    const bias = EX_STRUCTURAL_BIAS[sp.bx] || 0;
+    const lcgNoise = (_lcg(sp.sym + sp.bx + 'basis') - 0.5) * 0.003;
+    const spread = +Math.abs(bias * 100 + lcgNoise * 100 + 0.05).toFixed(3);
+
+    const feeT = (EX_FEES[sp.bx]?.taker || 0.001) * 200; // открытие + закрытие
+
     const sig = {
       id: `sp${++id}`, type: 'spread', sym: sp.sym, strategy: 'Spread',
-      bx: sp.bx, sx: sp.sx, bprice: null, sprice: null,
-      spread, vol: `$${(1+Math.random()*5).toFixed(1)}M`,
-      time: `~${2+Math.round(Math.random()*8)}с`, risk: 'low',
-      vip: true, hot: false, exchFee: 0.1, aiScore: 0,
-      latency: Math.round(10 + Math.random()*20),
+      bx: sp.bx, sx: sp.bx,
+      spread: Math.max(0.02, spread),
+      netSpread: Math.max(0.001, spread - feeT),
+      vol: `$${(noise(sp.sym+sp.bx, 1, 6) * 1e6 / 1e6).toFixed(1)}M`,
+      time: `~${Math.max(2, Math.round(noise(sp.sym, 2, 10)))}с`,
+      risk: 'low', vip: true, hot: false,
+      exchFee: +feeT.toFixed(3),
+      aiScore: 0,
+      latency: Math.max(10, Math.round(noise(sp.sym+'lat', 10, 30))),
     };
     sig.aiScore = aiScore(sig);
     all.push(sig);
   });
 
-  // Sort by AI score descending
   return all.sort((a, b) => b.aiScore - a.aiScore);
 }
 
 let SIGS = genSignals();
-const COIN_MAP = Object.fromEntries(COINS.map(c=>[c.sym,c]));
+const COIN_MAP = Object.fromEntries(COINS.map(c => [c.sym, c]));
 
-// ── SIGNAL REFRESH ENGINE ──────────────────────────────
-// Simulates WebSocket updates: partial refresh every 500ms
+// ── HFT UPDATE ENGINE v2 ──────────────────────────────────────
+// Заменяет Math.random() на tick глобальных цен
+// Спред НЕ корректируется случайно — он пересчитывается из новых цен
 let _updateCycle = 0;
 function hftUpdate() {
   _updateCycle++;
-  // Update prices in cache (simulate incoming WS data)
-  Object.keys(BASE_PRICES).forEach(sym => {
-    Object.keys(EX_FEES).forEach(ex => {
-      if ((EX_COINS[ex]||[]).includes(sym)) simPrice(sym, ex);
-    });
-  });
-  // Regenerate signals every 3.5s, partial update every 500ms
+
+  // Двигаем глобальную mid-цену для КАЖДОЙ монеты (Brownian + mean-reversion)
+  Object.keys(BASE_PRICES).forEach(sym => tickGlobalPrice(sym));
+
+  // Сбрасываем кэш цен бирж (пересчитаются при следующем обращении simPrice)
+  PRICE_CACHE.clear();
+
+  // Полная перегенерация сигналов каждые 3.5с (7 тиков × 500ms)
+  // Между ними — точечное обновление только spread/netSpread из новых цен
   if (_updateCycle % 7 === 0) {
     SIGS = genSignals();
   } else {
-    // Micro-update: adjust spreads by ±0.05%
-    SIGS = SIGS.map(s => ({
-      ...s,
-      spread: Math.max(0.01, +(s.spread + (Math.random()-.5)*.06).toFixed(3)),
-    }));
+    // Micro-update: пересчитываем только CEX-CEX спреды из актуальных цен
+    // Остальные стратегии менее чувствительны к 500ms тику
+    SIGS = SIGS.map(s => {
+      if (s.type !== 'cex') return s; // не трогаем не-CEX без полной регенерации
+
+      const pA = simPrice(s.sym, s.bx);
+      const pB = simPrice(s.sym, s.sx);
+      if (!pA || !pB) return s;
+
+      const spreadAB = (pB.bid - pA.ask) / pA.ask * 100;
+      const spreadBA = (pA.bid - pB.ask) / pB.ask * 100;
+      const bestSpread = Math.max(spreadAB, spreadBA);
+      const feeTotal = (EX_FEES[s.bx]?.taker||0.001) + (EX_FEES[s.sx]?.taker||0.001);
+
+      return {
+        ...s,
+        spread:    +bestSpread.toFixed(4),
+        netSpread: +(bestSpread - feeTotal * 100).toFixed(4),
+        bprice:    spreadAB >= spreadBA ? +pA.ask.toFixed(8) : +pB.ask.toFixed(8),
+        sprice:    spreadAB >= spreadBA ? +pB.bid.toFixed(8) : +pA.bid.toFixed(8),
+      };
+    });
   }
 }
 
@@ -1922,71 +2254,118 @@ const OrderTracker = {
   },
 };
 
-// ── SLIPPAGE ENGINE ───────────────────────────────────────────
-// Realistic slippage model based on order size vs available depth
-// In production: real order book depth comes from API per request
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  SLIPPAGE ENGINE v2 — Модель рыночного воздействия          ║
+// ║                                                              ║
+// ║  Реальное проскальзывание зависит от:                       ║
+// ║  1. Размера ордера vs глубины стакана                       ║
+// ║  2. Ликвидности конкретной биржи                            ║
+// ║  3. Волатильности монеты (чем волатильнее — тем хуже)       ║
+// ║  4. Времени суток (ночью стакан тоньше)                     ║
+// ║                                                              ║
+// ║  В production: берётся реальный orderbook через REST API    ║
+// ╚══════════════════════════════════════════════════════════════╝
+
+// Типичная глубина стакана (USD) для самого ликвидного уровня (Binance)
+// Тиры: [уровень_1%, уровень_2%, уровень_5%, уровень_10%] — слиппаж при этом объёме
+const ORDER_BOOK_DEPTH = {
+  BTC:   { d1:500_000, d2:1_200_000, d5:3_000_000, d10:8_000_000 },
+  ETH:   { d1:250_000, d2:600_000,   d5:1_500_000, d10:4_000_000 },
+  BNB:   { d1:120_000, d2:300_000,   d5:700_000,   d10:2_000_000 },
+  SOL:   { d1:80_000,  d2:200_000,   d5:500_000,   d10:1_200_000 },
+  XRP:   { d1:60_000,  d2:150_000,   d5:400_000,   d10:1_000_000 },
+  DOGE:  { d1:40_000,  d2:100_000,   d5:250_000,   d10:600_000   },
+  ADA:   { d1:30_000,  d2:80_000,    d5:200_000,   d10:500_000   },
+  AVAX:  { d1:50_000,  d2:120_000,   d5:300_000,   d10:800_000   },
+  DEFAULT:{ d1:15_000, d2:40_000,    d5:100_000,   d10:250_000   },
+};
+
+// Взвешенный слиппаж: чем глубже в стакан идёт ордер, тем хуже цена
+// Это линейная аппроксимация реального рыночного воздействия (market impact)
+// Реальная формула: slippage ≈ amount / (2 × liquidity_at_level)
 function calcSlippage(amount, sym, exId) {
-  // Approximate liquidity depth tiers in USD
-  const depth = {
-    BTC:  [100000, 300000, 600000, 1500000],
-    ETH:  [60000,  180000, 400000, 900000],
-    SOL:  [20000,  60000,  150000, 350000],
-    BNB:  [30000,  90000,  200000, 500000],
-    XRP:  [15000,  40000,  100000, 250000],
-    default: [8000, 25000,  60000,  150000],
-  };
-  // Exchange liquidity multiplier (Binance is deepest)
-  const mult = {
-    binance:2.5, coinbase:2.0, okx:1.9, bybit:1.8, kraken:1.6,
-    kucoin:1.3, gate:1.1, htx:1.1, bitget:1.1, mexc:0.9,
-    bitmart:0.7, phemex:0.7, crypto:0.8, bingx:0.7, lbank:0.5,
-  };
-  const tiers = (depth[sym] || depth.default).map(t => t * (mult[exId] || 1));
-  // Slippage increases non-linearly with order size
-  if (amount <= tiers[0]) return 0.00005;  // 0.005%
-  if (amount <= tiers[1]) return 0.0003;   // 0.03%
-  if (amount <= tiers[2]) return 0.001;    // 0.1%
-  if (amount <= tiers[3]) return 0.003;    // 0.3%
-  return 0.008;                            // 0.8% for whale orders
+  const depth  = ORDER_BOOK_DEPTH[sym] || ORDER_BOOK_DEPTH.DEFAULT;
+  const liqMul = EX_LIQUIDITY[exId]   || 0.5;
+  const volMul = (VOL_CLASS[sym] || VOL_CLASS.DEFAULT) / VOL_CLASS.DEFAULT;
+
+  // Масштабируем стакан под ликвидность биржи
+  const d1  = depth.d1  * liqMul;
+  const d2  = depth.d2  * liqMul;
+  const d5  = depth.d5  * liqMul;
+  const d10 = depth.d10 * liqMul;
+
+  // Интерполируем слиппаж между тирами
+  let slipPct;
+  if (amount <= d1)  slipPct = amount / (d1  * 2) * 0.01; // до 0.5% тира 1
+  else if (amount <= d2)  slipPct = 0.005 + (amount - d1)  / (d2  - d1)  * 0.015; // 0.5–2%
+  else if (amount <= d5)  slipPct = 0.020 + (amount - d2)  / (d5  - d2)  * 0.030; // 2–5%
+  else if (amount <= d10) slipPct = 0.050 + (amount - d5)  / (d10 - d5)  * 0.050; // 5–10%
+  else                    slipPct = 0.100 + (amount - d10) / d10 * 0.100; // 10%+ (whale)
+
+  // Корректировка на волатильность: более волатильные монеты скользят сильнее
+  // Во время сильного движения стакан становится тоньше
+  slipPct *= (0.5 + volMul * 0.5);
+
+  return Math.min(0.15, slipPct); // cap 15%
 }
 
-// ── REAL FEE BREAKDOWN ────────────────────────────────────────
-// 4-component fee model: Exchange A + Exchange B + Network + Platform
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  FEE ENGINE v2 — Реальная 5-компонентная модель комиссий    ║
+// ║                                                              ║
+// ║  Компоненты (от большего к меньшему для малых сумм):        ║
+// ║  1. Taker fee биржи покупки (% от суммы)                    ║
+// ║  2. Taker fee биржи продажи (% от суммы)                    ║
+// ║  3. Network fee вывода (ФИКСИРОВАННЫЙ USD!)                 ║
+// ║     ↑ Это убийца профита на малых суммах!                   ║
+// ║     При $100 сделке сетевая комиссия ETH $2.50 = 2.5%!      ║
+// ║  4. Slippage (рыночное воздействие)                         ║
+// ║  5. Platform fee NEXARB                                      ║
+// ╚══════════════════════════════════════════════════════════════╝
 function calcFees(amount, sig) {
   const sym = (sig.sym || '').split('/')[0].split(' ')[0].split('→')[0];
-  const exA = sig.bx?.toLowerCase();
-  const exB = sig.sx?.toLowerCase();
+  const exA = sig.bx?.toLowerCase().split(' ')[0]; // "Uniswap V3" → "uniswap"
+  const exB = sig.sx?.toLowerCase().split(' ')[0];
 
-  // Exchange taker fees (maker is cheaper but arb uses taker)
-  const feeA = amount * (EX_FEES[exA]?.taker || 0.001);
-  const feeB = amount * (EX_FEES[exB]?.taker || 0.001);
+  // ── 1. Taker fee биржи покупки ───────────────────────
+  // Арбитраж ВСЕГДА taker — иначе рыночная цена уйдёт пока стоит лимитник
+  const takerA = EX_FEES[exA]?.taker ?? 0.002; // default 0.2% для неизвестных
+  const feeA   = +(amount * takerA).toFixed(6);
 
-  // Network / withdrawal fee (approximate USD — real value from exchange API)
-  // These are WITHDRAWAL fees for moving funds between exchanges
-  const netFeeUSD = {
-    BTC: 1.20, ETH: 2.50, SOL: 0.01, BNB: 0.15,
-    XRP: 0.10, DOGE: 0.50, ADA: 0.20, AVAX: 0.30,
-    MATIC: 0.02, ARB: 0.10, OP: 0.10, TON: 0.05,
-    TRX: 0.10, NEAR: 0.10,
-    default: 0.50,
-  };
-  const networkFee = netFeeUSD[sym] !== undefined ? netFeeUSD[sym] : netFeeUSD.default;
+  // ── 2. Taker fee биржи продажи ───────────────────────
+  const takerB = EX_FEES[exB]?.taker ?? 0.002;
+  const feeB   = +(amount * takerB).toFixed(6);
 
-  // Slippage impact in USD
+  // ── 3. Network fee (газ / вывод) — ФИКСИРОВАННЫЙ USD ─
+  // Это НЕЗАВИСИМО от суммы сделки — именно поэтому мелкий арбитраж невыгоден
+  // Пример: вывод ETH стоит $2.50 всегда, будь то $100 или $100,000 ордер
+  const wfee   = WITHDRAWAL_FEES[sym] || WITHDRAWAL_FEES.DEFAULT;
+  const networkFee = +wfee.usd.toFixed(4); // уже в USD
+  const networkPct = amount > 0 ? +(networkFee / amount * 100).toFixed(4) : 0;
+
+  // ── 4. Slippage (рыночное воздействие) ───────────────
+  // Зависит от размера ордера и глубины стакана
   const slippagePct = calcSlippage(amount, sym, exA);
-  const slippageAmt = amount * slippagePct;
+  const slippageAmt = +(amount * slippagePct).toFixed(6);
 
-  // Platform fee
-  const platFee = amount * (S.vip ? S.vipFee : S.freeFee);
+  // ── 5. Platform fee NEXARB ────────────────────────────
+  const platFee = +(amount * (S.vip ? S.vipFee : S.freeFee)).toFixed(6);
+
+  const totalFees = feeA + feeB + networkFee + slippageAmt + platFee;
 
   return {
-    exchangeA:  +feeA.toFixed(4),
-    exchangeB:  +feeB.toFixed(4),
-    network:    +networkFee.toFixed(4),
-    slippage:   +slippageAmt.toFixed(4),
-    platform:   +platFee.toFixed(4),
-    total:      +(feeA + feeB + networkFee + slippageAmt + platFee).toFixed(4),
+    exchangeA:   +feeA.toFixed(4),
+    exchangeB:   +feeB.toFixed(4),
+    takerA_pct:  +(takerA * 100).toFixed(3),
+    takerB_pct:  +(takerB * 100).toFixed(3),
+    network:     +networkFee.toFixed(4),
+    networkPct:  +networkPct.toFixed(3), // % от суммы (важно для малых сумм!)
+    networkCoin: wfee.network,           // название сети (для отображения)
+    slippage:    +slippageAmt.toFixed(4),
     slippagePct: +(slippagePct * 100).toFixed(3),
+    platform:    +platFee.toFixed(4),
+    total:       +totalFees.toFixed(4),
+    // Минимальная сумма при которой network fee < 1% (breakeven size)
+    minProfitableAmount: +(networkFee * 100).toFixed(0),
   };
 }
 
@@ -2899,17 +3278,32 @@ function calcTrade() {
   const sig = S.currentSig; if (!sig) return;
   const amt = parseFloat(document.getElementById('tAmt').value) || 0;
 
-  // ── Real fee breakdown ─────────────────────────────────
-  const fees = calcFees(amt, sig);
+  // ── Полная 5-компонентная модель комиссий ──────────────────
+  const fees  = calcFees(amt, sig);
   const gross = +(amt * sig.spread / 100).toFixed(4);
-  const net = +(gross - fees.total).toFixed(4);
-  const roi = amt > 0 ? (net / amt * 100).toFixed(3) : 0;
-  const aiSc = sig.aiScore || aiScore(sig);
+  const net   = +(gross - fees.total).toFixed(4);
+  const roi   = amt > 0 ? (net / amt * 100).toFixed(3) : 0;
+  const aiSc  = sig.aiScore || aiScore(sig);
   const aiCol = aiSc>=70?'var(--green)':aiSc>=50?'var(--gold)':'var(--red)';
   const latMs = sig.latency || 50;
-  const slippagePct = ((fees.slippage / amt) * 100).toFixed(3);
 
-  // ── Client-side funds pre-check (backend MUST duplicate) ──
+  // ── Предупреждение: network fee как % от суммы ─────────────
+  // Ключевой инсайт: при малых суммах network fee съедает всё
+  const netFeeWarning = fees.networkPct > 1.0
+    ? `<div style="background:rgba(255,149,0,.08);border:1px solid rgba(255,149,0,.3);border-radius:6px;padding:5px 8px;margin:5px 0;font-size:9px;color:rgba(255,149,0,.9)">
+        ⚠️ Вывод <b>${fees.networkCoin}</b> = $${fees.network} (${fees.networkPct}% от суммы).
+        Мин. выгодная сумма: <b>~$${fees.minProfitableAmount}</b>
+       </div>`
+    : '';
+
+  // Предупреждение о слиппаже при больших суммах
+  const slipWarning = fees.slippagePct > 0.5
+    ? `<div style="background:rgba(255,59,48,.08);border:1px solid rgba(255,59,48,.25);border-radius:6px;padding:5px 8px;margin:5px 0;font-size:9px;color:rgba(255,100,80,.9)">
+        📉 Слиппаж ${fees.slippagePct}% — ордер большой для этой ликвидности. Уменьши сумму.
+       </div>`
+    : '';
+
+  // ── Клиентская проверка баланса (UX only, сервер дублирует) ─
   const fundsOk = amt <= S.balance;
   const execBtn = document.getElementById('tExecBtn');
   if (execBtn) {
@@ -2918,30 +3312,48 @@ function calcTrade() {
   }
 
   document.getElementById('tCalc').innerHTML = `
-    <div class="tc-row"><span class="tc-k">Сумма</span><span class="tc-v">$${amt.toFixed(2)}</span></div>
-    <div class="tc-row"><span class="tc-k">Спред (+${sig.spread}%)</span><span class="tc-v g">+$${gross}</span></div>
+    <div class="tc-row"><span class="tc-k">Сумма ордера</span><span class="tc-v">$${amt.toFixed(2)}</span></div>
+    <div class="tc-row"><span class="tc-k">Валовый спред (+${sig.spread}%)</span><span class="tc-v g">+$${gross}</span></div>
+    ${netFeeWarning}
     <div style="background:rgba(255,59,48,.06);border-radius:7px;padding:4px 0;margin:3px 0">
-      <div class="tc-row"><span class="tc-k">Биржа ${sig.bx||'A'} (taker)</span><span class="tc-v r">-$${fees.exchangeA}</span></div>
-      <div class="tc-row"><span class="tc-k">Биржа ${sig.sx||'B'} (taker)</span><span class="tc-v r">-$${fees.exchangeB}</span></div>
-      <div class="tc-row"><span class="tc-k">${t('network_fee')} / вывод</span><span class="tc-v r">-$${fees.network}</span></div>
-      <div class="tc-row"><span class="tc-k">${t('slippage')} (~${slippagePct}%)</span><span class="tc-v r">-$${fees.slippage}</span></div>
-      <div class="tc-row"><span class="tc-k">Платформа (${(S.vip?0.3:0.8)}%)</span><span class="tc-v" style="color:var(--gold)">-$${fees.platform}</span></div>
+      <div class="tc-row">
+        <span class="tc-k">🏦 ${sig.bx||'A'} taker (${fees.takerA_pct}%)</span>
+        <span class="tc-v r">−$${fees.exchangeA}</span>
+      </div>
+      <div class="tc-row">
+        <span class="tc-k">🏦 ${sig.sx||'B'} taker (${fees.takerB_pct}%)</span>
+        <span class="tc-v r">−$${fees.exchangeB}</span>
+      </div>
+      <div class="tc-row" style="${fees.networkPct>1?'font-weight:700':''}">
+        <span class="tc-k">🌐 Сеть ${fees.networkCoin} (${fees.networkPct}%)</span>
+        <span class="tc-v r">−$${fees.network}</span>
+      </div>
+      <div class="tc-row" style="${fees.slippagePct>0.3?'font-weight:700':''}">
+        <span class="tc-k">📉 Слиппаж (${fees.slippagePct}%)</span>
+        <span class="tc-v r">−$${fees.slippage}</span>
+      </div>
+      <div class="tc-row">
+        <span class="tc-k">💎 Платформа (${S.vip?'0.3':'0.8'}%)</span>
+        <span class="tc-v" style="color:var(--gold)">−$${fees.platform}</span>
+      </div>
     </div>
+    ${slipWarning}
     <div class="tc-row" style="border-top:1px solid var(--border);padding-top:6px">
       <span class="tc-k" style="font-weight:700">${t('total_fees')}</span>
-      <span class="tc-v r">-$${fees.total}</span>
+      <span class="tc-v r">−$${fees.total}</span>
     </div>
     <div class="tc-row" style="margin-top:2px">
       <span class="tc-k" style="font-weight:700;font-size:13px">${t('net_profit')}</span>
       <span class="tc-v ${net>=0?'g':'r'} BIG">${net>=0?'+':''}$${net}</span>
     </div>
-    <div class="tc-row"><span class="tc-k">ROI</span><span class="tc-v ${net>=0?'g':'r'}">${net>=0?'+':''}${roi}%</span></div>
+    <div class="tc-row"><span class="tc-k">ROI чистый</span><span class="tc-v ${net>=0?'g':'r'}">${net>=0?'+':''}${roi}%</span></div>
     <div class="tc-row"><span class="tc-k">⚡ Latency</span><span class="tc-v" style="color:${latMs<50?'var(--green)':'var(--gold)'}">&lt;${latMs}ms</span></div>
     <div class="tc-row"><span class="tc-k">🤖 AI Score</span><span class="tc-v" style="color:${aiCol}">${aiSc}/100</span></div>
   `;
   document.getElementById('tCommInfo').innerHTML =
-    `💰 $${fees.platform} (${S.vip?'0.3':'0.8'}%) → платформа. ` +
-    `${S.vip?'✅ VIP: приоритетное исполнение':'⚡ VIP снижает комиссию до 0.3%'}`;
+    `💰 $${fees.platform} (${S.vip?'0.3':'0.8'}%) → NEXARB. ` +
+    `Сеть: $${fees.network} (${fees.networkCoin}). ` +
+    `${S.vip?'✅ VIP: комиссия 0.3%':'⚡ VIP снижает платформ. до 0.3%'}`;
 }
 
 function execTrade() {

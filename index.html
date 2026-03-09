@@ -1905,6 +1905,7 @@ const _ui = {
 //   Локально       → http://localhost:8000
 // Чтобы переопределить вручную — задай window.NEXARB_API до загрузки:
 //   <script>window.NEXARB_API='https://nexarb-api-xxx.railway.app/api/v1'</script>
+window.NEXARB_API = 'https://nexarb-api.onrender.com/api/v1';
 const API_BASE = (() => {
   if (window.NEXARB_API) return window.NEXARB_API;
   const { protocol, hostname, port } = location;

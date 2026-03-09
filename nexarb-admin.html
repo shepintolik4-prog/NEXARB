@@ -397,6 +397,9 @@ select.inp { cursor:pointer; }
   </nav>
   <div class="sidebar-bottom">
     <div id="modeLabel" class="mode-badge mode-demo">DEMO</div>
+    <button id="toggleModeBtn" onclick="toggleDemoMode()" style="margin-left:8px;padding:4px 12px;border-radius:6px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.05);color:var(--text);font-size:11px;cursor:pointer;font-family:var(--font)">
+      Переключить режим
+    </button>
     <div id="apiUrl" style="margin-top:4px; word-break:break-all"></div>
   </div>
 </aside>
@@ -406,6 +409,11 @@ select.inp { cursor:pointer; }
   <!-- TOPBAR -->
   <div class="topbar">
     <div class="tb-title" id="pageTitle">Дашборд</div>
+    <input class="tb-input" id="apiUrlInput"
+           type="text" placeholder="http://localhost:8000"
+           title="URL сервера (сохраняется в localStorage)"
+           style="max-width:200px;font-size:11px;font-family:var(--mono)"
+           onchange="changeApiUrl(this.value)">
     <input class="tb-input" id="adminTokenInput"
            type="password" placeholder="X-Admin-Token..."
            onchange="saveToken(this.value)">
@@ -722,7 +730,11 @@ select.inp { cursor:pointer; }
 // ═══════════════════════════════════════════════════════════════
 //  STATE
 // ═══════════════════════════════════════════════════════════════
-let API_BASE = localStorage.getItem('nexarb_api') || 'http://localhost:8000';
+let API_BASE = localStorage.getItem('nexarb_api') || (() => {
+  const { protocol, hostname, port } = location;
+  if (hostname === 'localhost' || hostname === '127.0.0.1') return 'http://localhost:8000';
+  return `${protocol}//${hostname}${port ? ':' + port : ''}`;
+})();
 let ADMIN_TOKEN = localStorage.getItem('nexarb_admin_token') || '';
 let _config = {};
 let _usersPage = 1;
@@ -733,19 +745,64 @@ let _tradesPage = 1;
 // ═══════════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
   const saved = localStorage.getItem('nexarb_admin_token') || '';
-  if (saved) document.getElementById('adminTokenInput').value = saved;
+  if (saved) {
+    document.getElementById('adminTokenInput').value = saved;
+    ADMIN_TOKEN = saved;
+  }
 
   const savedUrl = localStorage.getItem('nexarb_api') || '';
   if (savedUrl) API_BASE = savedUrl;
 
+  // Заполняем оба элемента текущим URL
+  document.getElementById('apiUrlInput').value = API_BASE;
   document.getElementById('apiUrl').textContent = API_BASE;
 
+  // Автоподключение если токен есть — без задержки
   if (ADMIN_TOKEN) connectApi();
 });
 
 function saveToken(val) {
   ADMIN_TOKEN = val.trim();
   localStorage.setItem('nexarb_admin_token', ADMIN_TOKEN);
+}
+
+function changeApiUrl(val) {
+  val = (val || '').trim().replace(/\/+$/, '');
+  if (!val) return;
+  API_BASE = val;
+  localStorage.setItem('nexarb_api', val);
+  document.getElementById('apiUrl').textContent = val;
+  document.getElementById('apiUrlInput').value  = val;
+}
+
+// ── ПЕРЕКЛЮЧЕНИЕ DEMO/PROD РЕЖИМА ────────────────────────────
+async function toggleDemoMode() {
+  const isDemo = document.getElementById('modeLabel').textContent === 'DEMO';
+  const newMode = isDemo ? 'PROD' : 'DEMO';
+
+  if (newMode === 'PROD') {
+    const ok = confirm(
+      '⚠️ ПЕРЕКЛЮЧЕНИЕ В PRODUCTION РЕЖИМ\n\n' +
+      'В PROD режиме:\n' +
+      '• Используются РЕАЛЬНЫЕ балансы пользователей\n' +
+      '• Сделки списывают реальные деньги\n' +
+      '• Telegram auth обязателен\n\n' +
+      'Убедись что TG_BOT_TOKEN настроен в server.py\n\n' +
+      'Продолжить?'
+    );
+    if (!ok) return;
+  }
+
+  try {
+    await api('/api/admin/config', 'POST', { demo_mode: newMode === 'DEMO' });
+    document.getElementById('modeLabel').textContent = newMode;
+    document.getElementById('modeLabel').className = 'mode-badge ' + (newMode === 'DEMO' ? 'mode-demo' : 'mode-prod');
+    toast(newMode === 'PROD'
+      ? '🚀 PRODUCTION режим активирован! Реальные деньги.'
+      : '✅ DEMO режим активирован', newMode === 'PROD' ? 'warn' : 'ok');
+  } catch(e) {
+    toast('Ошибка переключения: ' + e.message, 'err');
+  }
 }
 
 async function connectApi() {
@@ -767,6 +824,12 @@ async function connectApi() {
       toast('Подключено к серверу v' + (r.version || '?'), 'ok');
       loadDashboard();
       loadConfig();
+      // Авто-обновление дашборда каждые 30 сек
+      if (!window._autoRefresh) {
+        window._autoRefresh = setInterval(() => {
+          if (ADMIN_TOKEN) loadDashboard();
+        }, 30000);
+      }
     } else {
       throw new Error('bad response');
     }
@@ -785,7 +848,7 @@ async function api(path, method = 'GET', body = null, withToken = true) {
   const headers = { 'Content-Type': 'application/json' };
   if (withToken && ADMIN_TOKEN) headers['X-Admin-Token'] = ADMIN_TOKEN;
 
-  const opts = { method, headers };
+  const opts = { method, headers, signal: AbortSignal.timeout(5000) };
   if (body) opts.body = JSON.stringify(body);
 
   try {
@@ -905,7 +968,7 @@ function renderUsers(data) {
     const daysLeft = u.vip_expires
       ? Math.max(0, Math.floor((u.vip_expires - Date.now()/1000) / 86400))
       : 0;
-    return `<tr>
+    return `<tr data-uid="${u.id}">
       <td>
         <div class="td-name">${esc(u.tg_first_name || 'Без имени')}</div>
         <div class="td-id">${u.id.slice(0,8)}...</div>
@@ -924,6 +987,7 @@ function renderUsers(data) {
           <button class="act-btn" onclick="openUserModal('${u.id}')">Детали</button>
           <button class="act-btn success" onclick="quickGrantVip('${u.id}')">VIP</button>
           <button class="act-btn" onclick="quickSetBalance('${u.id}')">💰</button>
+          <button class="act-btn" style="background:rgba(239,68,68,.15);color:#f87171;border-color:rgba(239,68,68,.3)" onclick="deleteUser('${u.id}','${u.tg_username||u.id}')">🗑</button>
         </div>
       </td>
     </tr>`;
@@ -982,6 +1046,7 @@ async function openUserModal(userId) {
         <button class="btn btn-primary" onclick="quickGrantVip('${u.id}');closeModal('userModal')">👑 Дать VIP месяц</button>
         <button class="btn btn-warn" onclick="quickSetBalance('${u.id}');closeModal('userModal')">💰 Установить баланс</button>
         <button class="btn btn-danger" onclick="revokeVipFor('${u.id}')">❌ Отозвать VIP</button>
+        <button class="btn" style="background:rgba(239,68,68,.2);color:#f87171;border:1px solid rgba(239,68,68,.4);margin-left:auto" onclick="deleteUser('${u.id}','${u.tg_username||u.id}');closeModal('userModal')">🗑 Удалить аккаунт</button>
       </div>
     `;
     document.getElementById('userModal').classList.add('open');
@@ -1047,6 +1112,21 @@ function renderTrades(data) {
 // ═══════════════════════════════════════════════════════════════
 //  VIP MANAGEMENT
 // ═══════════════════════════════════════════════════════════════
+async function deleteUser(userId, username) {
+  if (!confirm('⚠️ Удалить пользователя @' + username + '?\n\nУдалятся все сделки, баланс, VIP.\nОтменить нельзя!')) return;
+  try {
+    await api('/api/admin/users/' + userId, 'DELETE');
+    toast('✅ Пользователь @' + username + ' удалён', 'ok');
+    // Убираем строку из таблицы
+    const row = document.querySelector(`tr[data-uid="${userId}"]`);
+    if (row) row.remove();
+    // Обновляем список
+    setTimeout(loadUsers, 500);
+  } catch(e) {
+    toast('Ошибка: ' + e.message, 'err');
+  }
+}
+
 async function grantVip() {
   const userId = document.getElementById('vipUserId').value.trim();
   const plan   = document.getElementById('vipPlan').value;
@@ -1139,6 +1219,7 @@ async function quickLookup() {
           <button class="btn btn-primary" onclick="quickGrantVip('${u.id}')">👑 Дать VIP</button>
           <button class="btn btn-warn" onclick="quickSetBalance('${u.id}')">💰 Баланс</button>
           <button class="btn btn-danger" onclick="revokeVipFor('${u.id}')">❌ Отозвать VIP</button>
+        <button class="btn" style="background:rgba(239,68,68,.2);color:#f87171;border:1px solid rgba(239,68,68,.4);margin-left:auto" onclick="deleteUser('${u.id}','${u.tg_username||u.id}');closeModal('userModal')">🗑 Удалить аккаунт</button>
         </div>
       </div>
     `;
@@ -1191,6 +1272,7 @@ const PLATFORM_LABELS = {
   fee_free:           'Комиссия FREE (%)',
   fee_vip:            'Комиссия VIP (%)',
   free_trades_max:    'Лимит сделок FREE/день',
+  free_signals_count: 'Сигналов видят не-VIP',
   free_exchanges_max: 'Лимит бирж FREE',
   demo_start_balance: 'Старт баланс DEMO ($)',
   min_trade:          'Мин. сумма сделки ($)',

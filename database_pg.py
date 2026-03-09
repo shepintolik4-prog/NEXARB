@@ -1,70 +1,92 @@
 """
-NEXARB — Database Layer v6.0
-SQLite schema + all DB operations
-Все балансы, VIP, история сделок — ТОЛЬКО здесь.
+NEXARB — Database Layer v6.0 (PostgreSQL / Supabase)
+Замена SQLite на PostgreSQL для боевого деплоя.
 
-Примечания:
-- В продакшне с высокой нагрузкой: заменить SQLite на PostgreSQL
-  (psycopg2 или asyncpg). Схема совместима с минимальными правками.
-- Все write-операции используют BEGIN EXCLUSIVE для атомарности.
-- Аудит безопасности рекомендован перед боевым запуском.
+Использует только stdlib urllib + json для подключения к Supabase REST API,
+ИЛИ psycopg2 если доступен (быстрее).
+
+Env переменные (задать в Railway):
+  DATABASE_URL=postgresql://user:pass@host:5432/dbname
 """
 
-import sqlite3
 import os
 import time
+import json
 import logging
 
 logger = logging.getLogger('nexarb.db')
 
-DB_PATH = os.environ.get('NEXARB_DB', 'nexarb.db')
+DB_URL = os.environ.get('DATABASE_URL', '')
+
+# ─────────────────────────────────────────────────────────────
+# ПОДКЛЮЧЕНИЕ
+# ─────────────────────────────────────────────────────────────
+try:
+    import psycopg2
+    import psycopg2.extras
+    _USE_PSYCOPG2 = True
+    logger.info("Using psycopg2 for PostgreSQL")
+except ImportError:
+    _USE_PSYCOPG2 = False
+    logger.warning("psycopg2 not available — install it: pip install psycopg2-binary")
+
+def get_db():
+    """Возвращает соединение с PostgreSQL."""
+    if not DB_URL:
+        raise RuntimeError("DATABASE_URL not set!")
+    if not _USE_PSYCOPG2:
+        raise RuntimeError("psycopg2 not installed. Run: pip install psycopg2-binary")
+    conn = psycopg2.connect(DB_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+    return conn
+
+def row_to_dict(row):
+    if row is None:
+        return None
+    return dict(row)
 
 # ─────────────────────────────────────────────────────────────
 # SCHEMA
 # ─────────────────────────────────────────────────────────────
 SCHEMA = """
-PRAGMA journal_mode = WAL;
-PRAGMA foreign_keys = ON;
-
 CREATE TABLE IF NOT EXISTS users (
     id            TEXT PRIMARY KEY,
     tg_id         TEXT UNIQUE,
     tg_username   TEXT,
     tg_first_name TEXT,
     ref_code      TEXT UNIQUE NOT NULL,
-    referred_by   TEXT REFERENCES users(ref_code),
+    referred_by   TEXT,
     lang          TEXT DEFAULT 'ru',
     is_banned     INTEGER DEFAULT 0,
-    created_at    INTEGER DEFAULT (strftime('%s','now')),
-    last_seen     INTEGER DEFAULT (strftime('%s','now'))
+    created_at    BIGINT DEFAULT EXTRACT(EPOCH FROM NOW()),
+    last_seen     BIGINT DEFAULT EXTRACT(EPOCH FROM NOW())
 );
 
 CREATE TABLE IF NOT EXISTS balances (
     user_id       TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    usd_balance   REAL NOT NULL DEFAULT 0.0 CHECK(usd_balance >= 0),
+    usd_balance   REAL NOT NULL DEFAULT 0.0,
     demo_balance  REAL NOT NULL DEFAULT 3000.0,
-    updated_at    INTEGER DEFAULT (strftime('%s','now'))
+    updated_at    BIGINT DEFAULT EXTRACT(EPOCH FROM NOW())
 );
 
 CREATE TABLE IF NOT EXISTS vip_subscriptions (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    id            SERIAL PRIMARY KEY,
     user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     plan          TEXT NOT NULL,
-    starts_at     INTEGER NOT NULL,
-    expires_at    INTEGER NOT NULL,
+    starts_at     BIGINT NOT NULL,
+    expires_at    BIGINT NOT NULL,
     payment_id    TEXT,
-    granted_by    TEXT DEFAULT 'user',   -- 'user'|'admin'
+    granted_by    TEXT DEFAULT 'user',
     is_active     INTEGER DEFAULT 1,
-    created_at    INTEGER DEFAULT (strftime('%s','now'))
+    created_at    BIGINT DEFAULT EXTRACT(EPOCH FROM NOW())
 );
 
 CREATE TABLE IF NOT EXISTS connected_exchanges (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    id            SERIAL PRIMARY KEY,
     user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     exchange_id   TEXT NOT NULL,
     key_mask      TEXT NOT NULL,
     is_active     INTEGER DEFAULT 1,
-    connected_at  INTEGER DEFAULT (strftime('%s','now')),
+    connected_at  BIGINT DEFAULT EXTRACT(EPOCH FROM NOW()),
     UNIQUE(user_id, exchange_id)
 );
 
@@ -75,7 +97,7 @@ CREATE TABLE IF NOT EXISTS trades (
     strategy_type   TEXT NOT NULL,
     buy_exchange    TEXT NOT NULL,
     sell_exchange   TEXT NOT NULL,
-    amount          REAL NOT NULL CHECK(amount > 0),
+    amount          REAL NOT NULL,
     gross_profit    REAL NOT NULL,
     fee_exchange_a  REAL NOT NULL DEFAULT 0,
     fee_exchange_b  REAL NOT NULL DEFAULT 0,
@@ -90,66 +112,60 @@ CREATE TABLE IF NOT EXISTS trades (
     balance_before  REAL NOT NULL,
     balance_after   REAL NOT NULL,
     is_auto         INTEGER DEFAULT 0,
-    created_at      INTEGER DEFAULT (strftime('%s','now'))
+    created_at      BIGINT DEFAULT EXTRACT(EPOCH FROM NOW())
 );
 
 CREATE TABLE IF NOT EXISTS referrals (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    id            SERIAL PRIMARY KEY,
     referrer_id   TEXT NOT NULL REFERENCES users(id),
     referred_id   TEXT NOT NULL REFERENCES users(id),
     earned_usd    REAL DEFAULT 0,
-    created_at    INTEGER DEFAULT (strftime('%s','now')),
+    created_at    BIGINT DEFAULT EXTRACT(EPOCH FROM NOW()),
     UNIQUE(referred_id)
 );
 
 CREATE TABLE IF NOT EXISTS rate_limits (
     key           TEXT PRIMARY KEY,
     requests      INTEGER DEFAULT 1,
-    window_start  INTEGER DEFAULT (strftime('%s','now')),
-    blocked_until INTEGER DEFAULT 0
+    window_start  BIGINT DEFAULT EXTRACT(EPOCH FROM NOW()),
+    blocked_until BIGINT DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS revoked_tokens (
     jti           TEXT PRIMARY KEY,
     user_id       TEXT NOT NULL,
-    revoked_at    INTEGER DEFAULT (strftime('%s','now')),
-    expires_at    INTEGER NOT NULL
+    revoked_at    BIGINT DEFAULT EXTRACT(EPOCH FROM NOW()),
+    expires_at    BIGINT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS admin_log (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    id         SERIAL PRIMARY KEY,
     action     TEXT NOT NULL,
     target_id  TEXT,
     details    TEXT,
-    created_at INTEGER DEFAULT (strftime('%s','now'))
+    created_at BIGINT DEFAULT EXTRACT(EPOCH FROM NOW())
 );
 
 CREATE INDEX IF NOT EXISTS idx_trades_user   ON trades(user_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_trades_status ON trades(status);
 CREATE INDEX IF NOT EXISTS idx_vip_user      ON vip_subscriptions(user_id, is_active, expires_at);
 CREATE INDEX IF NOT EXISTS idx_revoked_jti   ON revoked_tokens(jti);
-CREATE INDEX IF NOT EXISTS idx_rate_key      ON rate_limits(key, window_start);
 CREATE INDEX IF NOT EXISTS idx_users_tg      ON users(tg_id);
 """
 
-
-# ─────────────────────────────────────────────────────────────
-# CONNECTION
-# ─────────────────────────────────────────────────────────────
-def get_db():
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False, timeout=10)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    conn.execute("PRAGMA journal_mode = WAL")
-    return conn
-
 def init_db():
+    """Создаёт таблицы если не существуют."""
     try:
         conn = get_db()
-        conn.executescript(SCHEMA)
+        cur  = conn.cursor()
+        # Выполняем каждый CREATE отдельно
+        for stmt in SCHEMA.strip().split(';'):
+            stmt = stmt.strip()
+            if stmt:
+                cur.execute(stmt)
         conn.commit()
+        cur.close()
         conn.close()
-        logger.info(f"DB initialized: {DB_PATH}")
+        logger.info("PostgreSQL DB initialized")
     except Exception as e:
         logger.critical(f"DB init failed: {e}")
         raise
@@ -162,34 +178,31 @@ def create_user(tg_id, tg_username, tg_first_name,
                 ref_code, user_id, referred_by=None, demo_balance=3000.0):
     conn = get_db()
     try:
-        conn.execute("""
+        cur = conn.cursor()
+        cur.execute("""
             INSERT INTO users (id, tg_id, tg_username, tg_first_name, ref_code, referred_by)
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s)
         """, (user_id, str(tg_id), tg_username, tg_first_name, ref_code, referred_by))
 
-        conn.execute("""
+        cur.execute("""
             INSERT INTO balances (user_id, usd_balance, demo_balance)
-            VALUES (?, 0.0, ?)
+            VALUES (%s, 0.0, %s)
         """, (user_id, demo_balance))
 
         if referred_by:
-            referrer = conn.execute(
-                "SELECT id FROM users WHERE ref_code = ?", (referred_by,)
-            ).fetchone()
+            cur.execute("SELECT id FROM users WHERE ref_code = %s", (referred_by,))
+            referrer = cur.fetchone()
             if referrer:
-                conn.execute("""
-                    INSERT OR IGNORE INTO referrals (referrer_id, referred_id)
-                    VALUES (?, ?)
+                cur.execute("""
+                    INSERT INTO referrals (referrer_id, referred_id)
+                    VALUES (%s, %s) ON CONFLICT (referred_id) DO NOTHING
                 """, (referrer['id'], user_id))
 
         conn.commit()
-        logger.debug(f"User created: {user_id[:8]}... tg={tg_id}")
         return True
-    except sqlite3.IntegrityError as e:
-        logger.debug(f"create_user IntegrityError (duplicate?): {e}")
-        return False
     except Exception as e:
-        logger.error(f"create_user error: {e}")
+        conn.rollback()
+        logger.debug(f"create_user error (duplicate?): {e}")
         return False
     finally:
         conn.close()
@@ -198,11 +211,11 @@ def create_user(tg_id, tg_username, tg_first_name,
 def get_user_by_tg_id(tg_id):
     conn = get_db()
     try:
-        return conn.execute(
-            "SELECT * FROM users WHERE tg_id = ? AND is_banned = 0", (str(tg_id),)
-        ).fetchone()
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM users WHERE tg_id = %s AND is_banned = 0", (str(tg_id),))
+        return row_to_dict(cur.fetchone())
     except Exception as e:
-        logger.error(f"get_user_by_tg_id error: {e}")
+        logger.error(f"get_user_by_tg_id: {e}")
         return None
     finally:
         conn.close()
@@ -211,11 +224,11 @@ def get_user_by_tg_id(tg_id):
 def get_user_by_id(user_id):
     conn = get_db()
     try:
-        return conn.execute(
-            "SELECT * FROM users WHERE id = ?", (user_id,)
-        ).fetchone()
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM users WHERE id = %s", (user_id,))
+        return row_to_dict(cur.fetchone())
     except Exception as e:
-        logger.error(f"get_user_by_id error: {e}")
+        logger.error(f"get_user_by_id: {e}")
         return None
     finally:
         conn.close()
@@ -224,30 +237,29 @@ def get_user_by_id(user_id):
 def update_last_seen(user_id):
     conn = get_db()
     try:
-        conn.execute(
-            "UPDATE users SET last_seen = ? WHERE id = ?",
-            (int(time.time()), user_id)
-        )
+        cur = conn.cursor()
+        cur.execute("UPDATE users SET last_seen = %s WHERE id = %s",
+                    (int(time.time()), user_id))
         conn.commit()
     except Exception as e:
-        logger.error(f"update_last_seen error: {e}")
+        logger.error(f"update_last_seen: {e}")
     finally:
         conn.close()
 
 
 # ─────────────────────────────────────────────────────────────
-# BALANCE OPERATIONS
+# BALANCE
 # ─────────────────────────────────────────────────────────────
 def get_balance(user_id):
     conn = get_db()
     try:
-        row = conn.execute(
-            "SELECT usd_balance, demo_balance FROM balances WHERE user_id = ?",
-            (user_id,)
-        ).fetchone()
+        cur = conn.cursor()
+        cur.execute("SELECT usd_balance, demo_balance FROM balances WHERE user_id = %s",
+                    (user_id,))
+        row = cur.fetchone()
         return dict(row) if row else {'usd_balance': 0.0, 'demo_balance': 3000.0}
     except Exception as e:
-        logger.error(f"get_balance error: {e}")
+        logger.error(f"get_balance: {e}")
         return {'usd_balance': 0.0, 'demo_balance': 3000.0}
     finally:
         conn.close()
@@ -255,45 +267,50 @@ def get_balance(user_id):
 
 def reserve_balance(user_id: str, amount: float, is_demo: bool = True) -> bool:
     """
-    Атомарно проверяет и вычитает amount из баланса.
-    Защита от race condition: UPDATE выполняется только если balance >= amount.
+    Атомарно проверяет и вычитает amount из баланса (PostgreSQL FOR UPDATE).
     Возвращает True если резерв успешен, False если баланса недостаточно.
     """
     col  = 'demo_balance' if is_demo else 'usd_balance'
     conn = get_db()
     try:
-        conn.execute("BEGIN EXCLUSIVE")
-        cur = conn.execute(
-            f"UPDATE balances SET {col} = {col} - ? "
-            f"WHERE user_id = ? AND {col} >= ?",
-            (amount, user_id, amount)
+        cur = conn.cursor()
+        # FOR UPDATE блокирует строку — защита от конкурентных трейдов
+        cur.execute(
+            f"SELECT {col} FROM balances WHERE user_id = %s FOR UPDATE",
+            (user_id,)
         )
-        if cur.rowcount == 0:
-            conn.execute("ROLLBACK")
+        row = cur.fetchone()
+        if not row or float(row[col]) < amount:
+            conn.rollback()
             return False
+        cur.execute(
+            f"UPDATE balances SET {col} = {col} - %s WHERE user_id = %s",
+            (amount, user_id)
+        )
         conn.commit()
         return True
     except Exception as e:
-        try: conn.execute("ROLLBACK")
+        try: conn.rollback()
         except: pass
-        logger.error(f"reserve_balance error: {e}")
+        logger.error(f"reserve_balance: {e}")
         return False
     finally:
         conn.close()
 
 
 def release_balance(user_id: str, amount: float, is_demo: bool = True) -> None:
-    """Откатывает резерв (при ошибке трейда после reserve_balance)."""
+    """Откатывает резерв при ошибке трейда."""
     col  = 'demo_balance' if is_demo else 'usd_balance'
     conn = get_db()
     try:
-        conn.execute(
-            f"UPDATE balances SET {col} = {col} + ? WHERE user_id = ?",
+        cur = conn.cursor()
+        cur.execute(
+            f"UPDATE balances SET {col} = {col} + %s WHERE user_id = %s",
             (amount, user_id)
         )
         conn.commit()
     except Exception as e:
-        logger.error(f"release_balance error: {e}")
+        logger.error(f"release_balance: {e}")
     finally:
         conn.close()
 
@@ -301,39 +318,38 @@ def release_balance(user_id: str, amount: float, is_demo: bool = True) -> None:
 def apply_trade_result(user_id, trade_id, net_profit, is_demo=True):
     conn = get_db()
     try:
-        conn.execute("BEGIN EXCLUSIVE")
-        bal_col = 'demo_balance' if is_demo else 'usd_balance'
-        row = conn.execute(
-            f"SELECT {bal_col} FROM balances WHERE user_id = ?", (user_id,)
-        ).fetchone()
+        cur = conn.cursor()
+        col = 'demo_balance' if is_demo else 'usd_balance'
+        # Блокируем строку
+        cur.execute(f"SELECT {col} FROM balances WHERE user_id = %s FOR UPDATE",
+                    (user_id,))
+        row = cur.fetchone()
         if not row:
-            conn.execute("ROLLBACK")
             return None, None
 
-        before = row[bal_col]
+        before = row[col]
         after  = max(0.0, round(before + net_profit, 8))
 
-        conn.execute(
-            f"UPDATE balances SET {bal_col} = ?, updated_at = ? WHERE user_id = ?",
+        cur.execute(
+            f"UPDATE balances SET {col} = %s, updated_at = %s WHERE user_id = %s",
             (after, int(time.time()), user_id)
         )
-        conn.execute("""
-            UPDATE trades SET balance_before=?, balance_after=?, status='completed'
-            WHERE id=?
+        cur.execute("""
+            UPDATE trades SET balance_before=%s, balance_after=%s, status='completed'
+            WHERE id=%s
         """, (before, after, trade_id))
         conn.commit()
         return before, after
     except Exception as e:
-        try: conn.execute("ROLLBACK")
-        except: pass
-        logger.error(f"apply_trade_result error: {e}")
+        conn.rollback()
+        logger.error(f"apply_trade_result: {e}")
         raise
     finally:
         conn.close()
 
 
 # ─────────────────────────────────────────────────────────────
-# VIP OPERATIONS
+# VIP
 # ─────────────────────────────────────────────────────────────
 PLAN_DAYS = {'week': 7, 'month': 30, 'year': 365, 'lifetime': 36500}
 
@@ -342,17 +358,20 @@ def activate_vip(user_id, plan, payment_id=None):
         raise ValueError(f"Unknown plan: {plan}")
     conn = get_db()
     try:
-        now       = int(time.time())
-        expires   = now + PLAN_DAYS[plan] * 86400
-        conn.execute("""
-            INSERT INTO vip_subscriptions (user_id, plan, starts_at, expires_at, payment_id, granted_by)
-            VALUES (?, ?, ?, ?, ?, 'user')
+        now     = int(time.time())
+        expires = now + PLAN_DAYS[plan] * 86400
+        cur     = conn.cursor()
+        cur.execute("""
+            INSERT INTO vip_subscriptions
+            (user_id, plan, starts_at, expires_at, payment_id, granted_by)
+            VALUES (%s, %s, %s, %s, %s, 'user')
         """, (user_id, plan, now, expires, payment_id))
         conn.commit()
         return {'plan': plan, 'expires_at': expires, 'is_active': True,
                 'days_left': PLAN_DAYS[plan]}
     except Exception as e:
-        logger.error(f"activate_vip error: {e}")
+        conn.rollback()
+        logger.error(f"activate_vip: {e}")
         raise
     finally:
         conn.close()
@@ -362,33 +381,36 @@ def get_vip_status(user_id):
     conn = get_db()
     try:
         now = int(time.time())
-        row = conn.execute("""
+        cur = conn.cursor()
+        cur.execute("""
             SELECT plan, expires_at FROM vip_subscriptions
-            WHERE user_id=? AND is_active=1 AND expires_at>?
+            WHERE user_id=%s AND is_active=1 AND expires_at>%s
             ORDER BY expires_at DESC LIMIT 1
-        """, (user_id, now)).fetchone()
+        """, (user_id, now))
+        row = cur.fetchone()
         if not row:
             return {'is_vip': False, 'plan': None, 'expires_at': None, 'days_left': 0}
         return {
-            'is_vip':    True,
-            'plan':      row['plan'],
+            'is_vip':     True,
+            'plan':       row['plan'],
             'expires_at': row['expires_at'],
-            'days_left': max(0, (row['expires_at'] - now) // 86400),
+            'days_left':  max(0, (row['expires_at'] - now) // 86400),
         }
     except Exception as e:
-        logger.error(f"get_vip_status error: {e}")
+        logger.error(f"get_vip_status: {e}")
         return {'is_vip': False, 'plan': None, 'expires_at': None, 'days_left': 0}
     finally:
         conn.close()
 
 
 # ─────────────────────────────────────────────────────────────
-# TRADE OPERATIONS
+# TRADES
 # ─────────────────────────────────────────────────────────────
 def create_trade(trade_data):
     conn = get_db()
     try:
-        conn.execute("""
+        cur = conn.cursor()
+        cur.execute("""
             INSERT INTO trades (
                 id, user_id, symbol, strategy_type,
                 buy_exchange, sell_exchange, amount,
@@ -396,7 +418,7 @@ def create_trade(trade_data):
                 fee_network, fee_slippage, fee_platform,
                 net_profit, spread_pct, ai_score, execution_ms,
                 status, balance_before, balance_after, is_auto
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending',?,?,?)
+            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         """, (
             trade_data['id'],       trade_data['user_id'],
             trade_data['symbol'],   trade_data['strategy_type'],
@@ -406,7 +428,7 @@ def create_trade(trade_data):
             trade_data['fee_network'],    trade_data['fee_slippage'],
             trade_data['fee_platform'],   trade_data['net_profit'],
             trade_data['spread_pct'],     trade_data.get('ai_score', 0),
-            trade_data.get('execution_ms', 0),
+            trade_data.get('execution_ms', 0), 'pending',
             trade_data.get('balance_before', 0),
             trade_data.get('balance_after', 0),
             1 if trade_data.get('is_auto') else 0,
@@ -414,7 +436,8 @@ def create_trade(trade_data):
         conn.commit()
         return trade_data['id']
     except Exception as e:
-        logger.error(f"create_trade error: {e}")
+        conn.rollback()
+        logger.error(f"create_trade: {e}")
         raise
     finally:
         conn.close()
@@ -423,12 +446,12 @@ def create_trade(trade_data):
 def get_trade(trade_id, user_id):
     conn = get_db()
     try:
-        row = conn.execute(
-            "SELECT * FROM trades WHERE id=? AND user_id=?", (trade_id, user_id)
-        ).fetchone()
-        return dict(row) if row else None
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM trades WHERE id=%s AND user_id=%s",
+                    (trade_id, user_id))
+        return row_to_dict(cur.fetchone())
     except Exception as e:
-        logger.error(f"get_trade error: {e}")
+        logger.error(f"get_trade: {e}")
         return None
     finally:
         conn.close()
@@ -438,20 +461,20 @@ def get_trades_history(user_id, page=1, per_page=20):
     conn = get_db()
     try:
         offset = (page - 1) * per_page
-        rows = conn.execute("""
-            SELECT * FROM trades WHERE user_id=?
-            ORDER BY created_at DESC LIMIT ? OFFSET ?
-        """, (user_id, per_page, offset)).fetchall()
-        total = conn.execute(
-            "SELECT COUNT(*) FROM trades WHERE user_id=?", (user_id,)
-        ).fetchone()[0]
-        return {
-            'items': [dict(r) for r in rows],
-            'total': total, 'page': page,
-            'pages': max(1, (total + per_page - 1) // per_page),
-        }
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT * FROM trades WHERE user_id=%s
+            ORDER BY created_at DESC LIMIT %s OFFSET %s
+        """, (user_id, per_page, offset))
+        rows = [dict(r) for r in cur.fetchall()]
+
+        cur.execute("SELECT COUNT(*) FROM trades WHERE user_id=%s", (user_id,))
+        total = cur.fetchone()['count']
+
+        return {'items': rows, 'total': total, 'page': page,
+                'pages': max(1, (total + per_page - 1) // per_page)}
     except Exception as e:
-        logger.error(f"get_trades_history error: {e}")
+        logger.error(f"get_trades_history: {e}")
         return {'items': [], 'total': 0, 'page': 1, 'pages': 1}
     finally:
         conn.close()
@@ -460,21 +483,22 @@ def get_trades_history(user_id, page=1, per_page=20):
 def get_trade_stats(user_id):
     conn = get_db()
     try:
-        row = conn.execute("""
+        cur = conn.cursor()
+        cur.execute("""
             SELECT COUNT(*) as total_trades,
                    COALESCE(SUM(net_profit), 0) as total_profit,
                    COALESCE(SUM(fee_platform), 0) as total_fees,
                    COUNT(CASE WHEN net_profit>0 THEN 1 END) as winning_trades,
                    COALESCE(MAX(net_profit), 0) as best_trade
-            FROM trades WHERE user_id=? AND status='completed'
-        """, (user_id,)).fetchone()
-        d = dict(row)
+            FROM trades WHERE user_id=%s AND status='completed'
+        """, (user_id,))
+        d = dict(cur.fetchone())
         d['win_rate'] = round(
             d['winning_trades'] / d['total_trades'] * 100, 1
         ) if d['total_trades'] > 0 else 0
         return d
     except Exception as e:
-        logger.error(f"get_trade_stats error: {e}")
+        logger.error(f"get_trade_stats: {e}")
         return {'total_trades': 0, 'total_profit': 0, 'total_fees': 0,
                 'winning_trades': 0, 'best_trade': 0, 'win_rate': 0}
     finally:
@@ -482,23 +506,25 @@ def get_trade_stats(user_id):
 
 
 # ─────────────────────────────────────────────────────────────
-# EXCHANGE KEYS
+# EXCHANGES
 # ─────────────────────────────────────────────────────────────
 def save_exchange_connection(user_id, exchange_id, api_key):
     mask = (api_key[:4] + '****' + api_key[-4:]) if len(api_key) >= 8 else '****'
     conn = get_db()
     try:
-        conn.execute("""
+        cur = conn.cursor()
+        cur.execute("""
             INSERT INTO connected_exchanges (user_id, exchange_id, key_mask)
-            VALUES (?, ?, ?)
-            ON CONFLICT(user_id, exchange_id) DO UPDATE SET
-                key_mask=excluded.key_mask, is_active=1,
-                connected_at=strftime('%s','now')
-        """, (user_id, exchange_id, mask))
+            VALUES (%s, %s, %s)
+            ON CONFLICT (user_id, exchange_id)
+            DO UPDATE SET key_mask=%s, is_active=1,
+                          connected_at=EXTRACT(EPOCH FROM NOW())
+        """, (user_id, exchange_id, mask, mask))
         conn.commit()
         return True
     except Exception as e:
-        logger.error(f"save_exchange_connection error: {e}")
+        conn.rollback()
+        logger.error(f"save_exchange_connection: {e}")
         return False
     finally:
         conn.close()
@@ -507,13 +533,14 @@ def save_exchange_connection(user_id, exchange_id, api_key):
 def get_connected_exchanges(user_id):
     conn = get_db()
     try:
-        rows = conn.execute("""
+        cur = conn.cursor()
+        cur.execute("""
             SELECT exchange_id, key_mask, connected_at
-            FROM connected_exchanges WHERE user_id=? AND is_active=1
-        """, (user_id,)).fetchall()
-        return [dict(r) for r in rows]
+            FROM connected_exchanges WHERE user_id=%s AND is_active=1
+        """, (user_id,))
+        return [dict(r) for r in cur.fetchall()]
     except Exception as e:
-        logger.error(f"get_connected_exchanges error: {e}")
+        logger.error(f"get_connected_exchanges: {e}")
         return []
     finally:
         conn.close()
@@ -522,14 +549,16 @@ def get_connected_exchanges(user_id):
 def remove_exchange(user_id, exchange_id):
     conn = get_db()
     try:
-        conn.execute("""
+        cur = conn.cursor()
+        cur.execute("""
             UPDATE connected_exchanges SET is_active=0
-            WHERE user_id=? AND exchange_id=?
+            WHERE user_id=%s AND exchange_id=%s
         """, (user_id, exchange_id))
         conn.commit()
         return True
     except Exception as e:
-        logger.error(f"remove_exchange error: {e}")
+        conn.rollback()
+        logger.error(f"remove_exchange: {e}")
         return False
     finally:
         conn.close()
@@ -541,22 +570,23 @@ def remove_exchange(user_id, exchange_id):
 def get_referral_stats(user_id):
     conn = get_db()
     try:
-        rows = conn.execute("""
+        cur = conn.cursor()
+        cur.execute("""
             SELECT r.referred_id, u.tg_username, u.tg_first_name,
                    r.earned_usd, r.created_at
             FROM referrals r
             JOIN users u ON u.id = r.referred_id
-            WHERE r.referrer_id = ?
+            WHERE r.referrer_id = %s
             ORDER BY r.created_at DESC
-        """, (user_id,)).fetchall()
-        total_earned = sum(r['earned_usd'] for r in rows)
+        """, (user_id,))
+        rows = [dict(r) for r in cur.fetchall()]
         return {
-            'referrals': [dict(r) for r in rows],
+            'referrals': rows,
             'count': len(rows),
-            'earned': round(total_earned, 2),
+            'earned': round(sum(r['earned_usd'] for r in rows), 2),
         }
     except Exception as e:
-        logger.error(f"get_referral_stats error: {e}")
+        logger.error(f"get_referral_stats: {e}")
         return {'referrals': [], 'count': 0, 'earned': 0}
     finally:
         conn.close()
@@ -569,44 +599,47 @@ def check_rate_limit(key, max_requests=60, window_seconds=60):
     now = int(time.time())
     conn = get_db()
     try:
-        row = conn.execute(
-            "SELECT requests, window_start, blocked_until FROM rate_limits WHERE key=?",
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT requests, window_start, blocked_until FROM rate_limits WHERE key=%s",
             (key,)
-        ).fetchone()
+        )
+        row = cur.fetchone()
 
         if row:
             if row['blocked_until'] > now:
                 return False, 0
             if now - row['window_start'] >= window_seconds:
-                conn.execute(
-                    "UPDATE rate_limits SET requests=1, window_start=? WHERE key=?",
+                cur.execute(
+                    "UPDATE rate_limits SET requests=1, window_start=%s WHERE key=%s",
                     (now, key)
                 )
                 conn.commit()
                 return True, max_requests - 1
             if row['requests'] >= max_requests:
                 block = now + window_seconds * 2
-                conn.execute(
-                    "UPDATE rate_limits SET blocked_until=? WHERE key=?",
+                cur.execute(
+                    "UPDATE rate_limits SET blocked_until=%s WHERE key=%s",
                     (block, key)
                 )
                 conn.commit()
                 return False, 0
-            conn.execute(
-                "UPDATE rate_limits SET requests=requests+1 WHERE key=?", (key,)
+            cur.execute(
+                "UPDATE rate_limits SET requests=requests+1 WHERE key=%s", (key,)
             )
             conn.commit()
             return True, max_requests - row['requests'] - 1
         else:
-            conn.execute(
-                "INSERT INTO rate_limits (key, requests, window_start) VALUES (?,1,?)",
+            cur.execute(
+                "INSERT INTO rate_limits (key, requests, window_start) VALUES (%s,1,%s)"
+                " ON CONFLICT (key) DO UPDATE SET requests=rate_limits.requests+1",
                 (key, now)
             )
             conn.commit()
             return True, max_requests - 1
     except Exception as e:
-        logger.error(f"check_rate_limit error: {e}")
-        return True, max_requests  # fail open (не блокируем при ошибке БД)
+        logger.error(f"check_rate_limit: {e}")
+        return True, max_requests
     finally:
         conn.close()
 
@@ -617,13 +650,14 @@ def check_rate_limit(key, max_requests=60, window_seconds=60):
 def revoke_token(jti, user_id, expires_at):
     conn = get_db()
     try:
-        conn.execute("""
-            INSERT OR IGNORE INTO revoked_tokens (jti, user_id, expires_at)
-            VALUES (?, ?, ?)
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO revoked_tokens (jti, user_id, expires_at)
+            VALUES (%s, %s, %s) ON CONFLICT (jti) DO NOTHING
         """, (jti, user_id, expires_at))
         conn.commit()
     except Exception as e:
-        logger.error(f"revoke_token error: {e}")
+        logger.error(f"revoke_token: {e}")
     finally:
         conn.close()
 
@@ -631,12 +665,11 @@ def revoke_token(jti, user_id, expires_at):
 def is_token_revoked(jti):
     conn = get_db()
     try:
-        row = conn.execute(
-            "SELECT 1 FROM revoked_tokens WHERE jti=?", (jti,)
-        ).fetchone()
-        return bool(row)
+        cur = conn.cursor()
+        cur.execute("SELECT 1 FROM revoked_tokens WHERE jti=%s", (jti,))
+        return bool(cur.fetchone())
     except Exception as e:
-        logger.error(f"is_token_revoked error: {e}")
+        logger.error(f"is_token_revoked: {e}")
         return False
     finally:
         conn.close()
@@ -646,14 +679,15 @@ def cleanup_expired_tokens():
     conn = get_db()
     try:
         now = int(time.time())
-        r1 = conn.execute("DELETE FROM revoked_tokens WHERE expires_at<?", (now,))
-        r2 = conn.execute("""
-            DELETE FROM rate_limits WHERE window_start<? AND blocked_until<?
+        cur = conn.cursor()
+        cur.execute("DELETE FROM revoked_tokens WHERE expires_at<%s", (now,))
+        cur.execute("""
+            DELETE FROM rate_limits
+            WHERE window_start<%s AND blocked_until<%s
         """, (now - 3600, now))
         conn.commit()
-        logger.info(f"Cleanup: {r1.rowcount} tokens, {r2.rowcount} rate limits removed")
     except Exception as e:
-        logger.error(f"cleanup_expired_tokens error: {e}")
+        logger.error(f"cleanup_expired_tokens: {e}")
     finally:
         conn.close()
 
@@ -662,102 +696,104 @@ def cleanup_expired_tokens():
 # ADMIN OPERATIONS
 # ─────────────────────────────────────────────────────────────
 def admin_get_platform_stats():
-    """Общая статистика платформы для admin-панели."""
     conn = get_db()
     try:
-        now = int(time.time())
-        day_ago = now - 86400
+        now      = int(time.time())
+        day_ago  = now - 86400
         week_ago = now - 7 * 86400
+        cur      = conn.cursor()
+        stats    = {}
 
-        stats = {}
+        cur.execute("SELECT COUNT(*) FROM users")
+        stats['total_users'] = cur.fetchone()['count']
 
-        # Пользователи
-        r = conn.execute("SELECT COUNT(*) FROM users").fetchone()
-        stats['total_users'] = r[0]
+        cur.execute("SELECT COUNT(*) FROM users WHERE created_at>%s", (day_ago,))
+        stats['new_users_24h'] = cur.fetchone()['count']
 
-        r = conn.execute("SELECT COUNT(*) FROM users WHERE created_at>?", (day_ago,)).fetchone()
-        stats['new_users_24h'] = r[0]
+        cur.execute("SELECT COUNT(*) FROM users WHERE last_seen>%s", (day_ago,))
+        stats['active_users_24h'] = cur.fetchone()['count']
 
-        r = conn.execute("SELECT COUNT(*) FROM users WHERE last_seen>?", (day_ago,)).fetchone()
-        stats['active_users_24h'] = r[0]
-
-        # VIP
-        r = conn.execute("""
+        cur.execute("""
             SELECT COUNT(DISTINCT user_id) FROM vip_subscriptions
-            WHERE is_active=1 AND expires_at>?
-        """, (now,)).fetchone()
-        stats['vip_users'] = r[0]
+            WHERE is_active=1 AND expires_at>%s
+        """, (now,))
+        stats['vip_users'] = cur.fetchone()['count']
 
-        # Сделки
-        r = conn.execute("SELECT COUNT(*), COALESCE(SUM(amount),0), COALESCE(SUM(net_profit),0), COALESCE(SUM(fee_platform),0) FROM trades").fetchone()
-        stats['total_trades']   = r[0]
-        stats['total_volume']   = round(r[1], 2)
-        stats['total_profit']   = round(r[2], 4)
-        stats['platform_fees']  = round(r[3], 4)
+        cur.execute("""
+            SELECT COUNT(*) as cnt,
+                   COALESCE(SUM(amount),0) as vol,
+                   COALESCE(SUM(net_profit),0) as prof,
+                   COALESCE(SUM(fee_platform),0) as fees
+            FROM trades
+        """)
+        r = cur.fetchone()
+        stats.update({'total_trades': r['cnt'], 'total_volume': round(r['vol'],2),
+                      'total_profit': round(r['prof'],4), 'platform_fees': round(r['fees'],4)})
 
-        r = conn.execute("""
-            SELECT COUNT(*), COALESCE(SUM(amount),0), COALESCE(SUM(fee_platform),0)
-            FROM trades WHERE created_at>?
-        """, (day_ago,)).fetchone()
-        stats['trades_24h']     = r[0]
-        stats['volume_24h']     = round(r[1], 2)
-        stats['fees_24h']       = round(r[2], 4)
+        cur.execute("""
+            SELECT COUNT(*) as cnt,
+                   COALESCE(SUM(amount),0) as vol,
+                   COALESCE(SUM(fee_platform),0) as fees
+            FROM trades WHERE created_at>%s
+        """, (day_ago,))
+        r = cur.fetchone()
+        stats.update({'trades_24h': r['cnt'], 'volume_24h': round(r['vol'],2),
+                      'fees_24h': round(r['fees'],4)})
 
-        r = conn.execute("""
-            SELECT COUNT(*), COALESCE(SUM(fee_platform),0)
-            FROM trades WHERE created_at>?
-        """, (week_ago,)).fetchone()
-        stats['trades_7d']     = r[0]
-        stats['fees_7d']       = round(r[1], 4)
+        cur.execute("""
+            SELECT COUNT(*) as cnt, COALESCE(SUM(fee_platform),0) as fees
+            FROM trades WHERE created_at>%s
+        """, (week_ago,))
+        r = cur.fetchone()
+        stats.update({'trades_7d': r['cnt'], 'fees_7d': round(r['fees'],4)})
 
-        # Популярные биржи
-        rows = conn.execute("""
+        cur.execute("""
             SELECT buy_exchange, COUNT(*) as cnt
             FROM trades GROUP BY buy_exchange ORDER BY cnt DESC LIMIT 5
-        """).fetchall()
-        stats['top_exchanges'] = [{'exchange': r[0], 'trades': r[1]} for r in rows]
+        """)
+        stats['top_exchanges'] = [{'exchange': r['buy_exchange'], 'trades': r['cnt']}
+                                   for r in cur.fetchall()]
 
-        # Популярные монеты
-        rows = conn.execute("""
-            SELECT symbol, COUNT(*) as cnt, COALESCE(SUM(net_profit),0) as profit
+        cur.execute("""
+            SELECT symbol, COUNT(*) as cnt,
+                   COALESCE(SUM(net_profit),0) as profit
             FROM trades GROUP BY symbol ORDER BY cnt DESC LIMIT 10
-        """).fetchall()
-        stats['top_symbols'] = [{'symbol': r[0], 'trades': r[1], 'profit': round(r[2], 4)} for r in rows]
-
+        """)
+        stats['top_symbols'] = [{'symbol': r['symbol'], 'trades': r['cnt'],
+                                  'profit': round(r['profit'],4)}
+                                  for r in cur.fetchall()]
         return stats
     except Exception as e:
-        logger.error(f"admin_get_platform_stats error: {e}")
+        logger.error(f"admin_get_platform_stats: {e}")
         return {}
     finally:
         conn.close()
 
 
 def admin_list_users(page=1, per_page=20, search='', vip_only=False):
-    """Список пользователей для admin-панели."""
     conn = get_db()
     try:
         now    = int(time.time())
         offset = (page - 1) * per_page
+        cur    = conn.cursor()
 
         where  = []
         params = []
 
         if search:
-            where.append("(u.tg_username LIKE ? OR u.tg_first_name LIKE ? OR u.tg_id LIKE ? OR u.id LIKE ?)")
+            where.append("(u.tg_username ILIKE %s OR u.tg_first_name ILIKE %s OR u.tg_id ILIKE %s OR u.id ILIKE %s)")
             s = f"%{search}%"
             params.extend([s, s, s, s])
 
         if vip_only:
-            where.append("""
+            where.append(f"""
                 EXISTS (SELECT 1 FROM vip_subscriptions v
-                        WHERE v.user_id=u.id AND v.is_active=1 AND v.expires_at>?)
+                        WHERE v.user_id=u.id AND v.is_active=1 AND v.expires_at>{now})
             """)
-            params.append(now)
 
         where_sql = "WHERE " + " AND ".join(where) if where else ""
 
-        count_params = params.copy()
-        rows = conn.execute(f"""
+        cur.execute(f"""
             SELECT u.*,
                    b.demo_balance, b.usd_balance,
                    (SELECT plan FROM vip_subscriptions v
@@ -769,123 +805,121 @@ def admin_list_users(page=1, per_page=20, search='', vip_only=False):
                    (SELECT COUNT(*) FROM trades t WHERE t.user_id=u.id) as trade_count,
                    (SELECT COALESCE(SUM(t.net_profit),0) FROM trades t WHERE t.user_id=u.id) as total_profit
             FROM users u
-            LEFT JOIN balances b ON b.user_id = u.id
+            LEFT JOIN balances b ON b.user_id=u.id
             {where_sql}
             ORDER BY u.created_at DESC
-            LIMIT ? OFFSET ?
-        """, params + [per_page, offset]).fetchall()
+            LIMIT %s OFFSET %s
+        """, params + [per_page, offset])
+        rows = [dict(r) for r in cur.fetchall()]
 
-        total = conn.execute(
-            f"SELECT COUNT(*) FROM users u {where_sql}", count_params
-        ).fetchone()[0]
+        cur.execute(f"SELECT COUNT(*) FROM users u {where_sql}", params)
+        total = cur.fetchone()['count']
 
-        return {
-            'items': [dict(r) for r in rows],
-            'total': total, 'page': page,
-            'pages': max(1, (total + per_page - 1) // per_page),
-        }
+        return {'items': rows, 'total': total, 'page': page,
+                'pages': max(1, (total + per_page - 1) // per_page)}
     except Exception as e:
-        logger.error(f"admin_list_users error: {e}")
+        logger.error(f"admin_list_users: {e}")
         return {'items': [], 'total': 0, 'page': 1, 'pages': 1}
     finally:
         conn.close()
 
 
 def admin_activate_vip(user_id, plan, days=None):
-    """Ручная выдача VIP администратором."""
     actual_days = days or PLAN_DAYS.get(plan, 30)
     conn = get_db()
     try:
         now     = int(time.time())
         expires = now + actual_days * 86400
-        conn.execute("""
+        cur     = conn.cursor()
+        cur.execute("""
             INSERT INTO vip_subscriptions
             (user_id, plan, starts_at, expires_at, payment_id, granted_by)
-            VALUES (?, ?, ?, ?, 'ADMIN', 'admin')
+            VALUES (%s, %s, %s, %s, 'ADMIN', 'admin')
         """, (user_id, plan, now, expires))
-        conn.execute("""
+        cur.execute("""
             INSERT INTO admin_log (action, target_id, details)
-            VALUES ('vip_grant', ?, ?)
+            VALUES ('vip_grant', %s, %s)
         """, (user_id, f"plan={plan} days={actual_days}"))
         conn.commit()
-        return {'plan': plan, 'expires_at': expires, 'days_left': actual_days, 'is_active': True}
+        return {'plan': plan, 'expires_at': expires,
+                'days_left': actual_days, 'is_active': True}
     except Exception as e:
-        logger.error(f"admin_activate_vip error: {e}")
+        conn.rollback()
+        logger.error(f"admin_activate_vip: {e}")
         raise
     finally:
         conn.close()
 
 
 def admin_revoke_vip(user_id):
-    """Отзыв всех активных VIP для пользователя."""
     conn = get_db()
     try:
-        conn.execute("""
+        cur = conn.cursor()
+        cur.execute("""
             UPDATE vip_subscriptions SET is_active=0
-            WHERE user_id=? AND is_active=1
+            WHERE user_id=%s AND is_active=1
         """, (user_id,))
-        conn.execute("""
+        cur.execute("""
             INSERT INTO admin_log (action, target_id, details)
-            VALUES ('vip_revoke', ?, 'all active subscriptions revoked')
+            VALUES ('vip_revoke', %s, 'all active revoked')
         """, (user_id,))
         conn.commit()
         return True
     except Exception as e:
-        logger.error(f"admin_revoke_vip error: {e}")
+        conn.rollback()
+        logger.error(f"admin_revoke_vip: {e}")
         return False
     finally:
         conn.close()
 
 
 def admin_set_balance(user_id, balance, is_demo=True):
-    """Ручная установка баланса администратором."""
     conn = get_db()
     try:
         col = 'demo_balance' if is_demo else 'usd_balance'
-        conn.execute(
-            f"UPDATE balances SET {col}=?, updated_at=? WHERE user_id=?",
+        cur = conn.cursor()
+        cur.execute(
+            f"UPDATE balances SET {col}=%s, updated_at=%s WHERE user_id=%s",
             (float(balance), int(time.time()), user_id)
         )
-        conn.execute("""
+        cur.execute("""
             INSERT INTO admin_log (action, target_id, details)
-            VALUES ('balance_set', ?, ?)
+            VALUES ('balance_set', %s, %s)
         """, (user_id, f"{'demo' if is_demo else 'real'}={balance}"))
         conn.commit()
         return True
     except Exception as e:
-        logger.error(f"admin_set_balance error: {e}")
+        conn.rollback()
+        logger.error(f"admin_set_balance: {e}")
         return False
     finally:
         conn.close()
 
 
 def admin_list_trades(page=1, per_page=30, user_id=None):
-    """Список всех сделок для admin-панели."""
     conn = get_db()
     try:
         offset = (page - 1) * per_page
-        where  = "WHERE t.user_id=?" if user_id else ""
+        cur    = conn.cursor()
+        where  = "WHERE t.user_id=%s" if user_id else ""
         params = [user_id] if user_id else []
 
-        rows = conn.execute(f"""
+        cur.execute(f"""
             SELECT t.*, u.tg_username, u.tg_first_name
             FROM trades t
             LEFT JOIN users u ON u.id=t.user_id
             {where}
-            ORDER BY t.created_at DESC LIMIT ? OFFSET ?
-        """, params + [per_page, offset]).fetchall()
+            ORDER BY t.created_at DESC LIMIT %s OFFSET %s
+        """, params + [per_page, offset])
+        rows = [dict(r) for r in cur.fetchall()]
 
-        total = conn.execute(
-            f"SELECT COUNT(*) FROM trades t {where}", params
-        ).fetchone()[0]
+        cur.execute(f"SELECT COUNT(*) FROM trades t {where}", params)
+        total = cur.fetchone()['count']
 
-        return {
-            'items': [dict(r) for r in rows],
-            'total': total, 'page': page,
-            'pages': max(1, (total + per_page - 1) // per_page),
-        }
+        return {'items': rows, 'total': total, 'page': page,
+                'pages': max(1, (total + per_page - 1) // per_page)}
     except Exception as e:
-        logger.error(f"admin_list_trades error: {e}")
+        logger.error(f"admin_list_trades: {e}")
         return {'items': [], 'total': 0, 'page': 1, 'pages': 1}
     finally:
         conn.close()

@@ -434,7 +434,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);overflow:hid
           <div class="brand-ver">v4.0 · HFT ENGINE · 8 СТРАТЕГИЙ</div>
         </div>
       </div>
-      <button class="tier-btn tier-free" id="tierBtn" onclick="showPg('vip')">${t('buy_vip')}</button>
+      <button class="tier-btn tier-free" id="tierBtn" onclick="showPg('vip')" data-i18n="buy_vip">⚡ FREE → VIP</button>
     </div>
     <div class="hdr-stats">
       <div class="hdr-stat">
@@ -501,7 +501,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);overflow:hid
     <div class="pg on" id="pg-signals">
       <div class="slbl">
         <div class="slbl-dot"></div>
-        <div class="slbl-txt">Арбитражные сигналы</div>
+        <div class="slbl-txt" data-i18n="arb_signals">Арбитражные сигналы</div>
         <div class="slbl-r" id="sigCount">—</div>
       </div>
       <div id="sigList"></div>
@@ -524,7 +524,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);overflow:hid
     <div class="pg" id="pg-scanner">
       <div class="slbl">
         <div class="slbl-dot"></div>
-        <div class="slbl-txt">⚡ HFT Live Сканер · 15 бирж</div>
+        <div class="slbl-txt" data-i18n="scanner_title">⚡ HFT Live Сканер</div>
         <div class="slbl-r" id="scanTime">--:--:--</div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--card);border:1px solid var(--border);border-radius:10px;margin-bottom:8px">
@@ -552,7 +552,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);overflow:hid
     <div class="pg" id="pg-exchanges">
       <div class="slbl">
         <div class="slbl-dot" style="background:var(--green)"></div>
-        <div class="slbl-txt">Биржи</div>
+        <div class="slbl-txt" data-i18n="exchanges_title">Биржи</div>
         <div class="slbl-r" id="connCount">0 / 15 подключено</div>
       </div>
       <div id="exchList"></div>
@@ -562,7 +562,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);overflow:hid
     <div class="pg" id="pg-history">
       <div class="slbl">
         <div class="slbl-dot" style="background:var(--purple)"></div>
-        <div class="slbl-txt">История сделок</div>
+        <div class="slbl-txt" data-i18n="history_title">История сделок</div>
       </div>
       <div class="hist-summary" id="histSum"></div>
       <div id="histList"></div>
@@ -581,7 +581,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);overflow:hid
         </div>
       </div>
       <div class="plans" id="plansList"></div>
-      <div class="slbl"><div class="slbl-txt">Что включает VIP</div></div>
+      <div class="slbl"><div class="slbl-txt" data-i18n="vip_title">VIP подписка</div></div>
       <div class="feat-tbl">
         <div class="ft-hdr"><span>Функция</span><span>FREE</span><span>VIP</span></div>
         <div id="featList"></div>
@@ -2432,13 +2432,13 @@ const LANGS = {
     slippage:'Проскальз.', network_fee:'Вывод/Сеть',
     total_fees:'Итого комиссии', net_profit:'ЧИСТЫЙ ПРОФИТ',
     conn_lost:'⚠️ Связь потеряна', conn_ok:'✅ Подключено',
-    arb_signals:'${t('arb_signals')}',
+    arb_signals:'АРБИТРАЖНЫЕ СИГНАЛЫ',
     buy_vip:'⚡ FREE → VIP', vip_active:'👑 VIP активен', free_plan:'FREE план',
-    cabinet:'Кабинет', no_referrals:'${t('no_referrals')}',
-    settings_title:'${t('settings_title')}', lang_label:'Язык интерфейса',
+    cabinet:'Кабинет', no_referrals:'Рефералов пока нет · Поделитесь ссылкой!',
+    settings_title:'НАСТРОЙКИ АККАУНТА', lang_label:'Язык интерфейса',
     commission:'Комиссия (FREE/VIP)', exchanges_connected:'Подключено бирж',
     ref_commission:'Реф. комиссия', from_platform:'от платформы',
-    auto_section:'${t('auto_section')}', auto_trade:'Авто-торговля',
+    auto_section:'АВТО-ТОРГОВЛЯ', auto_trade:'Авто-торговля',
     vip_active_badge:'VIP · АКТИВНА', vip_only_badge:'ТОЛЬКО VIP',
     amount_per_trade:'Сумма на сделку (USDT)',
     auto_only_vip:'👑 Авто-торговля только для VIP',

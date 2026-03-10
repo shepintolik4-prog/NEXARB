@@ -1951,24 +1951,26 @@ const API_BASE = 'https://nexarb-api.onrender.com/api/v1';
 const API = {
   _retries: new Map(),
 
-  async request(method, path, body = null, retryCount = 0) {
+  async request(method, path, body = null, retryCount = 0, silent = false) {
+    // Render Free tier: cold start = 50s. First attempt uses 60s timeout.
+    const timeoutMs = retryCount === 0 ? 60000 : 15000;
     try {
       const res = await fetch(API_BASE + path, {
         method,
         headers: SESSION.headers(),
         ...(body ? { body: JSON.stringify(body) } : {}),
-        signal: AbortSignal.timeout(8000), // 8s timeout
+        signal: AbortSignal.timeout(timeoutMs),
       });
 
       // Token expired
       if (res.status === 401) {
         SESSION.clear();
-        _netStatus.setError('auth');
+        if (!silent) _netStatus.setError('auth');
         return null;
       }
       // Server error
       if (res.status >= 500) {
-        _netStatus.setError('server');
+        if (!silent) _netStatus.setError('server');
         throw new Error(`Server error ${res.status}`);
       }
       // Client error
@@ -1981,12 +1983,12 @@ const API = {
       return await res.json();
 
     } catch (e) {
-      // Network failure — exponential retry for GET requests
+      // Network failure — retry silently before showing error toast
       if (e.name !== 'AbortError' && method === 'GET' && retryCount < 3) {
-        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, retryCount)));
-        return this.request(method, path, body, retryCount + 1);
+        await new Promise(r => setTimeout(r, 2000 * Math.pow(2, retryCount)));
+        return this.request(method, path, body, retryCount + 1, retryCount < 2);
       }
-      _netStatus.setError('network');
+      if (!silent) _netStatus.setError('network');
       throw e;
     }
   },
@@ -2043,14 +2045,17 @@ const _netStatus = {
   },
 
   setError(type) {
+    // Не спамить тостами — показываем только если статус изменился
+    const changed = this._state !== type;
     this._state = type;
     this._render();
     clearTimeout(this._timer);
+    if (!changed) return; // уже показали этот тип ошибки — молчим
     const msgs = {
       network: '⚠️ Нет соединения с сервером. Проверьте интернет.',
-      server:  '⚠️ Сервер временно недоступен. Повтор через 5 сек...',
-      auth:    '🔐 Сессия истекла. Пожалуйста, перезапустите приложение.',
-      ws_down: '📡 Поток котировок прерван. Переподключение...',
+      server:  '⚠️ Сервер временно недоступен. Повтор...',
+      auth:    '🔐 Сессия истекла. Перезапустите приложение.',
+      ws_down: '📡 Поток прерван. Переподключение...',
     };
     toastMsg(msgs[type] || '⚠️ Ошибка соединения', 'err');
   },
@@ -2737,8 +2742,8 @@ async function loadAccountFromServer() {
 
     return true;
   } catch (e) {
-    // Нет соединения — показываем состояние ошибки
-    _netStatus.setError('network');
+    // Сервер мог спать (Render Free cold start) — не пугаем пользователя сразу
+    // _netStatus уже обновлён внутри request() после 3 ретраев
     return false;
   } finally {
     if (spinner) spinner.style.display = 'none';
@@ -3939,7 +3944,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     setInterval(async () => {
       if (SESSION.valid()) {
         try {
-          const data = await API.getAccount();
+          const data = await API.request('GET', '/account', null, 0, true); // silent
           if (data) {
             _ui.setBalance(data.balance);
             _ui.setVip(data.vip, data.vip_expires);

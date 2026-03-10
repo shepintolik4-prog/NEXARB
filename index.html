@@ -620,7 +620,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);overflow:hid
     <button class="nb"    id="nb-auto"      onclick="showPg('auto')">     <span class="ni">🤖</span><span class="nl" data-i18n="auto_nav">Авто</span></button>
     <button class="nb"    id="nb-exchanges" onclick="showPg('exchanges')"><span class="ni">🔗</span><span class="nl" data-i18n="nav_exchanges">Биржи</span></button>
     <button class="nb"    id="nb-history"   onclick="showPg('history')">  <span class="ni">📜</span><span class="nl" data-i18n="nav_history">История</span></button>
-    <button class="nb"    id="nb-vip"       onclick="showPg('vip')">      <span class="ni">👑</span><span class="nl">VIP</span></button>
+    <button class="nb"    id="nb-vip"       onclick="showPg('vip')">      <span class="ni">👑</span><span class="nl" data-i18n="nav_vip">VIP</span></button>
   </nav>
 </div>
 
@@ -1873,6 +1873,9 @@ const _ui = {
     renderSigs();
     renderVip?.();
     renderVipAutoSettings?.();
+    // Скрываем кнопку VIP в меню у подписчиков
+    const nbVip = document.getElementById('nb-vip');
+    if (nbVip) nbVip.style.display = S.vip ? 'none' : '';
   },
   setTrades(v) {
     S.trades = parseInt(v) || 0;
@@ -2373,7 +2376,7 @@ function calcFees(amount, sig) {
 const LANGS = {
   ru: {
     nav_signals:'Сигналы', nav_scanner:'Сканер', nav_exchanges:'Биржи',
-    nav_history:'История', auto_title:'Авто-Торговля 24/7', auto_nav:'Авто',
+    nav_history:'История', auto_title:'Авто-Торговля 24/7', auto_nav:'Авто', nav_vip:'VIP',
     lang_changed:'🌐 Язык изменён',
     balance:'Баланс', profit_today:'Профит / сегодня', signals_count:'Сигналов',
     execute:'⚡ Исполнить', enter_pos:'💰 Открыть позицию',
@@ -2383,10 +2386,28 @@ const LANGS = {
     slippage:'Проскальз.', network_fee:'Вывод/Сеть',
     total_fees:'Итого комиссии', net_profit:'ЧИСТЫЙ ПРОФИТ',
     conn_lost:'⚠️ Связь потеряна', conn_ok:'✅ Подключено',
+    arb_signals:'АРБИТРАЖНЫЕ СИГНАЛЫ', buy_on:'Купить на', sell_on:'Продать на',
+    spread:'Спред', profit:'Профит', volume:'Объём', risk:'Риск',
+    low:'низкий', med:'средний', high:'высокий',
+    hot:'🔥 Горячий', vip_only:'Только VIP',
+    scanner_title:'СКАНЕР РЫНКА', exchanges_title:'МОИ БИРЖИ',
+    history_title:'ИСТОРИЯ СДЕЛОК', vip_title:'VIP ПОДПИСКА',
+    auto_trading:'Авто-торговля', settings:'Настройки',
+    connect_exchange:'Подключить биржу', disconnect:'Отключить',
+    connected:'Подключено', not_connected:'Не подключено',
+    buy_vip:'Купить VIP', vip_active:'VIP активен', free_plan:'FREE план',
+    monthly:'Месяц', yearly:'Год', lifetime:'Навсегда',
+    referrals:'Рефералы', ref_link:'Реферальная ссылка',
+    copy:'Скопировано!', share:'Поделиться',
+    no_history:'Нет сделок', loading:'Загрузка...',
+    trades:'сделок', win_rate:'Успешность',
+    amount:'Сумма', min:'мин', max:'макс',
+    cabinet:'Кабинет', logout:'Выйти',
+    profit_label:'МОЙ ПРОФИТ', ref_income:'РЕФ. ДОХОД',
   },
   en: {
     nav_signals:'Signals', nav_scanner:'Scanner', nav_exchanges:'Exchanges',
-    nav_history:'History', auto_title:'Auto-Trade 24/7', auto_nav:'Auto',
+    nav_history:'History', auto_title:'Auto-Trade 24/7', auto_nav:'Auto', nav_vip:'VIP',
     lang_changed:'🌐 Language changed',
     balance:'Balance', profit_today:'Profit / today', signals_count:'Signals',
     execute:'⚡ Execute', enter_pos:'💰 Open Position',
@@ -2396,10 +2417,28 @@ const LANGS = {
     slippage:'Slippage', network_fee:'Withdraw/Net',
     total_fees:'Total fees', net_profit:'NET PROFIT',
     conn_lost:'⚠️ Connection lost', conn_ok:'✅ Connected',
+    arb_signals:'ARBITRAGE SIGNALS', buy_on:'Buy on', sell_on:'Sell on',
+    spread:'Spread', profit:'Profit', volume:'Volume', risk:'Risk',
+    low:'low', med:'medium', high:'high',
+    hot:'🔥 Hot', vip_only:'VIP Only',
+    scanner_title:'MARKET SCANNER', exchanges_title:'MY EXCHANGES',
+    history_title:'TRADE HISTORY', vip_title:'VIP SUBSCRIPTION',
+    auto_trading:'Auto-Trading', settings:'Settings',
+    connect_exchange:'Connect exchange', disconnect:'Disconnect',
+    connected:'Connected', not_connected:'Not connected',
+    buy_vip:'Buy VIP', vip_active:'VIP active', free_plan:'FREE plan',
+    monthly:'Monthly', yearly:'Yearly', lifetime:'Lifetime',
+    referrals:'Referrals', ref_link:'Referral link',
+    copy:'Copied!', share:'Share',
+    no_history:'No trades', loading:'Loading...',
+    trades:'trades', win_rate:'Win rate',
+    amount:'Amount', min:'min', max:'max',
+    cabinet:'Cabinet', logout:'Logout',
+    profit_label:'MY PROFIT', ref_income:'REF. INCOME',
   },
   tr: {
     nav_signals:'Sinyaller', nav_scanner:'Tarayıcı', nav_exchanges:'Borsalar',
-    nav_history:'Geçmiş', auto_title:'Otomatik 24/7', auto_nav:'Oto',
+    nav_history:'Geçmiş', auto_title:'Otomatik 24/7', auto_nav:'Oto', nav_vip:'VIP',
     lang_changed:'🌐 Dil değiştirildi',
     balance:'Bakiye', profit_today:'Kar / bugün', signals_count:'Sinyal',
     execute:'⚡ Uygula', enter_pos:'💰 Pozisyon Aç',
@@ -2409,10 +2448,28 @@ const LANGS = {
     slippage:'Kayma', network_fee:'Çekim/Ağ',
     total_fees:'Toplam ücret', net_profit:'NET KAR',
     conn_lost:'⚠️ Bağlantı kesildi', conn_ok:'✅ Bağlandı',
+    arb_signals:'ARBİTRAJ SİNYALLERİ', buy_on:'Satın al', sell_on:'Sat',
+    spread:'Spread', profit:'Kar', volume:'Hacim', risk:'Risk',
+    low:'düşük', med:'orta', high:'yüksek',
+    hot:'🔥 Sıcak', vip_only:'Sadece VIP',
+    scanner_title:'PİYASA TARAYICI', exchanges_title:'BORSALARIM',
+    history_title:'İŞLEM GEÇMİŞİ', vip_title:'VIP ABONELİK',
+    auto_trading:'Otomatik İşlem', settings:'Ayarlar',
+    connect_exchange:'Borsa bağla', disconnect:'Bağlantıyı kes',
+    connected:'Bağlı', not_connected:'Bağlı değil',
+    buy_vip:'VIP Satın Al', vip_active:'VIP aktif', free_plan:'ÜCRETSİZ plan',
+    monthly:'Aylık', yearly:'Yıllık', lifetime:'Ömür boyu',
+    referrals:'Referanslar', ref_link:'Referans linki',
+    copy:'Kopyalandı!', share:'Paylaş',
+    no_history:'İşlem yok', loading:'Yükleniyor...',
+    trades:'işlem', win_rate:'Başarı oranı',
+    amount:'Miktar', min:'min', max:'maks',
+    cabinet:'Kabine', logout:'Çıkış',
+    profit_label:'KÂRIM', ref_income:'REF. GELİR',
   },
   es: {
     nav_signals:'Señales', nav_scanner:'Escáner', nav_exchanges:'Bolsas',
-    nav_history:'Historial', auto_title:'Auto-Trade 24/7', auto_nav:'Auto',
+    nav_history:'Historial', auto_title:'Auto-Trade 24/7', auto_nav:'Auto', nav_vip:'VIP',
     lang_changed:'🌐 Idioma cambiado',
     balance:'Balance', profit_today:'Ganancia / hoy', signals_count:'Señales',
     execute:'⚡ Ejecutar', enter_pos:'💰 Abrir Posición',
@@ -2422,10 +2479,28 @@ const LANGS = {
     slippage:'Desliz.', network_fee:'Retiro/Red',
     total_fees:'Total comisiones', net_profit:'GANANCIA NETA',
     conn_lost:'⚠️ Conexión perdida', conn_ok:'✅ Conectado',
+    arb_signals:'SEÑALES DE ARBITRAJE', buy_on:'Comprar en', sell_on:'Vender en',
+    spread:'Spread', profit:'Ganancia', volume:'Volumen', risk:'Riesgo',
+    low:'bajo', med:'medio', high:'alto',
+    hot:'🔥 Caliente', vip_only:'Solo VIP',
+    scanner_title:'ESCÁNER DE MERCADO', exchanges_title:'MIS BOLSAS',
+    history_title:'HISTORIAL', vip_title:'SUSCRIPCIÓN VIP',
+    auto_trading:'Auto-Trading', settings:'Configuración',
+    connect_exchange:'Conectar bolsa', disconnect:'Desconectar',
+    connected:'Conectado', not_connected:'No conectado',
+    buy_vip:'Comprar VIP', vip_active:'VIP activo', free_plan:'Plan GRATIS',
+    monthly:'Mensual', yearly:'Anual', lifetime:'De por vida',
+    referrals:'Referidos', ref_link:'Enlace de referido',
+    copy:'¡Copiado!', share:'Compartir',
+    no_history:'Sin operaciones', loading:'Cargando...',
+    trades:'operaciones', win_rate:'Tasa de éxito',
+    amount:'Monto', min:'mín', max:'máx',
+    cabinet:'Gabinete', logout:'Salir',
+    profit_label:'MI GANANCIA', ref_income:'ING. REF.',
   },
   de: {
     nav_signals:'Signale', nav_scanner:'Scanner', nav_exchanges:'Börsen',
-    nav_history:'Verlauf', auto_title:'Auto-Handel 24/7', auto_nav:'Auto',
+    nav_history:'Verlauf', auto_title:'Auto-Handel 24/7', auto_nav:'Auto', nav_vip:'VIP',
     lang_changed:'🌐 Sprache geändert',
     balance:'Guthaben', profit_today:'Gewinn / heute', signals_count:'Signale',
     execute:'⚡ Ausführen', enter_pos:'💰 Position öffnen',
@@ -2435,10 +2510,28 @@ const LANGS = {
     slippage:'Slippage', network_fee:'Auszahlung/Netz',
     total_fees:'Gesamtgebühren', net_profit:'NETTOGEWINN',
     conn_lost:'⚠️ Verbindung verloren', conn_ok:'✅ Verbunden',
+    arb_signals:'ARBITRAGE-SIGNALE', buy_on:'Kaufen bei', sell_on:'Verkaufen bei',
+    spread:'Spread', profit:'Gewinn', volume:'Volumen', risk:'Risiko',
+    low:'niedrig', med:'mittel', high:'hoch',
+    hot:'🔥 Heiß', vip_only:'Nur VIP',
+    scanner_title:'MARKT-SCANNER', exchanges_title:'MEINE BÖRSEN',
+    history_title:'HANDELSHISTORIE', vip_title:'VIP-ABO',
+    auto_trading:'Auto-Handel', settings:'Einstellungen',
+    connect_exchange:'Börse verbinden', disconnect:'Trennen',
+    connected:'Verbunden', not_connected:'Nicht verbunden',
+    buy_vip:'VIP kaufen', vip_active:'VIP aktiv', free_plan:'GRATIS-Plan',
+    monthly:'Monatlich', yearly:'Jährlich', lifetime:'Lebenslang',
+    referrals:'Empfehlungen', ref_link:'Empfehlungslink',
+    copy:'Kopiert!', share:'Teilen',
+    no_history:'Keine Trades', loading:'Laden...',
+    trades:'Trades', win_rate:'Erfolgsrate',
+    amount:'Betrag', min:'min', max:'max',
+    cabinet:'Kabinett', logout:'Abmelden',
+    profit_label:'MEIN GEWINN', ref_income:'REF. EINNAHMEN',
   },
   ar: {
     nav_signals:'إشارات', nav_scanner:'ماسح', nav_exchanges:'بورصات',
-    nav_history:'السجل', auto_title:'تداول آلي 24/7', auto_nav:'آلي',
+    nav_history:'السجل', auto_title:'تداول آلي 24/7', auto_nav:'آلي', nav_vip:'VIP',
     lang_changed:'🌐 تم تغيير اللغة',
     balance:'الرصيد', profit_today:'ربح اليوم', signals_count:'إشارات',
     execute:'⚡ تنفيذ', enter_pos:'💰 فتح مركز',
@@ -2448,6 +2541,24 @@ const LANGS = {
     slippage:'انزلاق', network_fee:'سحب/شبكة',
     total_fees:'إجمالي الرسوم', net_profit:'صافي الربح',
     conn_lost:'⚠️ انقطع الاتصال', conn_ok:'✅ متصل',
+    arb_signals:'إشارات المراجحة', buy_on:'اشتر في', sell_on:'بع في',
+    spread:'الفارق', profit:'الربح', volume:'الحجم', risk:'المخاطرة',
+    low:'منخفض', med:'متوسط', high:'مرتفع',
+    hot:'🔥 ساخن', vip_only:'VIP فقط',
+    scanner_title:'ماسح السوق', exchanges_title:'بورصاتي',
+    history_title:'سجل الصفقات', vip_title:'اشتراك VIP',
+    auto_trading:'التداول الآلي', settings:'الإعدادات',
+    connect_exchange:'ربط بورصة', disconnect:'قطع الاتصال',
+    connected:'متصل', not_connected:'غير متصل',
+    buy_vip:'شراء VIP', vip_active:'VIP نشط', free_plan:'الخطة المجانية',
+    monthly:'شهري', yearly:'سنوي', lifetime:'مدى الحياة',
+    referrals:'الإحالات', ref_link:'رابط الإحالة',
+    copy:'تم النسخ!', share:'مشاركة',
+    no_history:'لا صفقات', loading:'جارٍ التحميل...',
+    trades:'صفقات', win_rate:'معدل الفوز',
+    amount:'المبلغ', min:'أدنى', max:'أقصى',
+    cabinet:'الملف الشخصي', logout:'تسجيل الخروج',
+    profit_label:'ربحي', ref_income:'دخل الإحالة',
   },
 };
 
@@ -2461,6 +2572,11 @@ function applyI18n() {
     const v = LANGS[lang]?.[el.getAttribute('data-i18n')];
     if (v) el.textContent = v;
   });
+  // Перерисовываем динамические страницы чтобы обновить хардкоженные строки
+  try { renderSigs(); } catch {}
+  try { renderVip(); } catch {}
+  try { renderExchanges(); } catch {}
+  try { if (document.getElementById('pg-history')?.classList.contains('on')) renderHistory(); } catch {}
 }
 
 // ╔══════════════════════════════════════════════════════════════╗
@@ -2521,6 +2637,8 @@ async function loadAccountFromServer() {
 
     // userId и refCode — только от сервера, не генерируются клиентом
     S.userId  = data.user_id  || '';
+    S.name    = data.name     || data.user_id?.slice(0,8) || 'User';
+    S.username = data.username || '';
     S.refCode = data.ref_code || '';
 
     // Подключённые биржи — синхронизируем из сервера
@@ -2634,8 +2752,8 @@ function renderProfile() {
   <!-- HERO -->
   <div class="prof-hero">
     <div class="prof-avatar">🎯</div>
-    <div class="prof-name">${S.userId}</div>
-    <div class="prof-id">ID: ${S.userId} · ${S.lang==='ru'?'🇷🇺 Русский':S.lang==='en'?'🇬🇧 English':'🌐 '+S.lang}</div>
+    <div class="prof-name">${S.name || S.userId?.slice(0,8) || 'User'}</div>
+    <div class="prof-id">ID: ${S.userId?.slice(0,8) || '—'} · ${S.username ? '@'+S.username+' · ' : ''}${S.lang==='ru'?'🇷🇺 Русский':S.lang==='en'?'🇬🇧 English':'🌐 '+S.lang}</div>
     <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
       ${S.vip?`<span style="font-size:9px;padding:3px 8px;border-radius:4px;background:rgba(245,166,35,.15);color:var(--gold);border:1px solid rgba(245,166,35,.3);font-weight:700">👑 VIP</span>`:''}
       <span style="font-size:9px;padding:3px 8px;border-radius:4px;background:rgba(0,207,255,.1);color:var(--cyan);border:1px solid rgba(0,207,255,.2);font-weight:700">📊 ${S.trades} сделок</span>

@@ -1,5 +1,0 @@
-websockets==12.0
-cryptography>=42.0.0
-aiocryptopay==0.4.8
-# ccxt>=4.0.0       # раскомментировать для реальной торговли
-# psycopg2-binary   # раскомментировать при переходе на PostgreSQL

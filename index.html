@@ -524,7 +524,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);overflow:hid
     <div class="pg" id="pg-scanner">
       <div class="slbl">
         <div class="slbl-dot"></div>
-        <div class="slbl-txt" data-i18n="scanner_title">⚡ HFT Live Сканер</div>
+        <div class="slbl-txt" data-i18n="scanner_title">⚡ HFT · 35 бирж · 124 токена</div>
         <div class="slbl-r" id="scanTime">--:--:--</div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--card);border:1px solid var(--border);border-radius:10px;margin-bottom:8px">
@@ -553,7 +553,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);overflow:hid
       <div class="slbl">
         <div class="slbl-dot" style="background:var(--green)"></div>
         <div class="slbl-txt" data-i18n="exchanges_title">Биржи</div>
-        <div class="slbl-r" id="connCount">0 / 15 подключено</div>
+        <div class="slbl-r" id="connCount">0 / 35 подключено</div>
       </div>
       <div id="exchList"></div>
     </div>
@@ -711,7 +711,7 @@ const S = {
 };
 
 // ========================================================
-// 15 EXCHANGES
+// 35 EXCHANGES
 // ========================================================
 const EXCHS = [
   {id:'binance',name:'Binance',logo:'🟡',color:'#F0B90B',vol:'$24.1B',maker:'0.1%',taker:'0.1%',pairs:1400,
@@ -880,173 +880,260 @@ const SIGNAL_CACHE = new Map();
 // maker — лимитные ордера (дешевле, но нет гарантии исполнения)
 // taker — рыночные ордера (арбитраж всегда taker, иначе упустишь цену)
 const EX_FEES = {
-  binance:  { maker:0.0010, taker:0.0010 }, // VIP0; с BNB скидка 25% → 0.00075
-  okx:      { maker:0.0008, taker:0.0010 }, // Tier 1
-  bybit:    { maker:0.0010, taker:0.0010 }, // Standard
-  kucoin:   { maker:0.0010, taker:0.0010 }, // Tier 0
-  gate:     { maker:0.0020, taker:0.0020 }, // Base tier
-  mexc:     { maker:0.0000, taker:0.0020 }, // Maker rebate 0%, taker 0.2%
-  htx:      { maker:0.0020, taker:0.0020 }, // Huobi standard
-  coinbase: { maker:0.0040, taker:0.0060 }, // Advanced Trade base
-  kraken:   { maker:0.0016, taker:0.0026 }, // Tier 0 (0–10K USD)
-  bitget:   { maker:0.0010, taker:0.0010 }, // Standard spot
-  bitmart:  { maker:0.0025, taker:0.0025 }, // Standard
-  phemex:   { maker:0.0010, taker:0.0010 }, // Spot standard
-  crypto:   { maker:0.0040, taker:0.0040 }, // Crypto.com standard
-  bingx:    { maker:0.0010, taker:0.0020 }, // Standard
-  lbank:    { maker:0.0010, taker:0.0020 }, // Standard
-  // ── Новые биржи ──────────────────────────────────────────────
-  xt:       { maker:0.0008, taker:0.0016 }, // XT.com Standard
-  whitebit: { maker:0.0010, taker:0.0010 }, // WhiteBIT Standard
-  poloniex: { maker:0.0015, taker:0.0020 }, // Poloniex Standard
+  // ── ТОП БИРЖИ ────────────────────────────────────────────────
+  binance:  { maker:0.0010, taker:0.0010 }, // #1 объём мира
+  okx:      { maker:0.0008, taker:0.0010 }, // #2, maker дешевле
+  bybit:    { maker:0.0010, taker:0.0010 }, // #3 деривативы
+  kucoin:   { maker:0.0010, taker:0.0010 }, // "биржа альткоинов"
+  gate:     { maker:0.0020, taker:0.0020 }, // много листингов
+  mexc:     { maker:0.0000, taker:0.0020 }, // maker бесплатно!
+  htx:      { maker:0.0020, taker:0.0020 }, // бывший Huobi
+  coinbase: { maker:0.0040, taker:0.0060 }, // США премиум
+  kraken:   { maker:0.0016, taker:0.0026 }, // EUR/USD премиум
+  bitget:   { maker:0.0010, taker:0.0010 }, // быстрорастущая
+  bitmart:  { maker:0.0025, taker:0.0025 }, // мелкие листинги
+  phemex:   { maker:0.0010, taker:0.0010 }, // деривативы
+  crypto:   { maker:0.0040, taker:0.0040 }, // Crypto.com
+  bingx:    { maker:0.0010, taker:0.0020 }, // копитрейдинг
+  lbank:    { maker:0.0010, taker:0.0020 }, // азиатская
+  // ── ДОБАВЛЕННЫЕ РАНЕЕ ────────────────────────────────────────
+  xt:       { maker:0.0008, taker:0.0016 }, // XT.com
+  whitebit: { maker:0.0010, taker:0.0010 }, // WhiteBIT EU
+  poloniex: { maker:0.0015, taker:0.0020 }, // старейшая
   huobi:    { maker:0.0020, taker:0.0020 }, // Huobi Global
-  upbit:    { maker:0.0005, taker:0.0005 }, // Upbit Korea (lowest fees)
-  coinex:   { maker:0.0016, taker:0.0020 }, // CoinEx Standard
-  probit:   { maker:0.0020, taker:0.0020 }, // ProBit Standard
-  ascendex: { maker:0.0010, taker:0.0010 }, // AscendEX Standard
-  dydx:     { maker:0.0000, taker:0.0005 }, // dYdX maker rebate
-  uniswap:  { maker:0.0030, taker:0.0030 }, // Uniswap v3 0.3% pool
+  upbit:    { maker:0.0005, taker:0.0005 }, // Корея #1
+  coinex:   { maker:0.0016, taker:0.0020 }, // CoinEx
+  probit:   { maker:0.0020, taker:0.0020 }, // ProBit
+  ascendex: { maker:0.0010, taker:0.0010 }, // AscendEX
+  dydx:     { maker:0.0000, taker:0.0005 }, // DEX деривативы
+  uniswap:  { maker:0.0030, taker:0.0030 }, // DEX AMM
+  // ── НОВЫЕ БИРЖИ ──────────────────────────────────────────────
+  bitfinex: { maker:0.0010, taker:0.0020 }, // OG биржа, маржин
+  gemini:   { maker:0.0020, taker:0.0040 }, // США регулируемая
+  bitstamp: { maker:0.0030, taker:0.0050 }, // Европа старейшая
+  okx_dex:  { maker:0.0010, taker:0.0010 }, // OKX DEX агрегатор
+  pancake:  { maker:0.0025, taker:0.0025 }, // PancakeSwap BSC
+  raydium:  { maker:0.0025, taker:0.0025 }, // Raydium Solana DEX
+  jupiter:  { maker:0.0000, taker:0.0010 }, // Jupiter SOL агрегатор
+  curve:    { maker:0.0004, taker:0.0004 }, // Curve стейблы+ETH
+  aerodrome:{ maker:0.0020, taker:0.0020 }, // Aerodrome Base DEX
+  hyperliquid:{ maker:0.0000, taker:0.0025 },// Hyperliquid perps DEX
 };
 
-// ── РЕАЛЬНЫЕ WITHDRAWAL FEES (сеть + биржа, USD, 2025) ───────
-// Это САМАЯ ВАЖНАЯ часть: на малых суммах сетевая комиссия
-// полностью съедает прибыль от арбитража
-// Источник: withdrawalfees.com + официальные страницы бирж
 const WITHDRAWAL_FEES = {
-  // Монета → { network, usd }
-  // usd = примерная стоимость вывода в долларах
-  BTC:   { network:'BTC',     usd: 1.50  }, // ~0.00002 BTC при 75k$
-  ETH:   { network:'ERC20',   usd: 2.50  }, // переменный gas, ~15-30 gwei
-  BNB:   { network:'BEP20',   usd: 0.10  }, // BSC дёшев
-  SOL:   { network:'SOL',     usd: 0.01  }, // почти бесплатно
-  XRP:   { network:'XRP',     usd: 0.08  }, // фиксированный 0.25 XRP
-  DOGE:  { network:'DOGE',    usd: 0.50  }, // ~1 DOGE комиссия
-  ADA:   { network:'ADA',     usd: 0.20  }, // 0.17 ADA минимум
-  AVAX:  { network:'AVAX-C',  usd: 0.15  }, // C-chain дёшев
-  DOT:   { network:'DOT',     usd: 0.40  }, // ~0.1 DOT
-  MATIC: { network:'POLYGON', usd: 0.02  }, // дёшево
-  LINK:  { network:'ERC20',   usd: 2.50  }, // как ETH
-  UNI:   { network:'ERC20',   usd: 2.50  },
-  LTC:   { network:'LTC',     usd: 0.15  },
-  BCH:   { network:'BCH',     usd: 0.10  },
-  ATOM:  { network:'COSMOS',  usd: 0.05  },
-  APT:   { network:'APT',     usd: 0.02  },
-  ARB:   { network:'ARB',     usd: 0.10  }, // L2 дёшев
-  OP:    { network:'OP',      usd: 0.10  }, // L2 дёшев
-  NEAR:  { network:'NEAR',    usd: 0.05  },
-  SUI:   { network:'SUI',     usd: 0.02  },
-  TON:   { network:'TON',     usd: 0.05  },
-  TRX:   { network:'TRC20',   usd: 0.10  },
-  PEPE:  { network:'ERC20',   usd: 2.50  }, // ERC20 мемкоин — gas дорогой!
-  SHIB:  { network:'ERC20',   usd: 2.50  }, // аналогично
-  FLOKI: { network:'BEP20',   usd: 0.10  },
-  BONK:  { network:'SOL',     usd: 0.01  },
-  WIF:   { network:'SOL',     usd: 0.01  },
-  BOME:  { network:'SOL',     usd: 0.01  },
-  INJ:   { network:'INJ',     usd: 0.05  },
-  SEI:   { network:'SEI',     usd: 0.02  },
-  TIA:   { network:'CELESTIA',usd: 0.05  },
-  ENA:   { network:'ERC20',   usd: 2.50  },
-  FET:   { network:'ERC20',   usd: 2.50  },
-  TAO:   { network:'TAO',     usd: 0.30  },
-  RENDER:{ network:'SOL',     usd: 0.01  },
-  WLD:   { network:'OP',      usd: 0.10  },
-  ALGO:  { network:'ALGO',    usd: 0.05  },
-  DEFAULT:{ network:'ERC20',  usd: 2.50  }, // неизвестные ERC20 = дорого
+  BTC:   { network:'BTC',      usd: 1.50  },
+  ETH:   { network:'ERC20',    usd: 2.50  },
+  BNB:   { network:'BEP20',    usd: 0.10  },
+  SOL:   { network:'SOL',      usd: 0.01  },
+  XRP:   { network:'XRP',      usd: 0.08  },
+  DOGE:  { network:'DOGE',     usd: 0.50  },
+  ADA:   { network:'ADA',      usd: 0.20  },
+  AVAX:  { network:'AVAX-C',   usd: 0.15  },
+  DOT:   { network:'DOT',      usd: 0.40  },
+  MATIC: { network:'POLYGON',  usd: 0.02  },
+  LINK:  { network:'ERC20',    usd: 2.50  },
+  UNI:   { network:'ERC20',    usd: 2.50  },
+  LTC:   { network:'LTC',      usd: 0.15  },
+  BCH:   { network:'BCH',      usd: 0.10  },
+  ATOM:  { network:'COSMOS',   usd: 0.05  },
+  APT:   { network:'APT',      usd: 0.02  },
+  ARB:   { network:'ARB',      usd: 0.10  },
+  OP:    { network:'OP',       usd: 0.10  },
+  NEAR:  { network:'NEAR',     usd: 0.05  },
+  SUI:   { network:'SUI',      usd: 0.02  },
+  TON:   { network:'TON',      usd: 0.05  },
+  TRX:   { network:'TRC20',    usd: 0.10  },
+  PEPE:  { network:'ERC20',    usd: 2.50  },
+  SHIB:  { network:'ERC20',    usd: 2.50  },
+  FLOKI: { network:'BEP20',    usd: 0.10  },
+  BONK:  { network:'SOL',      usd: 0.01  },
+  WIF:   { network:'SOL',      usd: 0.01  },
+  BOME:  { network:'SOL',      usd: 0.01  },
+  INJ:   { network:'INJ',      usd: 0.05  },
+  SEI:   { network:'SEI',      usd: 0.02  },
+  TIA:   { network:'CELESTIA', usd: 0.05  },
+  ENA:   { network:'ERC20',    usd: 2.50  },
+  FET:   { network:'ERC20',    usd: 2.50  },
+  TAO:   { network:'TAO',      usd: 0.30  },
+  RENDER:{ network:'SOL',      usd: 0.01  },
+  WLD:   { network:'OP',       usd: 0.10  },
+  ALGO:  { network:'ALGO',     usd: 0.05  },
+  // Новые токены
+  NOT:   { network:'TON',      usd: 0.05  },
+  HMSTR: { network:'TON',      usd: 0.05  },
+  DOGS:  { network:'TON',      usd: 0.05  },
+  CATI:  { network:'TON',      usd: 0.05  },
+  BRETT: { network:'BASE',     usd: 0.05  },
+  PONKE: { network:'SOL',      usd: 0.01  },
+  POPCAT:{ network:'SOL',      usd: 0.01  },
+  MOG:   { network:'ERC20',    usd: 2.50  },
+  TURBO: { network:'ERC20',    usd: 2.50  },
+  PENDLE:{ network:'ERC20',    usd: 2.50  },
+  ETHFI: { network:'ERC20',    usd: 2.50  },
+  IO:    { network:'SOL',      usd: 0.01  },
+  ARKM:  { network:'ERC20',    usd: 2.50  },
+  STRK:  { network:'STARKNET', usd: 0.20  },
+  ZETA:  { network:'ZETA',     usd: 0.05  },
+  ONDO:  { network:'ERC20',    usd: 2.50  },
+  EIGEN: { network:'ERC20',    usd: 2.50  },
+  JTO:   { network:'SOL',      usd: 0.01  },
+  PYTH:  { network:'SOL',      usd: 0.01  },
+  JUP:   { network:'SOL',      usd: 0.01  },
+  RAY:   { network:'SOL',      usd: 0.01  },
+  ORCA:  { network:'SOL',      usd: 0.01  },
+  DRIFT: { network:'SOL',      usd: 0.01  },
+  MSOL:  { network:'SOL',      usd: 0.01  },
+  AERO:  { network:'BASE',     usd: 0.05  },
+  CRV:   { network:'ERC20',    usd: 2.50  },
+  MKR:   { network:'ERC20',    usd: 2.50  },
+  COMP:  { network:'ERC20',    usd: 2.50  },
+  SNX:   { network:'ERC20',    usd: 2.50  },
+  GRT:   { network:'ERC20',    usd: 2.50  },
+  LDO:   { network:'ERC20',    usd: 2.50  },
+  AAVE:  { network:'ERC20',    usd: 2.50  },
+  SAND:  { network:'ERC20',    usd: 2.50  },
+  MANA:  { network:'ERC20',    usd: 2.50  },
+  AXS:   { network:'ERC20',    usd: 2.50  },
+  BLUR:  { network:'ERC20',    usd: 2.50  },
+  IMX:   { network:'IMX',      usd: 0.10  },
+  HBAR:  { network:'HBAR',     usd: 0.05  },
+  VET:   { network:'VET',      usd: 0.05  },
+  FTM:   { network:'FTM',      usd: 0.05  },
+  KAVA:  { network:'KAVA',     usd: 0.05  },
+  CKB:   { network:'CKB',      usd: 0.05  },
+  ZK:    { network:'ZKSYNC',   usd: 0.10  },
+  LISTA: { network:'BEP20',    usd: 0.10  },
+  DEFAULT:{ network:'ERC20',   usd: 2.50  },
 };
 
 // ── БАЗОВЫЕ ЦЕНЫ (реалистичные, 2025) ────────────────────────
 const BASE_PRICES = {
-  BTC:67840, ETH:3541, BNB:578, SOL:148, XRP:0.506,
-  DOGE:0.162, ADA:0.441, AVAX:34.1, DOT:7.82, MATIC:0.881,
-  LINK:14.8, UNI:9.42, LTC:84.2, BCH:371, ETC:26.4,
-  ATOM:8.41, FIL:5.82, ICP:12.4, APT:9.81, ARB:1.021,
-  OP:2.14, NEAR:6.84, SUI:3.21, TON:5.42, TRX:0.121,
-  PEPE:0.00001211, SHIB:0.00002481, FLOKI:0.000182, BONK:0.0000320, WIF:2.84,
-  BOME:0.0088, MEME:0.0291, ORDI:41.2, SATS:0.000000408,
-  WLD:2.41, ALGO:0.182, VET:0.038, EGLD:44.2, ROSE:0.0842,
-  XMR:164, ZEC:28.4, DASH:28.1, AAVE:91.2, CRV:0.442,
-  MKR:2841, COMP:58.4, SNX:2.84, GRT:0.181, LDO:1.84,
-  RPL:18.4, SAND:0.412, MANA:0.381, AXS:6.82, ENJ:0.181,
-  GALA:0.038, IMX:1.84, FLOW:0.682, XTZ:0.841, EOS:0.681,
-  THETA:1.42, HBAR:0.084, INJ:28.4, SEI:0.481, TIA:6.84,
-  JTO:2.84, PYTH:0.481, JUP:0.682, STRK:0.881, EIGEN:2.41,
-  ENA:0.681, W:0.481, ONDO:0.881, RENDER:8.21, FET:2.41,
-  AGIX:0.481, TAO:488, PRIME:12.4, BLUR:0.281, NFT:0.000682,
-  // ── Новые токены 2025 ───────────────────────────────────────
-  NOT:0.0082, HMSTR:0.0021, DOGS:0.00041, CATI:0.0410,  // TON ecosystem
-  BRETT:0.1420, PONKE:0.0681, POPCAT:0.6810,              // Base/SOL memes
-  MOG:0.000002410, TURBO:0.0082, BABYDOGE:0.000000002,   // ETH memes
-  PENDLE:5.421, ETHFI:3.241, RSETH:3541,                  // LSDfi
-  STRK:0.681, ZETA:0.481, ALT:0.181,                     // L2/infra
-  IO:4.821, ARKM:1.481, TNSR:0.481,                      // AI/infra
-  LISTA:0.281, BANANA:41.2, CELO:0.681,                  // DeFi misc
-  CKB:0.0182, VENOM:0.0481, KAVA:0.681,                  // L1 alts
+  // ── LARGE CAP (топ-10) ───────────────────────────────────────
+  BTC:84200, ETH:3820, BNB:612, SOL:182, XRP:0.581,
+  DOGE:0.198, ADA:0.492, AVAX:38.4, DOT:9.12, MATIC:0.921,
+  // ── MID CAP ─────────────────────────────────────────────────
+  LINK:16.8, UNI:10.2, LTC:92.4, BCH:412, ETC:28.1,
+  ATOM:9.21, FIL:6.42, ICP:14.2, APT:11.4, ARB:1.142,
+  OP:2.48, NEAR:7.82, SUI:3.84, TON:6.12, TRX:0.138,
+  // ── DeFi ────────────────────────────────────────────────────
+  AAVE:102, CRV:0.482, MKR:3120, COMP:62.4, SNX:3.12,
+  GRT:0.212, LDO:2.08, RPL:20.4, SUSHI:1.42, BAL:3.84,
+  YFI:8420, CVX:4.82, FRAX:1.00, LQTY:1.84, PENDLE:6.21,
+  ETHFI:3.84, AERO:1.84, CRO:0.124, CELO:0.821,
+  // ── Layer 2 / Infra ─────────────────────────────────────────
+  STRK:0.782, ZETA:0.521, ALT:0.212, METIS:48.2,
+  IMX:1.94, MANTA:1.24, SCROLL:0.481, ZK:0.181,
+  BLAST:0.0482, MODE:0.0481,
+  // ── AI / Data ────────────────────────────────────────────────
+  FET:2.68, AGIX:0.521, RENDER:9.42, TAO:512, IO:5.42,
+  ARKM:1.68, TNSR:0.521, WLD:2.84, OCEAN:0.842, NMR:18.4,
+  // ── Memes / Viral ────────────────────────────────────────────
+  PEPE:0.0000148, SHIB:0.0000284, FLOKI:0.000212,
+  BONK:0.0000384, WIF:3.12, BOME:0.0092, MEME:0.0312,
+  BRETT:0.168, PONKE:0.0821, POPCAT:0.782, TURBO:0.0092,
+  MOG:0.00000284, NOT:0.0094, HMSTR:0.0024, DOGS:0.000048,
+  CATI:0.0482, BABYDOGE:0.000000002,
+  // ── TON Ecosystem ───────────────────────────────────────────
+  STON:0.082, SCALE:0.048, JETTON:0.0048,
+  // ── Solana Ecosystem ─────────────────────────────────────────
+  JTO:3.12, PYTH:0.521, JUP:0.784, ORCA:3.84, RAY:3.42,
+  MSOL:198, JITO:0.048, DRIFT:0.842,
+  // ── Стейблы / RWA ────────────────────────────────────────────
+  ONDO:1.02, EIGEN:2.68, W:0.521, ENA:0.784,
+  // ── GameFi / NFT ─────────────────────────────────────────────
+  SAND:0.448, MANA:0.412, AXS:7.42, ENJ:0.212,
+  GALA:0.042, FLOW:0.748, IMX:1.94, BLUR:0.312,
+  PRIME:14.2, NFT:0.000748,
+  // ── Misc L1 ──────────────────────────────────────────────────
+  ALGO:0.212, VET:0.042, EGLD:48.2, ROSE:0.092,
+  XMR:178, ZEC:31.2, DASH:31.4, HBAR:0.098,
+  EOS:0.748, XTZ:0.924, THETA:1.58, CKB:0.0194,
+  KAVA:0.748, FTM:0.848, ONE:0.0212,
+  // ── Ранее добавленные ────────────────────────────────────────
+  ORDI:44.2, SATS:0.000000421, LISTA:0.312, BANANA:44.2,
 };
 
-// ── КЛАССЫ ВОЛАТИЛЬНОСТИ ──────────────────────────────────────
 // Определяет амплитуду колебаний цены между тиками
 // Источник: средняя внутридневная волатильность (σ per tick)
+// ── КЛАССЫ ВОЛАТИЛЬНОСТИ ──────────────────────────────────────
 const VOL_CLASS = {
-  // σ в % за один 500ms тик
-  BTC:0.018, ETH:0.022, BNB:0.025, SOL:0.030,        // large cap: ~0.02%/тик
-  XRP:0.030, ADA:0.028, AVAX:0.032, DOT:0.030,         // mid cap:  ~0.03%/тик
+  // Large cap
+  BTC:0.018, ETH:0.022, BNB:0.025, SOL:0.030,
+  XRP:0.030, ADA:0.028, AVAX:0.032, DOT:0.030,
+  // Mid cap
   LINK:0.032, ARB:0.035, OP:0.035, NEAR:0.038,
-  INJ:0.045, SEI:0.050, TIA:0.048, SUI:0.042,          // small cap: ~0.04-0.05%
-  PEPE:0.080, SHIB:0.075, WIF:0.090, BONK:0.085,       // мемкоины: ~0.07-0.09%
-  TAO:0.060, RENDER:0.055, ENA:0.055, FET:0.050,
+  LTC:0.028, BCH:0.030, ATOM:0.035, APT:0.040,
+  SUI:0.042, TON:0.038, TRX:0.028, UNI:0.038,
+  // Small cap / DeFi
+  INJ:0.045, SEI:0.050, TIA:0.048, ENA:0.055,
+  FET:0.050, RENDER:0.055, TAO:0.060, IO:0.080,
+  ARKM:0.075, PENDLE:0.065, ETHFI:0.070,
+  AAVE:0.038, CRV:0.055, MKR:0.040, COMP:0.048,
+  GRT:0.060, LDO:0.055, ONDO:0.065, EIGEN:0.070,
+  // Memes
+  PEPE:0.080, SHIB:0.075, WIF:0.090, BONK:0.085,
+  FLOKI:0.095, BRETT:0.100, PONKE:0.105, POPCAT:0.095,
+  MOG:0.120, TURBO:0.115, NOT:0.110, HMSTR:0.130,
+  DOGS:0.125, CATI:0.120, MEME:0.095, BOME:0.100,
+  // Solana ecosystem
+  JTO:0.055, PYTH:0.060, JUP:0.058, RAY:0.065,
+  ORCA:0.070, DRIFT:0.080, MSOL:0.025,
+  // L2 / Infra
+  STRK:0.085, ZETA:0.090, ALT:0.095, METIS:0.060,
+  IMX:0.060, ZK:0.100, BLAST:0.110, MODE:0.115,
+  SCROLL:0.100, MANTA:0.095,
+  // GameFi
+  SAND:0.055, MANA:0.055, AXS:0.060, GALA:0.080,
+  BLUR:0.085, PRIME:0.070, FLOW:0.058,
+  // Misc
+  ALGO:0.040, VET:0.045, EGLD:0.042, HBAR:0.038,
+  FTM:0.060, ONE:0.070, KAVA:0.055, CKB:0.080,
   DEFAULT:0.040,
-  // Новые токены
-  NOT:0.110, BRETT:0.100, POPCAT:0.095, PONKE:0.105,
-  MOG:0.120, TURBO:0.115, PENDLE:0.065, ETHFI:0.070,
-  IO:0.080, ARKM:0.075, STRK:0.085, ZETA:0.090,
-  LISTA:0.085, BANANA:0.060, HMSTR:0.130, DOGS:0.125,
 };
 
 // ── ТИКОВЫЕ СПРЕДЫ (bid-ask на бирже) ────────────────────────
 // Реальная разница между лучшим бидом и аском в стакане
 // Источник: empirical data от маркет-мейкеров
 const TICK_SPREAD_BPS = {
-  BTC:1,   ETH:2,   BNB:3,   SOL:3,    // 0.01–0.03% bid-ask
-  XRP:5,   ADA:5,   AVAX:5,  DOT:5,    // 0.05% bid-ask
-  LINK:6,  ARB:7,   OP:7,    NEAR:8,   // 0.06–0.08%
-  INJ:10,  SEI:12,  TIA:10,  SUI:8,    // 0.10–0.12%
-  PEPE:20, SHIB:20, WIF:25,  BONK:25,  // мемкоины: 0.2–0.25%
-  TAO:15,  FET:12,  ENA:12,
+  BTC:1, ETH:2, BNB:3, SOL:3,
+  XRP:5, ADA:5, AVAX:5, DOT:5, LTC:4, BCH:4,
+  LINK:6, ARB:7, OP:7, NEAR:8, ATOM:6, APT:7,
+  SUI:8, TON:7, TRX:4, UNI:7,
+  INJ:10, SEI:12, TIA:10, ENA:12, FET:12,
+  RENDER:12, TAO:15, IO:14, ARKM:14, PENDLE:12,
+  AAVE:8, CRV:12, MKR:8, GRT:15, LDO:12,
+  ONDO:14, EIGEN:16, JTO:12, PYTH:13, JUP:12,
+  RAY:14, ORCA:15, DRIFT:18,
+  PEPE:20, SHIB:20, WIF:25, BONK:25, FLOKI:25,
+  BRETT:28, PONKE:30, POPCAT:28, MOG:35,
+  NOT:30, HMSTR:35, DOGS:38, CATI:32,
+  MEME:25, BOME:28, TURBO:32,
+  STRK:18, ZETA:20, ALT:22, METIS:15,
+  IMX:14, ZK:22, BLAST:25, MODE:28,
+  SAND:14, MANA:14, AXS:15, GALA:20,
+  BLUR:20, PRIME:16, ALGO:8,
+  VET:10, EGLD:10, HBAR:10, FTM:15,
   DEFAULT:10,
 };
 
-// ── СТРУКТУРНОЕ СМЕЩЕНИЕ ЦЕН ПО БИРЖАМ ───────────────────────
 // Реальный факт: одна и та же монета торгуется по разным ценам
 // на разных биржах из-за разного потока ордеров и маркет-мейкеров.
 // Binance = эталон (0). Остальные отклоняются.
 // Единица: доля от цены (0.001 = +0.1% относительно Binance)
+// ── СТРУКТУРНОЕ СМЕЩЕНИЕ ЦЕН ПО БИРЖАМ ───────────────────────
 const EX_STRUCTURAL_BIAS = {
-  binance:  0.00000,   // эталон
-  okx:     -0.00012,   // чуть ниже (конкурент)
-  bybit:    0.00018,   // чуть выше
-  kucoin:   0.00031,   // выше (менее ликвидный)
-  gate:     0.00072,   // заметно выше (региональная)
-  mexc:     0.00110,   // выше (~+0.11%)
-  htx:      0.00048,   // умеренно выше
-  coinbase: 0.00240,   // premium (~+0.24%, США спрос)
-  kraken:   0.00170,   // premium (USD/EUR пары)
-  bitget:   0.00038,   // незначительно выше
-  bitmart:  0.00140,   // заметно выше (малая ликвидность)
-  phemex:   0.00055,   // умеренно выше
-  crypto:   0.00190,   // premium
-  bingx:    0.00085,   // выше
-  lbank:    0.00195,   // высокое смещение (малая биржа)
-  xt:       0.00140,   // XT.com regional premium
-  whitebit: 0.00120,   // WhiteBIT European premium
-  poloniex: 0.00160,   // Poloniex legacy premium
-  huobi:    0.00048,   // Huobi Global
-  upbit:    0.00280,   // Upbit Korea kimchi premium
-  coinex:   0.00130,   // CoinEx moderate
-  probit:   0.00200,   // ProBit small exchange
-  ascendex: 0.00110,   // AscendEX moderate
-  dydx:     0.00000,   // dYdX synthetic (tracks index)
-  uniswap:  0.00050,   // Uniswap AMM slight premium
+  binance:  0.00000, okx:     -0.00012, bybit:    0.00018,
+  kucoin:   0.00031, gate:     0.00072, mexc:     0.00110,
+  htx:      0.00048, coinbase: 0.00240, kraken:   0.00170,
+  bitget:   0.00038, bitmart:  0.00140, phemex:   0.00055,
+  crypto:   0.00190, bingx:    0.00085, lbank:    0.00195,
+  xt:       0.00140, whitebit: 0.00120, poloniex: 0.00160,
+  huobi:    0.00048, upbit:    0.00280, coinex:   0.00130,
+  probit:   0.00200, ascendex: 0.00110, dydx:     0.00000,
+  uniswap:  0.00050, bitfinex: 0.00090, gemini:   0.00260,
+  bitstamp: 0.00180, okx_dex:  0.00020, pancake:  0.00080,
+  raydium:  0.00060, jupiter:  0.00030, curve:    0.00010,
+  aerodrome:0.00070, hyperliquid:0.00000,
 };
 
 // ── ЛИКВИДНОСТЬ БИРЖ (% от объёма Binance) ───────────────────
@@ -1056,6 +1143,9 @@ const EX_LIQUIDITY = {
   bitmart:0.080, phemex:0.090, crypto:0.120, bingx:0.100, lbank:0.070,
   xt:0.090, whitebit:0.110, poloniex:0.060, huobi:0.180, upbit:0.200,
   coinex:0.080, probit:0.040, ascendex:0.070, dydx:0.150, uniswap:0.300,
+  bitfinex:0.220, gemini:0.140, bitstamp:0.130, okx_dex:0.180,
+  pancake:0.250, raydium:0.200, jupiter:0.350, curve:0.280,
+  aerodrome:0.120, hyperliquid:0.200,
 };
 
 // ── БАЗОВЫЕ ОБЪЁМЫ 24h (USD) для топ монет ───────────────────
@@ -1066,34 +1156,107 @@ const BASE_VOLUMES_24H = {
   DEFAULT:50_000_000,
 };
 
-// EX_COINS — остаётся без изменений
 const EX_COINS = {
-  binance:['BTC','ETH','BNB','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC','LINK','UNI','LTC','ATOM','APT','ARB','OP','NEAR','SUI','TON','TRX','PEPE','SHIB','BONK','WIF','WLD','ALGO','AAVE','GRT','LDO','INJ','SEI','TIA','JTO','PYTH','JUP','ENA','W','RENDER','FET','TAO'],
-  okx:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','DOT','LINK','ARB','OP','NEAR','SUI','TON','TRX','PEPE','BONK','WIF','WLD','ALGO','AAVE','INJ','SEI','TIA','ENA','FET','TAO','ORDI'],
-  bybit:['BTC','ETH','BNB','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC','LINK','APT','ARB','OP','NEAR','SUI','TON','PEPE','SHIB','BONK','WIF','MEME','WLD','AAVE','INJ','SEI','TIA','JTO','ENA','RENDER','TAO'],
-  kucoin:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','DOT','LINK','UNI','APT','ARB','NEAR','TON','FLOKI','BONK','WIF','ALGO','AAVE','GRT','INJ','TIA','FET','AGIX','RENDER'],
-  gate:['BTC','ETH','BNB','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC','LINK','ARB','NEAR','SUI','PEPE','SHIB','FLOKI','BONK','WIF','BOME','MEME','ORDI','ALGO','VET','AAVE','INJ','ENA','FET','RENDER','TAO','BLUR'],
-  mexc:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','ARB','NEAR','TON','PEPE','SHIB','FLOKI','BONK','WIF','BOME','MEME','ORDI','SATS','WLD','ALGO','INJ','SEI','ENA','FET','AGIX','RENDER','BLUR','NFT'],
-  htx:['BTC','ETH','BNB','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC','LINK','TON','PEPE','WLD','ALGO','VET','AAVE','INJ'],
-  coinbase:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC','LINK','UNI','LTC','ATOM','APT','ARB','NEAR','ALGO','AAVE','GRT','COMP','SNX'],
-  kraken:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC','LINK','UNI','LTC','BCH','ETC','ATOM','XMR','ZEC','DASH','AAVE','GRT'],
-  bitget:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','APT','ARB','NEAR','TON','PEPE','BONK','WIF','MEME','INJ','SEI','ENA','RENDER','TAO'],
-  bitmart:['BTC','ETH','SOL','XRP','ADA','AVAX','NEAR','TON','PEPE','SHIB','FLOKI','WIF','BOME','MEME'],
-  phemex:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','ARB','NEAR'],
-  crypto:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC','LINK','UNI','LTC','CRO'],
-  bingx:['BTC','ETH','SOL','XRP','DOGE','PEPE','SHIB','BONK','WIF'],
-  lbank:['BTC','ETH','SOL','XRP','DOGE','PEPE','SHIB','FLOKI','BONK'],
-  xt:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','ARB','OP','NEAR','TON','PEPE','SHIB','BONK','WIF','MEME','NOT','BRETT','IO','ARKM'],
-  whitebit:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','DOT','LINK','ARB','TON','PEPE','NOT','LISTA'],
-  poloniex:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC','LINK','UNI','LTC','TRX','ALGO'],
-  huobi:['BTC','ETH','BNB','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC','LINK','TON','PEPE','WLD','INJ','ENA'],
-  upbit:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC','LINK','UNI','LTC','BCH','ETC','ATOM','XRP'],
-  coinex:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','ARB','NEAR','TON','PEPE','BONK','WIF','NOT','IO'],
-  probit:['BTC','ETH','SOL','XRP','DOGE','ADA','NEAR','TON','PEPE'],
-  ascendex:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','DOT','ARB','NEAR','INJ','SEI','ENA'],
-  dydx:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC','LINK','ARB','OP','NEAR','APT','SUI'],
-  uniswap:['ETH','LINK','UNI','AAVE','GRT','LDO','RPL','SNX','CRV','MKR','COMP','PEPE','SHIB','WIF','ENA','PENDLE','ETHFI'],
+  // ── ТОП БИРЖИ — максимальный охват ──────────────────────────
+  binance: ['BTC','ETH','BNB','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC',
+            'LINK','UNI','LTC','ATOM','APT','ARB','OP','NEAR','SUI','TON',
+            'TRX','PEPE','SHIB','BONK','WIF','WLD','ALGO','AAVE','GRT','LDO',
+            'INJ','SEI','TIA','JTO','PYTH','JUP','ENA','W','RENDER','FET',
+            'TAO','ONDO','EIGEN','NOT','IO','ARKM','PENDLE','ETHFI','STRK','CRV'],
+  okx:     ['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','DOT','LINK','ARB',
+            'OP','NEAR','SUI','TON','TRX','PEPE','BONK','WIF','WLD','ALGO',
+            'AAVE','INJ','SEI','TIA','ENA','FET','TAO','ORDI','NOT','IO',
+            'ARKM','STRK','ZETA','ONDO','EIGEN','PYTH','JUP','JTO','PENDLE','BLUR'],
+  bybit:   ['BTC','ETH','BNB','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC',
+            'LINK','APT','ARB','OP','NEAR','SUI','TON','PEPE','SHIB','BONK',
+            'WIF','MEME','WLD','AAVE','INJ','SEI','TIA','JTO','ENA','RENDER',
+            'TAO','NOT','BRETT','IO','ARKM','STRK','ONDO','DRIFT','JUP','PYTH'],
+  kucoin:  ['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','DOT','LINK','UNI',
+            'APT','ARB','NEAR','TON','FLOKI','BONK','WIF','ALGO','AAVE','GRT',
+            'INJ','TIA','FET','AGIX','RENDER','NOT','BRETT','POPCAT','IO','ARKM',
+            'PENDLE','ETHFI','ZK','BLAST','LISTA','BANANA','ONDO','STRK','ZETA','RAY'],
+  gate:    ['BTC','ETH','BNB','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC',
+            'LINK','ARB','NEAR','SUI','PEPE','SHIB','FLOKI','BONK','WIF','BOME',
+            'MEME','ORDI','ALGO','VET','AAVE','INJ','ENA','FET','RENDER','TAO',
+            'BLUR','NOT','BRETT','PONKE','POPCAT','TURBO','MOG','HMSTR','DOGS','CATI',
+            'IO','ARKM','PENDLE','STRK','ZETA','DRIFT','JUP','RAY','ORCA','LISTA'],
+  mexc:    ['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','ARB','NEAR','TON',
+            'PEPE','SHIB','FLOKI','BONK','WIF','BOME','MEME','ORDI','SATS','WLD',
+            'ALGO','INJ','SEI','ENA','FET','AGIX','RENDER','BLUR','NFT','NOT',
+            'BRETT','PONKE','POPCAT','TURBO','MOG','HMSTR','DOGS','CATI','BABYDOGE',
+            'IO','ARKM','STRK','ZETA','ALT','LISTA','BANANA','DRIFT','ZK','BLAST'],
+  htx:     ['BTC','ETH','BNB','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC',
+            'LINK','TON','PEPE','WLD','ALGO','VET','AAVE','INJ','ENA','FET',
+            'NOT','BONK','WIF','STRK','RENDER','TAO','ARB','NEAR','SUI','JTO'],
+  coinbase:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC','LINK',
+            'UNI','LTC','ATOM','APT','ARB','NEAR','ALGO','AAVE','GRT','COMP',
+            'SNX','CRV','MKR','LDO','ONDO','RENDER','FET','PENDLE','EIGEN','WLD'],
+  kraken:  ['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC','LINK',
+            'UNI','LTC','BCH','ETC','ATOM','XMR','ZEC','DASH','AAVE','GRT',
+            'MKR','COMP','CRV','SNX','LDO','ONDO','INJ','TAO','NEAR','ARB'],
+  bitget:  ['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','APT','ARB','NEAR',
+            'TON','PEPE','BONK','WIF','MEME','INJ','SEI','ENA','RENDER','TAO',
+            'NOT','BRETT','IO','ARKM','STRK','ONDO','JTO','PYTH','JUP','FLOKI'],
+  bitmart: ['BTC','ETH','SOL','XRP','ADA','AVAX','NEAR','TON','PEPE','SHIB',
+            'FLOKI','WIF','BOME','MEME','NOT','BRETT','HMSTR','DOGS','CATI','TURBO'],
+  phemex:  ['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','ARB','NEAR','INJ',
+            'SEI','MATIC','LINK','APT','SUI'],
+  crypto:  ['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC','LINK',
+            'UNI','LTC','CRO','ATOM','NEAR','ARB','AAVE','GRT'],
+  bingx:   ['BTC','ETH','SOL','XRP','DOGE','PEPE','SHIB','BONK','WIF','NOT',
+            'BRETT','FLOKI','MEME','BOME','ARB','NEAR','TON'],
+  lbank:   ['BTC','ETH','SOL','XRP','DOGE','PEPE','SHIB','FLOKI','BONK','NOT',
+            'BRETT','HMSTR','DOGS','TURBO','MOG'],
+  // ── ДОБАВЛЕННЫЕ РАНЕЕ ────────────────────────────────────────
+  xt:      ['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','ARB','OP','NEAR',
+            'TON','PEPE','SHIB','BONK','WIF','MEME','NOT','BRETT','IO','ARKM',
+            'STRK','ZETA','ONDO','LISTA','HMSTR','DOGS','CATI','JUP','PYTH','SEI'],
+  whitebit:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','DOT','LINK','ARB',
+            'TON','PEPE','NOT','LISTA','NEAR','BNB','MATIC','UNI','ENA','INJ'],
+  poloniex:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC','LINK',
+            'UNI','LTC','TRX','ALGO','NEAR','ARB','AAVE','GRT'],
+  huobi:   ['BTC','ETH','BNB','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC',
+            'LINK','TON','PEPE','WLD','INJ','ENA','NOT','ARB','NEAR','FET'],
+  upbit:   ['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC','LINK',
+            'UNI','LTC','BCH','ETC','ATOM','EOS','XTZ','HBAR','ALGO','VET',
+            'SAND','MANA','AXS','FLOW','GALA','ARB','NEAR','INJ','STX','IMX'],
+  coinex:  ['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','ARB','NEAR','TON',
+            'PEPE','BONK','WIF','NOT','IO','BRETT','STRK','INJ','SEI','ENA'],
+  probit:  ['BTC','ETH','SOL','XRP','DOGE','ADA','NEAR','TON','PEPE','NOT','BRETT'],
+  ascendex:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','DOT','ARB','NEAR',
+            'INJ','SEI','ENA','TIA','JTO','STRK','ONDO'],
+  dydx:    ['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC','LINK',
+            'ARB','OP','NEAR','APT','SUI','INJ','SEI','TIA','ATOM','LTC'],
+  uniswap: ['ETH','LINK','UNI','AAVE','GRT','LDO','RPL','SNX','CRV','MKR',
+            'COMP','PEPE','SHIB','WIF','ENA','PENDLE','ETHFI','BLUR','ONDO',
+            'BAL','CVX','YFI','FRAX','SUSHI'],
+  // ── НОВЫЕ БИРЖИ ──────────────────────────────────────────────
+  bitfinex:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC','LINK',
+            'LTC','BCH','ETC','XMR','ALGO','AAVE','GRT','MKR','SNX','NEAR',
+            'ARB','OP','UNI','CRV','COMP'],
+  gemini:  ['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC','LINK',
+            'UNI','LTC','ATOM','AAVE','MKR','COMP','GRT','SNX','CRV','NEAR'],
+  bitstamp:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC','LINK',
+            'UNI','LTC','BCH','ALGO','AAVE','NEAR','ARB'],
+  okx_dex: ['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','LINK','ARB','OP',
+            'NEAR','PEPE','BONK','WIF','AAVE','UNI','PENDLE','ENA','INJ','STRK'],
+  pancake: ['BNB','ETH','CAKE','BTCB','XRP','ADA','DOT','LINK','UNI','AAVE',
+            'SHIB','FLOKI','BONK','PEPE','MEME','NOT','INJ','SEI','TIA','ENA',
+            'PENDLE','ONDO','LISTA','ARKM','ALT'],
+  raydium: ['SOL','BTC','ETH','BONK','WIF','BOME','JTO','PYTH','JUP','RAY',
+            'ORCA','MSOL','DRIFT','RENDER','MEME','NOT','BRETT','POPCAT','MOG','PONKE'],
+  jupiter: ['SOL','BTC','ETH','BONK','WIF','BOME','JTO','PYTH','JUP','RAY',
+            'ORCA','MSOL','DRIFT','RENDER','MEME','NOT','BRETT','POPCAT',
+            'TURBO','PONKE','HMSTR','DOGS','CATI','IO','ARKM'],
+  curve:   ['ETH','BTC','AAVE','CRV','CVX','MKR','SNX','FRAX','LQTY','PENDLE',
+            'ETHFI','YFI','BAL','COMP','UNI','GRT','LDO'],
+  aerodrome:['ETH','AERO','USDC','CBBTC','LINK','UNI','AAVE','CRV','PENDLE',
+             'BRETT','MOG','ENA','LDO','SNX','BAL'],
+  hyperliquid:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','DOT','LINK','ARB',
+               'OP','NEAR','APT','SUI','INJ','SEI','TIA','PEPE','WIF','BONK',
+               'ENA','TAO','IO','RENDER','STRK','ONDO','EIGEN','NOT','BRETT','PENDLE'],
 };
+
 
 // ── ГЛОБАЛЬНАЯ "ИСТИНА" РЫНКА ─────────────────────────────────
 // Одна глобальная mid-цена на актив — как реальный рынок,
@@ -2924,7 +3087,7 @@ function renderProfile() {
     </div>
     <div class="prof-row">
       <span class="prof-key">🏦 ${t('exchanges_connected')}</span>
-      <span class="prof-val c">${S.connected.size} / 15</span>
+      <span class="prof-val c">${S.connected.size} / 35</span>
     </div>
     <div class="prof-row">
       <span class="prof-key">📊 ${t('ref_commission')}</span>

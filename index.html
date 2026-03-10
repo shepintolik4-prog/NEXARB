@@ -18,7 +18,7 @@
   --font:'Oxanium',sans-serif;--mono:'Fira Code',monospace;
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{height:100%;height:100dvh;overscroll-behavior:none}
+html,body{height:100%;overscroll-behavior:none}
 body{background:var(--bg);color:var(--text);font-family:var(--font);overflow:hidden}
 
 /* STARS BG */
@@ -28,10 +28,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);overflow:hid
 .scanline{position:fixed;inset:0;z-index:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,207,255,0.012) 2px,rgba(0,207,255,0.012) 4px);pointer-events:none}
 
 /* APP SHELL */
-/* height управляется JS через --tg-vh (Telegram viewport) или 100dvh (браузер) */
-.app{position:relative;z-index:1;width:100%;max-width:480px;
-     height:100vh;height:100dvh;height:var(--tg-vh,100dvh);
-     margin:0 auto;display:flex;flex-direction:column;overflow:visible}
+.app{position:relative;z-index:1;width:100%;max-width:480px;height:100vh;margin:0 auto;display:flex;flex-direction:column;overflow:visible}
 
 /* FILTER ZONE */
 #filterZone{flex-shrink:0;background:rgba(6,13,24,0.97);border-bottom:1px solid var(--border)}
@@ -687,7 +684,7 @@ const S = {
   vip: false, plan: 'year',
   lang: 'ru',
   connected: new Set(['binance','okx']),
-  trades: 0, maxFree: 5, freeSignals: 3,
+  trades: 0, maxFree: 5,
   balance: 3240, profit: 0,
   freeFee: 0.008, vipFee: 0.003,
   ownerEarned: 0,
@@ -1900,22 +1897,7 @@ const _ui = {
 };
 
 // ── BACKEND API CLIENT ────────────────────────────────────────
-// Автоопределение URL сервера:
-//   Railway/Vercel → тот же домен что у HTML, порт по умолчанию
-//   Локально       → http://localhost:8000
-// Чтобы переопределить вручную — задай window.NEXARB_API до загрузки:
-//   <script>window.NEXARB_API='https://nexarb-api-xxx.railway.app/api/v1'</script>
-window.NEXARB_API = 'https://nexarb-api.onrender.com/api/v1';
-const API_BASE = (() => {
-  if (window.NEXARB_API) return window.NEXARB_API;
-  const { protocol, hostname, port } = location;
-  // Открыт через file:// или localhost → локальный сервер
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    return `http://${hostname}:8000/api/v1`;
-  }
-  // Открыт через https (Vercel / Railway / домен) → тот же хост
-  return `${protocol}//${hostname}${port ? ':' + port : ''}/api/v1`;
-})();
+const API_BASE = 'https://nexarb-api.onrender.com/api/v1';
 
 const API = {
   _retries: new Map(),
@@ -2052,21 +2034,14 @@ const wsManager = {
   _lastPong: 0,
   connected: false,
 
-  // FIX 3: вычисляем URL price_feed автоматически из текущего хоста.
-  // Локально: ws://localhost:8001/ws/prices
-  // Railway:  wss://nexarb-feed.railway.app/ws/prices  (задать PRICE_FEED_URL)
-  _feedUrl() {
-    if (typeof PRICE_FEED_URL !== 'undefined' && PRICE_FEED_URL) return PRICE_FEED_URL;
-    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host  = location.host.replace(/:\d+$/, '');   // убираем порт
-    return `${proto}//${host}:8001/ws/prices`;
-  },
-
-  connect(url) {
-    url = url || this._feedUrl();
+  connect(url = 'wss://your-backend.com/ws/prices') {
     if (this.ws) { try { this.ws.close(1000); } catch {} }
     try {
-      this.ws = new WebSocket(url);
+      // Attach session token as query param (standard WS auth pattern)
+      const wsUrl = SESSION.valid()
+        ? `${url}?token=${encodeURIComponent(SESSION._token)}`
+        : url;
+      this.ws = new WebSocket(wsUrl);
       this.ws.onopen    = () => this._onOpen();
       this.ws.onmessage = e  => this._onMessage(e);
       this.ws.onerror   = () => this._onError();
@@ -2078,12 +2053,6 @@ const wsManager = {
     this.connected = true;
     this._delay = 1000;
     _netStatus.setOk();
-
-    // FIX 3: отправляем JWT как первое сообщение (price_feed.py ждёт {type:"auth"})
-    if (SESSION.valid() && SESSION._token) {
-      this.send({ type: 'auth', token: SESSION._token });
-    }
-
     // Subscribe to all connected exchanges
     this.send({
       type: 'subscribe',
@@ -2107,15 +2076,8 @@ const wsManager = {
     try {
       const data = JSON.parse(e.data);
 
-      // Auth response
-      if (data.type === 'auth_ok')   { return; }
-      if (data.type === 'auth_fail') { console.warn('WS auth failed:', data.error); return; }
-
       // Heartbeat response
       if (data.type === 'pong') { this._lastPong = Date.now(); return; }
-
-      // Server shutdown notice — reconnect after delay
-      if (data.type === 'server_shutdown') { this._scheduleReconnect(); return; }
 
       // Order status update pushed from server
       if (data.type === 'order_update') {
@@ -2123,23 +2085,9 @@ const wsManager = {
         return;
       }
 
-      // Balance update pushed from server (after trade, deposit, etc.)\
+      // Balance update pushed from server (after trade, deposit, etc.)
       if (data.type === 'balance_update') {
         _ui.setBalance(data.balance);
-        return;
-      }
-
-      // FIX 3: сигналы от price_feed — обновляем SIGS и перерисовываем
-      if (data.type === 'signals' && Array.isArray(data.data)) {
-        const incoming = data.data;
-        // Мёржим: обновляем существующие + добавляем новые, не дублируя
-        const sigMap = new Map(SIGS.map(s => [s.id, s]));
-        incoming.forEach(s => {
-          const id = `${s.sym}:${s.bx}:${s.sx}`;
-          sigMap.set(id, { ...s, id });
-        });
-        SIGS = [...sigMap.values()].sort((a, b) => (b.net || b.spread) - (a.net || a.spread));
-        rafScheduler.schedule();
         return;
       }
 
@@ -2575,19 +2523,6 @@ async function loadAccountFromServer() {
     S.userId  = data.user_id  || '';
     S.refCode = data.ref_code || '';
 
-    // Загружаем конфиг платформы один раз (кеш — не перезапрашивать)
-    if (data.platform && !S._cfgLoaded) {
-      const cfg = data.platform;
-      if (cfg.fee_free            !== undefined) S.freeFee    = cfg.fee_free;
-      if (cfg.fee_vip             !== undefined) S.vipFee     = cfg.fee_vip;
-      if (cfg.free_trades_max     !== undefined) S.maxFree    = cfg.free_trades_max;
-      if (cfg.free_signals_count  !== undefined) S.freeSignals= cfg.free_signals_count;
-      if (cfg.min_trade           !== undefined) S.minTrade   = cfg.min_trade;
-      if (cfg.max_trade           !== undefined) S.maxTrade   = cfg.max_trade;
-      if (cfg.demo_start_balance  !== undefined) S.demoStartBalance = cfg.demo_start_balance;
-      S._cfgLoaded = true;
-    }
-
     // Подключённые биржи — синхронизируем из сервера
     if (Array.isArray(data.connected_exchanges)) {
       S.connected = new Set(data.connected_exchanges);
@@ -2911,9 +2846,7 @@ function renderSigs() {
   document.getElementById('sigCount').textContent = `${list.length} / ${totalSigs} · 🔥${hotSigs}`;
 
   document.getElementById('sigList').innerHTML = list.map(sig => {
-    // Первые S.freeSignals сигналов видны всем, остальные — только VIP
-    const sigIndex = list.indexOf(sig);
-    const locked = !S.vip && sig.vip && sigIndex >= S.freeSignals;
+    const locked = sig.vip && !S.vip;
     const tm = TYPE_META[sig.type] || { label: sig.type, icon:'◈', color:'var(--text2)' };
     const bConn = conn.has(sig.bx.toLowerCase()) || !['cex'].includes(sig.type);
     const sConn = conn.has(sig.sx.toLowerCase()) || !['cex'].includes(sig.type);
@@ -2936,14 +2869,14 @@ function renderSigs() {
       netPct = +(rate - exchFeePct - platFeePct).toFixed(4);
       rateLabel = `${rate.toFixed(4)}%`;
       rateSub = '/8ч';
-      profitLabel = '✓ чистый /8ч';
+      profitLabel = 'чистый /8ч';
       displayAnnual = sig.annualYield ? `~${sig.annualYield}%/год` : '';
     } else {
       // CEX/DEX/Tri/etc: разовая сделка
       netPct = +(sig.spread - exchFeePct - platFeePct).toFixed(3);
       rateLabel = `+${sig.spread}%`;
       rateSub = '';
-      profitLabel = '✓ после всех комиссий';
+      profitLabel = 'чистый профит';
     }
 
     if (!locked && netPct <= 0) return '';
@@ -3724,31 +3657,6 @@ function mkStars(){
 // INIT
 // ========================================================
 document.addEventListener('DOMContentLoaded', async () => {
-  // ── Telegram WebApp инициализация ────────────────────────
-  const tg = window.Telegram?.WebApp;
-  if (tg) {
-    tg.ready();
-    tg.expand();
-
-    if (tg.themeParams?.bg_color) {
-      document.documentElement.style.setProperty('--tg-bg', tg.themeParams.bg_color);
-    }
-
-    const applyViewport = () => {
-      const h = tg.viewportStableHeight || tg.viewportHeight || window.innerHeight;
-      // Только CSS переменную — не трогаем inline style чтобы не сломать flex
-      document.documentElement.style.setProperty('--tg-vh', h + 'px');
-    };
-    tg.onEvent('viewportChanged', applyViewport);
-    applyViewport();
-  } else {
-    const applyVh = () => {
-      document.documentElement.style.setProperty('--tg-vh', window.innerHeight + 'px');
-    };
-    window.addEventListener('resize', applyVh);
-    applyVh();
-  }
-
   mkStars();
 
   // ── Шаг 1: загружаем UI-настройки из localStorage ─────────
@@ -3810,18 +3718,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // ── Сигналы: симуляция запускается СРАЗУ ─────────────────
-  // Это гарантирует работу сигналов даже без price_feed сервера.
-  // WS подключается как улучшение поверх — если недоступен, симуляция продолжает работать.
+  // ── Сигналы: обновление каждые 500ms ─────────────────────
+  // Production: заменить на wsManager.connect('wss://...')
   setInterval(liveUpdate, 500);
-
-  // Подключаем WS к price_feed только если он явно задан
-  // (price_feed.py сейчас не запущен на Render — только server.py)
-  if (typeof PRICE_FEED_URL !== 'undefined' && PRICE_FEED_URL) {
-    wsManager.connect(PRICE_FEED_URL);
-  }
-  // Если WS подключился — он будет обновлять SIGS через _onMessage
-  // Если нет — setInterval выше обеспечивает симуляцию
 
   // Обновляем badge
   setInterval(() => {

@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { BarChart3, TrendingUp, TrendingDown } from 'lucide-react';
-import { EXCHANGES } from '../constants';
+import { EXCHS } from '../constants';
 
 interface PriceTick {
   exchange: string;
@@ -31,7 +31,7 @@ const Scanner: React.FC<{ prices: PriceTick[] }> = ({ prices }) => {
           <thead>
             <tr className="bg-bg3/50 text-[10px] text-muted uppercase font-bold tracking-widest">
               <th className="p-4 border-b border-border">Symbol</th>
-              {EXCHANGES.map(ex => (
+              {EXCHS.map(ex => (
                 <th key={ex.id} className="p-4 border-b border-border text-center">{ex.name}</th>
               ))}
             </tr>
@@ -40,7 +40,7 @@ const Scanner: React.FC<{ prices: PriceTick[] }> = ({ prices }) => {
             {symbols.map(sym => (
               <tr key={sym} className="border-b border-border/50 hover:bg-bg3/20 transition-colors">
                 <td className="p-4 font-bold text-sm">{sym}</td>
-                {EXCHANGES.map(ex => {
+                {EXCHS.map(ex => {
                   const tick = prices.find(p => p.exchange === ex.id && p.pair.startsWith(sym));
                   return (
                     <td key={ex.id} className="p-4 text-center">

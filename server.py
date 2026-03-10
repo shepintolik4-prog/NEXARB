@@ -431,6 +431,14 @@ class NexarbHandler(BaseHTTPRequestHandler):
             json_response(self, 429, {'error': 'Too many requests', 'retry_after': 60})
         return allowed
 
+    def do_HEAD(self):
+        # UptimeRobot и другие мониторы используют HEAD запросы
+        # Отвечаем 200 OK без тела — сервер жив
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', '0')
+        self.end_headers()
+
     def do_GET(self):
         if not self._global_rate_check():
             return
@@ -673,8 +681,6 @@ class NexarbHandler(BaseHTTPRequestHandler):
 
         json_response(self, 200, {
             'user_id':   user_id,
-            'name':      user.get('tg_first_name') or user.get('tg_username') or 'User',
-            'username':  user.get('tg_username', ''),
             'balance':   round(balance, 2),
             'profit':    round(stats.get('total_profit', 0), 4),
             'trades':    stats.get('total_trades', 0),

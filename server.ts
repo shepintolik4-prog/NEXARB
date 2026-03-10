@@ -20,13 +20,118 @@ async function startServer() {
     },
   });
 
-  const PORT = process.env.PORT || 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   app.use(express.json());
 
+  // --- DATABASE MOCK (In production use SQLite or MongoDB) ---
+  let db = {
+    users: {} as any,
+    trades: [] as any[],
+    config: {
+      fee_free: 0.008,
+      fee_vip: 0.003,
+      demo_mode: true,
+      free_trades_max: 5
+    }
+  };
+
+  // Helper to get or create user
+  const getUser = (userId: string) => {
+    if (!db.users[userId]) {
+      db.users[userId] = {
+        id: userId,
+        balance: 3000,
+        profit: 0,
+        trades: 0,
+        vip: false,
+        vip_expires: null,
+        connected_exchanges: ['binance', 'okx'],
+        ref_code: 'REF' + Math.random().toString(36).substring(7).toUpperCase()
+      };
+    }
+    return db.users[userId];
+  };
+
   // API Routes
   app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", timestamp: new Date().toISOString() });
+    res.json({ status: "ok", timestamp: new Date().toISOString(), demo: db.config.demo_mode });
+  });
+
+  // Account Info
+  app.get("/api/v1/account", (req, res) => {
+    const userId = req.query.userId as string || "demo_user";
+    res.json(getUser(userId));
+  });
+
+  // Submit Trade
+  app.post("/api/v1/trades", (req, res) => {
+    const { userId, symbol, amount, spread, buyExchange, sellExchange, type } = req.body;
+    const user = getUser(userId || "demo_user");
+
+    if (!user.vip && user.trades >= db.config.free_trades_max) {
+      return res.status(403).json({ error: "Free limit reached" });
+    }
+
+    const feeRate = user.vip ? db.config.fee_vip : db.config.fee_free;
+    const platformFee = amount * feeRate;
+    const netProfit = (amount * (spread / 100)) - platformFee;
+
+    user.balance += netProfit;
+    user.profit += netProfit;
+    user.trades += 1;
+
+    const trade = {
+      id: Math.random().toString(36).substring(7),
+      userId: user.id,
+      symbol,
+      amount,
+      netProfit,
+      platformFee,
+      spread,
+      buyExchange,
+      sellExchange,
+      type,
+      status: 'completed',
+      created_at: Date.now() / 1000
+    };
+
+    db.trades.push(trade);
+    res.json({ ...trade, newBalance: user.balance });
+  });
+
+  // VIP Subscription
+  app.post("/api/v1/vip/subscribe", (req, res) => {
+    const { userId, plan } = req.body;
+    const user = getUser(userId || "demo_user");
+    user.vip = true;
+    user.vip_expires = Date.now() + (plan === 'year' ? 31536000000 : 2592000000);
+    res.json({ ok: true, expires_at: user.vip_expires / 1000 });
+  });
+
+  // Admin Stats
+  app.get("/api/admin/stats", (req, res) => {
+    const totalUsers = Object.keys(db.users).length;
+    const totalTrades = db.trades.length;
+    const totalVolume = db.trades.reduce((a, b) => a + b.amount, 0);
+    const platformFees = db.trades.reduce((a, b) => a + b.platformFee, 0);
+
+    res.json({
+      total_users: totalUsers,
+      total_trades: totalTrades,
+      total_volume: totalVolume,
+      platform_fees: platformFees,
+      vip_users: Object.values(db.users).filter((u: any) => u.vip).length,
+      trades_24h: db.trades.filter(t => t.created_at > (Date.now()/1000 - 86400)).length,
+      top_symbols: [],
+      top_exchanges: []
+    });
+  });
+
+  // Admin Config
+  app.post("/api/admin/config", (req, res) => {
+    db.config = { ...db.config, ...req.body };
+    res.json({ ok: true });
   });
 
   // Mock Price Feed Logic (In real app, this would connect to exchanges)

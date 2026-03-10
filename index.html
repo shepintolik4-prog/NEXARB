@@ -434,7 +434,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);overflow:hid
           <div class="brand-ver">v4.0 · HFT ENGINE · 8 СТРАТЕГИЙ</div>
         </div>
       </div>
-      <button class="tier-btn tier-free" id="tierBtn" onclick="showPg('vip')">⚡ FREE → VIP</button>
+      <button class="tier-btn tier-free" id="tierBtn" onclick="showPg('vip')">${t('buy_vip')}</button>
     </div>
     <div class="hdr-stats">
       <div class="hdr-stat">
@@ -591,7 +591,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);overflow:hid
 
       <!-- AUTO-TRADE LINK -->
       <div style="height:14px"></div>
-      <div style="background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.25);border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:12px;cursor:pointer" onclick="S.vip?showPg('auto'):toastMsg('👑 Авто-торговля только для VIP','warn')">
+      <div style="background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.25);border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:12px;cursor:pointer" onclick="S.vip?showPg('auto'):toastMsg(t('auto_only_vip'),'warn')">
         <div style="font-size:28px">🤖</div>
         <div style="flex:1">
           <div style="font-weight:700;font-size:13px;color:#c084fc" data-i18n="auto_title">Авто-Торговля 24/7</div>
@@ -895,6 +895,17 @@ const EX_FEES = {
   crypto:   { maker:0.0040, taker:0.0040 }, // Crypto.com standard
   bingx:    { maker:0.0010, taker:0.0020 }, // Standard
   lbank:    { maker:0.0010, taker:0.0020 }, // Standard
+  // ── Новые биржи ──────────────────────────────────────────────
+  xt:       { maker:0.0008, taker:0.0016 }, // XT.com Standard
+  whitebit: { maker:0.0010, taker:0.0010 }, // WhiteBIT Standard
+  poloniex: { maker:0.0015, taker:0.0020 }, // Poloniex Standard
+  huobi:    { maker:0.0020, taker:0.0020 }, // Huobi Global
+  upbit:    { maker:0.0005, taker:0.0005 }, // Upbit Korea (lowest fees)
+  coinex:   { maker:0.0016, taker:0.0020 }, // CoinEx Standard
+  probit:   { maker:0.0020, taker:0.0020 }, // ProBit Standard
+  ascendex: { maker:0.0010, taker:0.0010 }, // AscendEX Standard
+  dydx:     { maker:0.0000, taker:0.0005 }, // dYdX maker rebate
+  uniswap:  { maker:0.0030, taker:0.0030 }, // Uniswap v3 0.3% pool
 };
 
 // ── РЕАЛЬНЫЕ WITHDRAWAL FEES (сеть + биржа, USD, 2025) ───────
@@ -962,6 +973,15 @@ const BASE_PRICES = {
   JTO:2.84, PYTH:0.481, JUP:0.682, STRK:0.881, EIGEN:2.41,
   ENA:0.681, W:0.481, ONDO:0.881, RENDER:8.21, FET:2.41,
   AGIX:0.481, TAO:488, PRIME:12.4, BLUR:0.281, NFT:0.000682,
+  // ── Новые токены 2025 ───────────────────────────────────────
+  NOT:0.0082, HMSTR:0.0021, DOGS:0.00041, CATI:0.0410,  // TON ecosystem
+  BRETT:0.1420, PONKE:0.0681, POPCAT:0.6810,              // Base/SOL memes
+  MOG:0.000002410, TURBO:0.0082, BABYDOGE:0.000000002,   // ETH memes
+  PENDLE:5.421, ETHFI:3.241, RSETH:3541,                  // LSDfi
+  STRK:0.681, ZETA:0.481, ALT:0.181,                     // L2/infra
+  IO:4.821, ARKM:1.481, TNSR:0.481,                      // AI/infra
+  LISTA:0.281, BANANA:41.2, CELO:0.681,                  // DeFi misc
+  CKB:0.0182, VENOM:0.0481, KAVA:0.681,                  // L1 alts
 };
 
 // ── КЛАССЫ ВОЛАТИЛЬНОСТИ ──────────────────────────────────────
@@ -976,6 +996,11 @@ const VOL_CLASS = {
   PEPE:0.080, SHIB:0.075, WIF:0.090, BONK:0.085,       // мемкоины: ~0.07-0.09%
   TAO:0.060, RENDER:0.055, ENA:0.055, FET:0.050,
   DEFAULT:0.040,
+  // Новые токены
+  NOT:0.110, BRETT:0.100, POPCAT:0.095, PONKE:0.105,
+  MOG:0.120, TURBO:0.115, PENDLE:0.065, ETHFI:0.070,
+  IO:0.080, ARKM:0.075, STRK:0.085, ZETA:0.090,
+  LISTA:0.085, BANANA:0.060, HMSTR:0.130, DOGS:0.125,
 };
 
 // ── ТИКОВЫЕ СПРЕДЫ (bid-ask на бирже) ────────────────────────
@@ -1012,6 +1037,16 @@ const EX_STRUCTURAL_BIAS = {
   crypto:   0.00190,   // premium
   bingx:    0.00085,   // выше
   lbank:    0.00195,   // высокое смещение (малая биржа)
+  xt:       0.00140,   // XT.com regional premium
+  whitebit: 0.00120,   // WhiteBIT European premium
+  poloniex: 0.00160,   // Poloniex legacy premium
+  huobi:    0.00048,   // Huobi Global
+  upbit:    0.00280,   // Upbit Korea kimchi premium
+  coinex:   0.00130,   // CoinEx moderate
+  probit:   0.00200,   // ProBit small exchange
+  ascendex: 0.00110,   // AscendEX moderate
+  dydx:     0.00000,   // dYdX synthetic (tracks index)
+  uniswap:  0.00050,   // Uniswap AMM slight premium
 };
 
 // ── ЛИКВИДНОСТЬ БИРЖ (% от объёма Binance) ───────────────────
@@ -1019,6 +1054,8 @@ const EX_LIQUIDITY = {
   binance:1.000, okx:0.650, bybit:0.550, kraken:0.300, coinbase:0.480,
   kucoin:0.280,  gate:0.220, htx:0.200, bitget:0.180, mexc:0.160,
   bitmart:0.080, phemex:0.090, crypto:0.120, bingx:0.100, lbank:0.070,
+  xt:0.090, whitebit:0.110, poloniex:0.060, huobi:0.180, upbit:0.200,
+  coinex:0.080, probit:0.040, ascendex:0.070, dydx:0.150, uniswap:0.300,
 };
 
 // ── БАЗОВЫЕ ОБЪЁМЫ 24h (USD) для топ монет ───────────────────
@@ -1046,6 +1083,16 @@ const EX_COINS = {
   crypto:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC','LINK','UNI','LTC','CRO'],
   bingx:['BTC','ETH','SOL','XRP','DOGE','PEPE','SHIB','BONK','WIF'],
   lbank:['BTC','ETH','SOL','XRP','DOGE','PEPE','SHIB','FLOKI','BONK'],
+  xt:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','ARB','OP','NEAR','TON','PEPE','SHIB','BONK','WIF','MEME','NOT','BRETT','IO','ARKM'],
+  whitebit:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','DOT','LINK','ARB','TON','PEPE','NOT','LISTA'],
+  poloniex:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC','LINK','UNI','LTC','TRX','ALGO'],
+  huobi:['BTC','ETH','BNB','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC','LINK','TON','PEPE','WLD','INJ','ENA'],
+  upbit:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC','LINK','UNI','LTC','BCH','ETC','ATOM','XRP'],
+  coinex:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','ARB','NEAR','TON','PEPE','BONK','WIF','NOT','IO'],
+  probit:['BTC','ETH','SOL','XRP','DOGE','ADA','NEAR','TON','PEPE'],
+  ascendex:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','DOT','ARB','NEAR','INJ','SEI','ENA'],
+  dydx:['BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','DOT','MATIC','LINK','ARB','OP','NEAR','APT','SUI'],
+  uniswap:['ETH','LINK','UNI','AAVE','GRT','LDO','RPL','SNX','CRV','MKR','COMP','PEPE','SHIB','WIF','ENA','PENDLE','ETHFI'],
 };
 
 // ── ГЛОБАЛЬНАЯ "ИСТИНА" РЫНКА ─────────────────────────────────
@@ -1635,7 +1682,7 @@ function atHTML(idSuffix) {
   return `
   <div class="at-card">
     <div class="at-header">
-      <div class="at-title">🤖 Авто-торговля <span class="at-badge ${S.vip?'on':'off'}">${S.vip?'VIP · АКТИВНА':'ТОЛЬКО VIP'}</span></div>
+      <div class="at-title">🤖 Авто-торговля <span class="at-badge ${S.vip?'on':'off'}">${S.vip?t('vip_active_badge'):t('vip_only_badge')}</span></div>
       <label class="toggle">
         <input type="checkbox" ${isRun?'checked':''} onchange="toggleAuto(this.checked)">
         <span class="toggle-slider"></span>
@@ -1643,7 +1690,7 @@ function atHTML(idSuffix) {
     </div>
     <div class="at-settings">
       <div class="at-row">
-        <span class="at-key">💵 Сумма на сделку (USDT)</span>
+        <span class="at-key">💵 ${t('amount_per_trade')}</span>
         <input class="at-inp" type="number" value="${as.amount}" min="10" oninput="S.autoSettings.amount=+this.value;saveStorage()">
       </div>
       <div class="at-row">
@@ -1698,7 +1745,7 @@ function renderAutoPanel() {
       <div class="at-card" onclick="showPg('vip')" style="cursor:pointer">
         <div class="at-locked">
           <div class="at-locked-ico">🤖</div>
-          <div class="at-locked-title">Авто-торговля 24/7</div>
+          <div class="at-locked-title">${t('auto_trading_247')}</div>
           <div class="at-locked-sub">Бот сам находит арбитраж и исполняет сделки пока вы спите.<br>Прибыль без участия — только для VIP пользователей.</div>
           <div class="at-locked-btn">👑 Получить VIP →</div>
         </div>
@@ -1731,10 +1778,10 @@ function toggleAuto(checked) {
   S.autoEnabled = checked;
   saveStorage();
   if (checked) {
-    toastMsg('🤖 Авто-торговля запущена!','ok');
+    toastMsg(t('auto_started'),'ok');
     startAutoBot();
   } else {
-    toastMsg('⏸ Авто-торговля остановлена','warn');
+    toastMsg(t('auto_stopped'),'warn');
     if (S.autoTimer) { clearInterval(S.autoTimer); S.autoTimer = null; }
   }
   renderAutoPanel();
@@ -1873,7 +1920,6 @@ const _ui = {
     renderSigs();
     renderVip?.();
     renderVipAutoSettings?.();
-    // Скрываем кнопку VIP в меню у подписчиков
     const nbVip = document.getElementById('nb-vip');
     if (nbVip) nbVip.style.display = S.vip ? 'none' : '';
   },
@@ -2386,24 +2432,30 @@ const LANGS = {
     slippage:'Проскальз.', network_fee:'Вывод/Сеть',
     total_fees:'Итого комиссии', net_profit:'ЧИСТЫЙ ПРОФИТ',
     conn_lost:'⚠️ Связь потеряна', conn_ok:'✅ Подключено',
-    arb_signals:'АРБИТРАЖНЫЕ СИГНАЛЫ', buy_on:'Купить на', sell_on:'Продать на',
-    spread:'Спред', profit:'Профит', volume:'Объём', risk:'Риск',
-    low:'низкий', med:'средний', high:'высокий',
-    hot:'🔥 Горячий', vip_only:'Только VIP',
-    scanner_title:'СКАНЕР РЫНКА', exchanges_title:'МОИ БИРЖИ',
-    history_title:'ИСТОРИЯ СДЕЛОК', vip_title:'VIP ПОДПИСКА',
-    auto_trading:'Авто-торговля', settings:'Настройки',
-    connect_exchange:'Подключить биржу', disconnect:'Отключить',
-    connected:'Подключено', not_connected:'Не подключено',
-    buy_vip:'Купить VIP', vip_active:'VIP активен', free_plan:'FREE план',
+    arb_signals:'${t('arb_signals')}',
+    buy_vip:'⚡ FREE → VIP', vip_active:'👑 VIP активен', free_plan:'FREE план',
+    cabinet:'Кабинет', no_referrals:'${t('no_referrals')}',
+    settings_title:'${t('settings_title')}', lang_label:'Язык интерфейса',
+    commission:'Комиссия (FREE/VIP)', exchanges_connected:'Подключено бирж',
+    ref_commission:'Реф. комиссия', from_platform:'от платформы',
+    auto_section:'${t('auto_section')}', auto_trade:'Авто-торговля',
+    vip_active_badge:'VIP · АКТИВНА', vip_only_badge:'ТОЛЬКО VIP',
+    amount_per_trade:'Сумма на сделку (USDT)',
+    auto_only_vip:'👑 Авто-торговля только для VIP',
+    auto_started:'🤖 Авто-торговля запущена!',
+    auto_stopped:'⏸ Авто-торговля остановлена',
+    auto_status_on:'● АКТИВНА', auto_status_off:'○ СТОП',
+    auto_vip_only_title:'Авто-торговля только для VIP',
     monthly:'Месяц', yearly:'Год', lifetime:'Навсегда',
-    referrals:'Рефералы', ref_link:'Реферальная ссылка',
-    copy:'Скопировано!', share:'Поделиться',
     no_history:'Нет сделок', loading:'Загрузка...',
     trades:'сделок', win_rate:'Успешность',
-    amount:'Сумма', min:'мин', max:'макс',
-    cabinet:'Кабинет', logout:'Выйти',
     profit_label:'МОЙ ПРОФИТ', ref_income:'РЕФ. ДОХОД',
+    connect_exchange:'Подключить биржу', disconnect:'Отключить',
+    vip_title:'VIP ПОДПИСКА', scanner_title:'СКАНЕР РЫНКА',
+    history_title:'ИСТОРИЯ СДЕЛОК', exchanges_title:'МОИ БИРЖИ',
+    auto_trading_247:'Авто-торговля 24/7',
+    spread:'Спред', profit:'Профит', volume:'Объём',
+    low_risk:'низкий', med_risk:'средний', high_risk:'высокий',
   },
   en: {
     nav_signals:'Signals', nav_scanner:'Scanner', nav_exchanges:'Exchanges',
@@ -2417,24 +2469,30 @@ const LANGS = {
     slippage:'Slippage', network_fee:'Withdraw/Net',
     total_fees:'Total fees', net_profit:'NET PROFIT',
     conn_lost:'⚠️ Connection lost', conn_ok:'✅ Connected',
-    arb_signals:'ARBITRAGE SIGNALS', buy_on:'Buy on', sell_on:'Sell on',
-    spread:'Spread', profit:'Profit', volume:'Volume', risk:'Risk',
-    low:'low', med:'medium', high:'high',
-    hot:'🔥 Hot', vip_only:'VIP Only',
-    scanner_title:'MARKET SCANNER', exchanges_title:'MY EXCHANGES',
-    history_title:'TRADE HISTORY', vip_title:'VIP SUBSCRIPTION',
-    auto_trading:'Auto-Trading', settings:'Settings',
-    connect_exchange:'Connect exchange', disconnect:'Disconnect',
-    connected:'Connected', not_connected:'Not connected',
-    buy_vip:'Buy VIP', vip_active:'VIP active', free_plan:'FREE plan',
+    arb_signals:'ARBITRAGE SIGNALS',
+    buy_vip:'⚡ FREE → VIP', vip_active:'👑 VIP active', free_plan:'FREE plan',
+    cabinet:'Cabinet', no_referrals:'No referrals yet · Share your link!',
+    settings_title:'ACCOUNT SETTINGS', lang_label:'Interface language',
+    commission:'Commission (FREE/VIP)', exchanges_connected:'Connected exchanges',
+    ref_commission:'Ref. commission', from_platform:'from platform',
+    auto_section:'AUTO-TRADING', auto_trade:'Auto-trading',
+    vip_active_badge:'VIP · ACTIVE', vip_only_badge:'VIP ONLY',
+    amount_per_trade:'Amount per trade (USDT)',
+    auto_only_vip:'👑 Auto-trading for VIP only',
+    auto_started:'🤖 Auto-trading started!',
+    auto_stopped:'⏸ Auto-trading stopped',
+    auto_status_on:'● ACTIVE', auto_status_off:'○ STOP',
+    auto_vip_only_title:'Auto-trading for VIP only',
     monthly:'Monthly', yearly:'Yearly', lifetime:'Lifetime',
-    referrals:'Referrals', ref_link:'Referral link',
-    copy:'Copied!', share:'Share',
     no_history:'No trades', loading:'Loading...',
     trades:'trades', win_rate:'Win rate',
-    amount:'Amount', min:'min', max:'max',
-    cabinet:'Cabinet', logout:'Logout',
     profit_label:'MY PROFIT', ref_income:'REF. INCOME',
+    connect_exchange:'Connect exchange', disconnect:'Disconnect',
+    vip_title:'VIP SUBSCRIPTION', scanner_title:'MARKET SCANNER',
+    history_title:'TRADE HISTORY', exchanges_title:'MY EXCHANGES',
+    auto_trading_247:'Auto-trading 24/7',
+    spread:'Spread', profit:'Profit', volume:'Volume',
+    low_risk:'low', med_risk:'medium', high_risk:'high',
   },
   tr: {
     nav_signals:'Sinyaller', nav_scanner:'Tarayıcı', nav_exchanges:'Borsalar',
@@ -2448,24 +2506,30 @@ const LANGS = {
     slippage:'Kayma', network_fee:'Çekim/Ağ',
     total_fees:'Toplam ücret', net_profit:'NET KAR',
     conn_lost:'⚠️ Bağlantı kesildi', conn_ok:'✅ Bağlandı',
-    arb_signals:'ARBİTRAJ SİNYALLERİ', buy_on:'Satın al', sell_on:'Sat',
-    spread:'Spread', profit:'Kar', volume:'Hacim', risk:'Risk',
-    low:'düşük', med:'orta', high:'yüksek',
-    hot:'🔥 Sıcak', vip_only:'Sadece VIP',
-    scanner_title:'PİYASA TARAYICI', exchanges_title:'BORSALARIM',
-    history_title:'İŞLEM GEÇMİŞİ', vip_title:'VIP ABONELİK',
-    auto_trading:'Otomatik İşlem', settings:'Ayarlar',
-    connect_exchange:'Borsa bağla', disconnect:'Bağlantıyı kes',
-    connected:'Bağlı', not_connected:'Bağlı değil',
-    buy_vip:'VIP Satın Al', vip_active:'VIP aktif', free_plan:'ÜCRETSİZ plan',
+    arb_signals:'ARBİTRAJ SİNYALLERİ',
+    buy_vip:'⚡ ÜCRETSİZ → VIP', vip_active:'👑 VIP aktif', free_plan:'ÜCRETSİZ plan',
+    cabinet:'Profil', no_referrals:'Henüz referans yok · Linkinizi paylaşın!',
+    settings_title:'HESAP AYARLARI', lang_label:'Arayüz dili',
+    commission:'Komisyon (ÜCRETSİZ/VIP)', exchanges_connected:'Bağlı borsalar',
+    ref_commission:'Ref. komisyonu', from_platform:'platformdan',
+    auto_section:'OTOMATİK İŞLEM', auto_trade:'Otomatik işlem',
+    vip_active_badge:'VIP · AKTİF', vip_only_badge:'SADECE VIP',
+    amount_per_trade:'İşlem başına miktar (USDT)',
+    auto_only_vip:'👑 Otomatik işlem sadece VIP için',
+    auto_started:'🤖 Otomatik işlem başladı!',
+    auto_stopped:'⏸ Otomatik işlem durduruldu',
+    auto_status_on:'● AKTİF', auto_status_off:'○ DUR',
+    auto_vip_only_title:'Otomatik işlem sadece VIP için',
     monthly:'Aylık', yearly:'Yıllık', lifetime:'Ömür boyu',
-    referrals:'Referanslar', ref_link:'Referans linki',
-    copy:'Kopyalandı!', share:'Paylaş',
     no_history:'İşlem yok', loading:'Yükleniyor...',
     trades:'işlem', win_rate:'Başarı oranı',
-    amount:'Miktar', min:'min', max:'maks',
-    cabinet:'Kabine', logout:'Çıkış',
     profit_label:'KÂRIM', ref_income:'REF. GELİR',
+    connect_exchange:'Borsa bağla', disconnect:'Bağlantıyı kes',
+    vip_title:'VIP ABONELİK', scanner_title:'PİYASA TARAYICI',
+    history_title:'İŞLEM GEÇMİŞİ', exchanges_title:'BORSALARIM',
+    auto_trading_247:'Otomatik işlem 24/7',
+    spread:'Spread', profit:'Kar', volume:'Hacim',
+    low_risk:'düşük', med_risk:'orta', high_risk:'yüksek',
   },
   es: {
     nav_signals:'Señales', nav_scanner:'Escáner', nav_exchanges:'Bolsas',
@@ -2479,24 +2543,30 @@ const LANGS = {
     slippage:'Desliz.', network_fee:'Retiro/Red',
     total_fees:'Total comisiones', net_profit:'GANANCIA NETA',
     conn_lost:'⚠️ Conexión perdida', conn_ok:'✅ Conectado',
-    arb_signals:'SEÑALES DE ARBITRAJE', buy_on:'Comprar en', sell_on:'Vender en',
-    spread:'Spread', profit:'Ganancia', volume:'Volumen', risk:'Riesgo',
-    low:'bajo', med:'medio', high:'alto',
-    hot:'🔥 Caliente', vip_only:'Solo VIP',
-    scanner_title:'ESCÁNER DE MERCADO', exchanges_title:'MIS BOLSAS',
-    history_title:'HISTORIAL', vip_title:'SUSCRIPCIÓN VIP',
-    auto_trading:'Auto-Trading', settings:'Configuración',
-    connect_exchange:'Conectar bolsa', disconnect:'Desconectar',
-    connected:'Conectado', not_connected:'No conectado',
-    buy_vip:'Comprar VIP', vip_active:'VIP activo', free_plan:'Plan GRATIS',
+    arb_signals:'SEÑALES DE ARBITRAJE',
+    buy_vip:'⚡ GRATIS → VIP', vip_active:'👑 VIP activo', free_plan:'Plan GRATIS',
+    cabinet:'Gabinete', no_referrals:'Sin referidos · ¡Comparte tu enlace!',
+    settings_title:'CONFIGURACIÓN DE CUENTA', lang_label:'Idioma de interfaz',
+    commission:'Comisión (GRATIS/VIP)', exchanges_connected:'Bolsas conectadas',
+    ref_commission:'Comisión ref.', from_platform:'de la plataforma',
+    auto_section:'AUTO-TRADING', auto_trade:'Auto-trading',
+    vip_active_badge:'VIP · ACTIVO', vip_only_badge:'SOLO VIP',
+    amount_per_trade:'Monto por operación (USDT)',
+    auto_only_vip:'👑 Auto-trading solo para VIP',
+    auto_started:'🤖 Auto-trading iniciado!',
+    auto_stopped:'⏸ Auto-trading detenido',
+    auto_status_on:'● ACTIVO', auto_status_off:'○ STOP',
+    auto_vip_only_title:'Auto-trading solo para VIP',
     monthly:'Mensual', yearly:'Anual', lifetime:'De por vida',
-    referrals:'Referidos', ref_link:'Enlace de referido',
-    copy:'¡Copiado!', share:'Compartir',
     no_history:'Sin operaciones', loading:'Cargando...',
     trades:'operaciones', win_rate:'Tasa de éxito',
-    amount:'Monto', min:'mín', max:'máx',
-    cabinet:'Gabinete', logout:'Salir',
     profit_label:'MI GANANCIA', ref_income:'ING. REF.',
+    connect_exchange:'Conectar bolsa', disconnect:'Desconectar',
+    vip_title:'SUSCRIPCIÓN VIP', scanner_title:'ESCÁNER DE MERCADO',
+    history_title:'HISTORIAL', exchanges_title:'MIS BOLSAS',
+    auto_trading_247:'Auto-trading 24/7',
+    spread:'Spread', profit:'Ganancia', volume:'Volumen',
+    low_risk:'bajo', med_risk:'medio', high_risk:'alto',
   },
   de: {
     nav_signals:'Signale', nav_scanner:'Scanner', nav_exchanges:'Börsen',
@@ -2510,24 +2580,30 @@ const LANGS = {
     slippage:'Slippage', network_fee:'Auszahlung/Netz',
     total_fees:'Gesamtgebühren', net_profit:'NETTOGEWINN',
     conn_lost:'⚠️ Verbindung verloren', conn_ok:'✅ Verbunden',
-    arb_signals:'ARBITRAGE-SIGNALE', buy_on:'Kaufen bei', sell_on:'Verkaufen bei',
-    spread:'Spread', profit:'Gewinn', volume:'Volumen', risk:'Risiko',
-    low:'niedrig', med:'mittel', high:'hoch',
-    hot:'🔥 Heiß', vip_only:'Nur VIP',
-    scanner_title:'MARKT-SCANNER', exchanges_title:'MEINE BÖRSEN',
-    history_title:'HANDELSHISTORIE', vip_title:'VIP-ABO',
-    auto_trading:'Auto-Handel', settings:'Einstellungen',
-    connect_exchange:'Börse verbinden', disconnect:'Trennen',
-    connected:'Verbunden', not_connected:'Nicht verbunden',
-    buy_vip:'VIP kaufen', vip_active:'VIP aktiv', free_plan:'GRATIS-Plan',
+    arb_signals:'ARBITRAGE-SIGNALE',
+    buy_vip:'⚡ GRATIS → VIP', vip_active:'👑 VIP aktiv', free_plan:'GRATIS-Plan',
+    cabinet:'Kabinett', no_referrals:'Noch keine Empfehlungen · Link teilen!',
+    settings_title:'KONTOEINSTELLUNGEN', lang_label:'Oberflächensprache',
+    commission:'Provision (GRATIS/VIP)', exchanges_connected:'Verbundene Börsen',
+    ref_commission:'Ref.-Provision', from_platform:'von der Plattform',
+    auto_section:'AUTO-HANDEL', auto_trade:'Auto-Handel',
+    vip_active_badge:'VIP · AKTIV', vip_only_badge:'NUR VIP',
+    amount_per_trade:'Betrag pro Trade (USDT)',
+    auto_only_vip:'👑 Auto-Handel nur für VIP',
+    auto_started:'🤖 Auto-Handel gestartet!',
+    auto_stopped:'⏸ Auto-Handel gestoppt',
+    auto_status_on:'● AKTIV', auto_status_off:'○ STOP',
+    auto_vip_only_title:'Auto-Handel nur für VIP',
     monthly:'Monatlich', yearly:'Jährlich', lifetime:'Lebenslang',
-    referrals:'Empfehlungen', ref_link:'Empfehlungslink',
-    copy:'Kopiert!', share:'Teilen',
     no_history:'Keine Trades', loading:'Laden...',
     trades:'Trades', win_rate:'Erfolgsrate',
-    amount:'Betrag', min:'min', max:'max',
-    cabinet:'Kabinett', logout:'Abmelden',
     profit_label:'MEIN GEWINN', ref_income:'REF. EINNAHMEN',
+    connect_exchange:'Börse verbinden', disconnect:'Trennen',
+    vip_title:'VIP-ABONNEMENT', scanner_title:'MARKT-SCANNER',
+    history_title:'HANDELSHISTORIE', exchanges_title:'MEINE BÖRSEN',
+    auto_trading_247:'Auto-Handel 24/7',
+    spread:'Spread', profit:'Gewinn', volume:'Volumen',
+    low_risk:'niedrig', med_risk:'mittel', high_risk:'hoch',
   },
   ar: {
     nav_signals:'إشارات', nav_scanner:'ماسح', nav_exchanges:'بورصات',
@@ -2541,24 +2617,30 @@ const LANGS = {
     slippage:'انزلاق', network_fee:'سحب/شبكة',
     total_fees:'إجمالي الرسوم', net_profit:'صافي الربح',
     conn_lost:'⚠️ انقطع الاتصال', conn_ok:'✅ متصل',
-    arb_signals:'إشارات المراجحة', buy_on:'اشتر في', sell_on:'بع في',
-    spread:'الفارق', profit:'الربح', volume:'الحجم', risk:'المخاطرة',
-    low:'منخفض', med:'متوسط', high:'مرتفع',
-    hot:'🔥 ساخن', vip_only:'VIP فقط',
-    scanner_title:'ماسح السوق', exchanges_title:'بورصاتي',
-    history_title:'سجل الصفقات', vip_title:'اشتراك VIP',
-    auto_trading:'التداول الآلي', settings:'الإعدادات',
-    connect_exchange:'ربط بورصة', disconnect:'قطع الاتصال',
-    connected:'متصل', not_connected:'غير متصل',
-    buy_vip:'شراء VIP', vip_active:'VIP نشط', free_plan:'الخطة المجانية',
+    arb_signals:'إشارات المراجحة',
+    buy_vip:'⚡ مجاني → VIP', vip_active:'👑 VIP نشط', free_plan:'الخطة المجانية',
+    cabinet:'الملف الشخصي', no_referrals:'لا إحالات بعد · شارك رابطك!',
+    settings_title:'إعدادات الحساب', lang_label:'لغة الواجهة',
+    commission:'العمولة (مجاني/VIP)', exchanges_connected:'البورصات المتصلة',
+    ref_commission:'عمولة الإحالة', from_platform:'من المنصة',
+    auto_section:'التداول الآلي', auto_trade:'تداول آلي',
+    vip_active_badge:'VIP · نشط', vip_only_badge:'VIP فقط',
+    amount_per_trade:'المبلغ لكل صفقة (USDT)',
+    auto_only_vip:'👑 التداول الآلي لـ VIP فقط',
+    auto_started:'🤖 التداول الآلي بدأ!',
+    auto_stopped:'⏸ التداول الآلي متوقف',
+    auto_status_on:'● نشط', auto_status_off:'○ إيقاف',
+    auto_vip_only_title:'التداول الآلي لـ VIP فقط',
     monthly:'شهري', yearly:'سنوي', lifetime:'مدى الحياة',
-    referrals:'الإحالات', ref_link:'رابط الإحالة',
-    copy:'تم النسخ!', share:'مشاركة',
     no_history:'لا صفقات', loading:'جارٍ التحميل...',
     trades:'صفقات', win_rate:'معدل الفوز',
-    amount:'المبلغ', min:'أدنى', max:'أقصى',
-    cabinet:'الملف الشخصي', logout:'تسجيل الخروج',
     profit_label:'ربحي', ref_income:'دخل الإحالة',
+    connect_exchange:'ربط بورصة', disconnect:'قطع الاتصال',
+    vip_title:'اشتراك VIP', scanner_title:'ماسح السوق',
+    history_title:'سجل الصفقات', exchanges_title:'بورصاتي',
+    auto_trading_247:'تداول آلي 24/7',
+    spread:'الفارق', profit:'الربح', volume:'الحجم',
+    low_risk:'منخفض', med_risk:'متوسط', high_risk:'مرتفع',
   },
 };
 
@@ -2572,10 +2654,11 @@ function applyI18n() {
     const v = LANGS[lang]?.[el.getAttribute('data-i18n')];
     if (v) el.textContent = v;
   });
-  // Перерисовываем динамические страницы чтобы обновить хардкоженные строки
+  // Перерисовываем динамические страницы
   try { renderSigs(); } catch {}
   try { renderVip(); } catch {}
   try { renderExchanges(); } catch {}
+  try { renderProfile(); } catch {}
   try { if (document.getElementById('pg-history')?.classList.contains('on')) renderHistory(); } catch {}
 }
 
@@ -2822,7 +2905,7 @@ function renderProfile() {
   <div class="prof-card">
     <div class="prof-card-title">⚙️ Настройки аккаунта</div>
     <div class="prof-row">
-      <span class="prof-key">🌐 Язык интерфейса</span>
+      <span class="prof-key">🌐 ${t('lang_label')}</span>
       <div style="display:flex;gap:5px">
         <span class="lang-opt ${S.lang==='ru'?'sel':''}" onclick="changeLang('ru',this)">🇷🇺 RU</span>
         <span class="lang-opt ${S.lang==='en'?'sel':''}" onclick="changeLang('en',this)">🇬🇧 EN</span>
@@ -2831,22 +2914,22 @@ function renderProfile() {
       </div>
     </div>
     <div class="prof-row">
-      <span class="prof-key">💳 Комиссия (FREE/VIP)</span>
+      <span class="prof-key">💳 ${t('commission')}</span>
       <span class="prof-val">0.8% / 0.3%</span>
     </div>
     <div class="prof-row">
-      <span class="prof-key">🏦 Подключено бирж</span>
+      <span class="prof-key">🏦 ${t('exchanges_connected')}</span>
       <span class="prof-val c">${S.connected.size} / 15</span>
     </div>
     <div class="prof-row">
-      <span class="prof-key">📊 Реф. комиссия</span>
-      <span class="prof-val go">20% от платформы</span>
+      <span class="prof-key">📊 ${t('ref_commission')}</span>
+      <span class="prof-val go">20% ${t('from_platform')}</span>
     </div>
   </div>
 
   <!-- AUTO-TRADE SHORTCUT -->
   <div class="prof-card">
-    <div class="prof-card-title">🤖 Авто-торговля</div>
+    <div class="prof-card-title">🤖 ${t('auto_trade')}</div>
     <div id="profAutoTrade"></div>
   </div>
 
@@ -3604,7 +3687,7 @@ function renderAutoPage() {
   renderVipAutoSettings();
   const badge = document.getElementById('autoStatusBadge');
   if (badge) {
-    badge.textContent = S.autoEnabled ? '● АКТИВНА' : '○ СТОП';
+    badge.textContent = S.autoEnabled ? t('auto_status_on') : t('auto_status_off');
     badge.style.color = S.autoEnabled ? 'var(--green)' : 'var(--muted)';
   }
   // Stats section
@@ -3613,7 +3696,7 @@ function renderAutoPage() {
   if (!S.vip) {
     stats.innerHTML = `<div style="text-align:center;padding:24px 16px">
       <div style="font-size:36px;margin-bottom:10px">🤖</div>
-      <div style="font-weight:700;color:var(--gold);font-size:14px;margin-bottom:6px">Авто-торговля только для VIP</div>
+      <div style="font-weight:700;color:var(--gold);font-size:14px;margin-bottom:6px">${t('auto_vip_only_title')}</div>
       <div style="font-size:11px;color:var(--muted);margin-bottom:16px">Бот 24/7 автоматически исполняет сигналы по вашим настройкам</div>
       <button onclick="showPg('vip')" style="padding:10px 24px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--gold),#f97316);color:#000;font-weight:700;font-size:12px;cursor:pointer">👑 Активировать VIP</button>
     </div>`;

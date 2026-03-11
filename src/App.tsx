@@ -3,17 +3,24 @@ import { io } from 'socket.io-client';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Zap, Bot, User, BarChart3, Wallet as WalletIcon,
+  Zap, Bot, User, BarChart3, Layers,
   Crown, Shield, TrendingUp, Search, AlertCircle,
 } from 'lucide-react';
 import { EXCHS, COINS } from './constants';
 import { LANGS } from './i18n';
 import Admin from './Admin';
 import Scanner from './components/Scanner';
-import Wallet from './components/Wallet';
+import Strategies from './components/Strategies';
 import Profile from './components/Profile';
 
 const socket = io();
+
+const TYPE_LABELS: Record<string, { label: string; color: string }> = {
+  cex:   { label: 'CEX',        color: 'text-cyan-400' },
+  tri:   { label: 'TRIANGULAR', color: 'text-purple-400' },
+  dex:   { label: 'DEX',        color: 'text-emerald-400' },
+  cross: { label: 'CROSS-CHAIN',color: 'text-amber-400' },
+};
 
 export default function App() {
   const [page, setPage] = useState('signals');
@@ -26,13 +33,14 @@ export default function App() {
   const [amount, setAmount] = useState(200);
   const [autoTrade, setAutoTrade] = useState(false);
   const [adminPanel, setAdminPanel] = useState(false);
+  const [filterType, setFilterType] = useState<string>('all');
 
   const t = (key: string) => LANGS[lang]?.[key] || LANGS['ru'][key] || key;
 
   useEffect(() => {
     fetchAccount();
     socket.on('signals', (s: any[]) => setSignals(s));
-    socket.on('prices', (p: any[]) => setPrices(p));
+    socket.on('prices',  (p: any[]) => setPrices(p));
     return () => { socket.off('signals'); socket.off('prices'); };
   }, []);
 
@@ -43,11 +51,8 @@ export default function App() {
       const userId = tgUser?.id ? `tg_${tgUser.id}` : 'demo_user';
       const res = await axios.get(`/api/v1/account?userId=${userId}`);
       setUser(res.data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { console.error(err); }
+    finally { setLoading(false); }
   };
 
   const handleTrade = async () => {
@@ -61,9 +66,7 @@ export default function App() {
       setUser({ ...user, balance: res.data.newBalance, trades: user.trades + 1 });
       setTradeModal(null);
       alert('Сделка успешно исполнена!');
-    } catch (err: any) {
-      alert(err.response?.data?.error || 'Ошибка сделки');
-    }
+    } catch (err: any) { alert(err.response?.data?.error || 'Ошибка сделки'); }
   };
 
   const buyVip = async (plan: string) => {
@@ -74,8 +77,12 @@ export default function App() {
     } catch { alert('Ошибка оплаты'); }
   };
 
+  const filteredSignals = filterType === 'all'
+    ? signals
+    : signals.filter(s => s.type === filterType);
+
   if (loading) return (
-    <div className="h-screen bg-slate-950 flex items-center justify-center text-cyan-400 font-mono">
+    <div className="h-screen bg-slate-950 flex items-center justify-center text-cyan-400 font-mono animate-pulse">
       LOADING NEXARB...
     </div>
   );
@@ -87,7 +94,7 @@ export default function App() {
       <header className="sticky top-0 z-40 bg-slate-900/80 backdrop-blur-xl border-b border-slate-800 px-4 py-3">
         <div className="max-w-md mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-cyan-400 to-purple-500 rounded-lg flex items-center justify-center font-bold text-slate-900">N∞</div>
+            <div className="w-8 h-8 bg-gradient-to-br from-cyan-400 to-purple-500 rounded-lg flex items-center justify-center font-bold text-slate-900 text-sm">N∞</div>
             <div>
               <h1 className="text-lg font-bold tracking-tight">NEX<span className="text-cyan-400">ARB</span></h1>
               <p className="text-[10px] text-slate-500 font-mono uppercase tracking-widest">v4.0 HFT Engine</p>
@@ -107,9 +114,9 @@ export default function App() {
 
         <div className="max-w-md mx-auto grid grid-cols-3 gap-2 mt-3">
           {[
-            { label: t('balance'), value: `$${user.balance.toLocaleString()}`, color: 'text-cyan-400' },
-            { label: t('profit_today'), value: `+$${user.profit.toFixed(2)}`, color: 'text-emerald-400' },
-            { label: t('signals_count'), value: signals.length.toString(), color: 'text-amber-500' },
+            { label: t('balance'),       value: `$${user.balance.toLocaleString()}`, color: 'text-cyan-400' },
+            { label: t('profit_today'),  value: `+$${user.profit.toFixed(2)}`,       color: 'text-emerald-400' },
+            { label: t('signals_count'), value: signals.length.toString(),            color: 'text-amber-500' },
           ].map((s, i) => (
             <div key={i} className="bg-slate-800/50 rounded-lg p-2 border border-slate-700/50">
               <p className="text-[8px] text-slate-500 uppercase font-bold">{s.label}</p>
@@ -137,40 +144,66 @@ export default function App() {
                     <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
                     <h2 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{t('arb_signals')}</h2>
                   </div>
-                  <span className="text-[10px] font-mono text-slate-500">{signals.length} active</span>
+                  <span className="text-[10px] font-mono text-slate-500">{filteredSignals.length} active</span>
                 </div>
 
-                {signals.length > 0 ? signals.map(sig => (
-                  <div key={sig.id} onClick={() => setTradeModal(sig)}
-                    className={`relative bg-slate-900 border border-slate-800 rounded-xl overflow-hidden cursor-pointer hover:border-slate-700 transition-all ${sig.hot ? 'ring-1 ring-emerald-500/30' : ''}`}
-                  >
-                    {sig.hot && (
-                      <div className="absolute top-2 right-2 bg-emerald-500/10 text-emerald-400 text-[8px] font-bold px-2 py-0.5 rounded border border-emerald-500/30">🔥 HOT</div>
-                    )}
-                    <div className="p-4 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-slate-800 rounded-full flex items-center justify-center text-xl border border-slate-700">
-                          {COINS.find(c => sig.sym.startsWith(c.sym))?.ico || '◈'}
+                {/* Type filter */}
+                <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
+                  {[
+                    { id: 'all',   label: 'All',        color: 'text-slate-300' },
+                    { id: 'cex',   label: 'CEX',        color: 'text-cyan-400' },
+                    { id: 'tri',   label: 'Triangular', color: 'text-purple-400' },
+                    { id: 'dex',   label: 'DEX',        color: 'text-emerald-400' },
+                    { id: 'cross', label: 'Cross-chain',color: 'text-amber-400' },
+                  ].map(f => (
+                    <button key={f.id} onClick={() => setFilterType(f.id)}
+                      className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all ${
+                        filterType === f.id
+                          ? `bg-slate-800 border-slate-600 ${f.color}`
+                          : 'bg-slate-900/50 border-slate-800 text-slate-600 hover:border-slate-700'
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+
+                {filteredSignals.length > 0 ? filteredSignals.map(sig => {
+                  const typeInfo = TYPE_LABELS[sig.type] || TYPE_LABELS['cex'];
+                  return (
+                    <div key={sig.id} onClick={() => setTradeModal(sig)}
+                      className={`relative bg-slate-900 border border-slate-800 rounded-xl overflow-hidden cursor-pointer hover:border-slate-700 transition-all ${sig.hot ? 'ring-1 ring-emerald-500/30' : ''}`}
+                    >
+                      {sig.hot && (
+                        <div className="absolute top-2 right-2 bg-emerald-500/10 text-emerald-400 text-[8px] font-bold px-2 py-0.5 rounded border border-emerald-500/30">🔥 HOT</div>
+                      )}
+                      <div className="p-4 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-slate-800 rounded-full flex items-center justify-center text-xl border border-slate-700">
+                            {COINS.find(c => sig.sym.startsWith(c.sym))?.ico || '◈'}
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-sm">{sig.sym}</h3>
+                            <p className={`text-[10px] uppercase font-bold ${typeInfo.color}`}>
+                              {typeInfo.label} · {sig.bx} → {sig.sx}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <h3 className="font-bold text-sm">{sig.sym}</h3>
-                          <p className="text-[10px] text-slate-500 uppercase font-bold">{sig.type} · {sig.bx} → {sig.sx}</p>
+                        <div className="text-right">
+                          <p className="text-xl font-mono font-bold text-emerald-400">+{sig.spread}%</p>
+                          <p className="text-[9px] text-slate-500 font-bold uppercase">Net Profit</p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-xl font-mono font-bold text-emerald-400">+{sig.spread}%</p>
-                        <p className="text-[9px] text-slate-500 font-bold uppercase">Net Profit</p>
+                      <div className="px-4 py-2 bg-slate-950/50 border-t border-slate-800/50 flex items-center justify-between text-[10px] font-mono">
+                        <div className="flex items-center gap-4">
+                          <span className="text-slate-500">Score: <span className="text-cyan-400">{sig.aiScore}</span></span>
+                          <span className="text-slate-500">Time: <span className="text-slate-300">~5s</span></span>
+                        </div>
+                        <button className="text-cyan-400 font-bold hover:underline">EXECUTE ⚡</button>
                       </div>
                     </div>
-                    <div className="px-4 py-2 bg-slate-950/50 border-t border-slate-800/50 flex items-center justify-between text-[10px] font-mono">
-                      <div className="flex items-center gap-4">
-                        <span className="text-slate-500">Score: <span className="text-cyan-400">{sig.aiScore}</span></span>
-                        <span className="text-slate-500">Time: <span className="text-slate-300">~5s</span></span>
-                      </div>
-                      <button className="text-cyan-400 font-bold hover:underline">EXECUTE ⚡</button>
-                    </div>
-                  </div>
-                )) : (
+                  );
+                }) : (
                   <div className="py-20 text-center space-y-3">
                     <Search className="w-12 h-12 text-slate-800 mx-auto" />
                     <p className="text-slate-500 text-sm">Scanning market for opportunities...</p>
@@ -188,12 +221,12 @@ export default function App() {
               </motion.div>
             )}
 
-            {/* WALLET */}
-            {page === 'wallet' && (
-              <motion.div key="wallet"
+            {/* STRATEGIES */}
+            {page === 'strategies' && (
+              <motion.div key="strategies"
                 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
               >
-                <Wallet user={user} />
+                <Strategies user={user} t={t} onUpgrade={() => setPage('vip')} />
               </motion.div>
             )}
 
@@ -221,9 +254,9 @@ export default function App() {
                   <div className="p-4 bg-cyan-500/5 border border-cyan-500/10 rounded-xl">
                     <p className="text-[10px] text-cyan-400 leading-relaxed">
                       <AlertCircle size={10} className="inline mr-1 mb-0.5" />
-                      Configure detailed auto-trading parameters in your{' '}
+                      Настройте параметры в{' '}
                       <button onClick={() => setPage('profile')} className="underline font-bold">
-                        Profile → Auto-Trading Settings
+                        Профиль → Авто-трейдинг
                       </button>
                     </p>
                   </div>
@@ -240,7 +273,7 @@ export default function App() {
                   </div>
                   <h2 className="text-2xl font-black text-amber-500">NEXARB VIP</h2>
                   <p className="text-xs text-slate-400 max-w-[280px] mx-auto leading-relaxed">
-                    Unlock advanced arbitrage strategies, auto-trading, and 0.3% platform fees.
+                    Все 4 стратегии, 7 сетей, авто-трейдинг и комиссия 0.3%.
                   </p>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
@@ -250,7 +283,7 @@ export default function App() {
                     { id: 'year', name: 'Year', price: '$149' },
                   ].map(p => (
                     <div key={p.id} onClick={() => buyVip(p.id)}
-                      className={`p-4 rounded-xl border text-center cursor-pointer transition-all ${p.popular ? 'bg-amber-500/5 border-amber-500/50' : 'bg-slate-900 border-slate-800 hover:border-slate-700'}`}
+                      className={`p-4 rounded-xl border text-center cursor-pointer transition-all active:scale-95 ${p.popular ? 'bg-amber-500/5 border-amber-500/50' : 'bg-slate-900 border-slate-800 hover:border-slate-700'}`}
                     >
                       {p.popular && <div className="text-[8px] font-bold text-amber-500 mb-1 uppercase">Popular</div>}
                       <p className="text-[10px] font-bold text-slate-500 uppercase">{p.name}</p>
@@ -264,10 +297,11 @@ export default function App() {
                   </div>
                   <div className="divide-y divide-slate-800">
                     {[
-                      { icon: <Zap size={14}/>, name: '1000+ Signals/Day', free: '30', vip: '∞' },
-                      { icon: <Bot size={14}/>, name: 'Auto-Trading 24/7', free: '❌', vip: '✅' },
-                      { icon: <Shield size={14}/>, name: 'Platform Fee', free: '0.8%', vip: '0.3%' },
-                      { icon: <TrendingUp size={14}/>, name: 'Triangular Arb', free: '❌', vip: '✅' },
+                      { icon: <Zap size={14}/>,       name: '1000+ Signals/Day',        free: '30',    vip: '∞' },
+                      { icon: <Bot size={14}/>,        name: 'Auto-Trading 24/7',        free: '❌',   vip: '✅' },
+                      { icon: <Shield size={14}/>,     name: 'Platform Fee',             free: '0.8%', vip: '0.3%' },
+                      { icon: <TrendingUp size={14}/>, name: 'DEX + Cross-chain + Tri',  free: '❌',   vip: '✅' },
+                      { icon: <Layers size={14}/>,     name: '7 Networks (ETH/SOL/...)', free: '❌',   vip: '✅' },
                     ].map((f, i) => (
                       <div key={i} className="p-3 flex items-center justify-between text-[11px]">
                         <div className="flex items-center gap-2 text-slate-400">{f.icon}<span>{f.name}</span></div>
@@ -287,13 +321,7 @@ export default function App() {
               <motion.div key="profile"
                 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
               >
-                <Profile
-                  user={user}
-                  lang={lang}
-                  setLang={setLang}
-                  t={t}
-                  onUpgrade={() => setPage('vip')}
-                />
+                <Profile user={user} lang={lang} setLang={setLang} t={t} onUpgrade={() => setPage('vip')} />
               </motion.div>
             )}
 
@@ -305,14 +333,14 @@ export default function App() {
       <nav className="fixed bottom-0 left-0 right-0 z-50 bg-slate-900/90 backdrop-blur-xl border-t border-slate-800 px-4 pb-safe">
         <div className="max-w-md mx-auto flex items-center justify-between py-2">
           {[
-            { id: 'signals', icon: <Zap size={20}/>, label: t('nav_signals') },
-            { id: 'scanner', icon: <BarChart3 size={20}/>, label: t('nav_scanner') },
-            { id: 'auto',    icon: <Bot size={20}/>,     label: t('auto_nav') },
-            { id: 'wallet',  icon: <WalletIcon size={20}/>, label: 'Wallet' },
-            { id: 'profile', icon: <User size={20}/>,    label: t('cabinet') },
+            { id: 'signals',    icon: <Zap size={20}/>,      label: t('nav_signals') },
+            { id: 'scanner',    icon: <BarChart3 size={20}/>, label: t('nav_scanner') },
+            { id: 'strategies', icon: <Layers size={20}/>,    label: 'Стратегии' },
+            { id: 'auto',       icon: <Bot size={20}/>,       label: t('auto_nav') },
+            { id: 'profile',    icon: <User size={20}/>,      label: t('cabinet') },
           ].map(item => (
             <button key={item.id} onClick={() => setPage(item.id)}
-              className={`flex flex-col items-center gap-1 px-3 py-1 rounded-xl transition-all ${page === item.id ? 'text-cyan-400' : 'text-slate-500 hover:text-slate-300'}`}
+              className={`flex flex-col items-center gap-1 px-2 py-1 rounded-xl transition-all ${page === item.id ? 'text-cyan-400' : 'text-slate-500 hover:text-slate-300'}`}
             >
               {item.icon}
               <span className="text-[8px] font-bold uppercase tracking-tighter">{item.label}</span>
@@ -335,7 +363,13 @@ export default function App() {
               <div className="w-12 h-1.5 bg-slate-800 rounded-full mx-auto mb-2" />
               <div className="space-y-1">
                 <h3 className="text-xl font-black tracking-tight">Execute Arbitrage</h3>
-                <p className="text-xs text-slate-500">{tradeModal.sym} · {tradeModal.bx} → {tradeModal.sx}</p>
+                <div className="flex items-center gap-2">
+                  <span className={`text-[10px] font-bold uppercase ${TYPE_LABELS[tradeModal.type]?.color || 'text-cyan-400'}`}>
+                    {TYPE_LABELS[tradeModal.type]?.label || 'CEX'}
+                  </span>
+                  <span className="text-slate-600">·</span>
+                  <span className="text-xs text-slate-500">{tradeModal.sym} · {tradeModal.bx} → {tradeModal.sx}</span>
+                </div>
               </div>
               <div className="space-y-4">
                 <div className="space-y-2">

@@ -1,576 +1,224 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
+import axios from 'axios';
+import { Crown, FlaskConical, Zap, Settings, Key, Users, Shield, Globe, ChevronRight, Copy, Check, Activity, Calendar, Bot } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import {
-  Crown,
-  TrendingUp,
-  BarChart3,
-  Users,
-  Copy,
-  Check,
-  Key,
-  Plus,
-  Trash2,
-  Eye,
-  EyeOff,
-  Bot,
-  Globe,
-  ChevronDown,
-  Zap,
-  Shield,
-  Star,
-  ExternalLink,
-} from 'lucide-react';
-import { EXCHS } from '../constants';
-import { encrypt, maskKey } from '../utils/crypto';
 
-interface ProfileProps {
-  user: {
-    id: string;
-    balance: number;
-    profit: number;
-    trades: number;
-    vip: boolean;
-    vip_expires: number | null;
-    connected_exchanges: string[];
-    ref_code: string;
-  };
-  lang: string;
-  setLang: (l: string) => void;
-  t: (key: string) => string;
-  onUpgrade: () => void;
-}
+const LANGS_LIST = [{code:'ru',flag:'🇷🇺',name:'Русский'},{code:'en',flag:'🇺🇸',name:'English'},{code:'de',flag:'🇩🇪',name:'Deutsch'},{code:'zh',flag:'🇨🇳',name:'中文'}];
 
-interface ApiKey {
-  exchangeId: string;
-  keyMask: string;
-  isActive: boolean;
-}
+export default function Profile({ user, lang, setLang, t, onUpgrade, onModeSwitch, tradingMode='demo', userId='demo_user' }: any) {
+  const [tab, setTab] = useState('overview');
+  const [copied, setCopied] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [autoEnabled, setAutoEnabled] = useState(user?.auto_trading||false);
+  const [autoAmount, setAutoAmount] = useState(user?.auto_amount||100);
+  const [autoSpread, setAutoSpread] = useState(user?.auto_min_spread||0.2);
+  const [autoRisk, setAutoRisk] = useState(user?.auto_risk||'medium');
 
-interface AutoSettings {
-  amount: number;
-  minSpread: number;
-  maxRisk: 'low' | 'medium' | 'high';
-}
+  const displayName = user?.tg_first_name ? `${user.tg_first_name}${user.tg_last_name?' '+user.tg_last_name:''}` : user?.id||'User';
+  const vipDays = user?.vip_expires ? Math.max(0,Math.ceil((user.vip_expires-Date.now()/1000)/86400)) : 0;
 
-const LANG_OPTIONS = [
-  { code: 'ru', label: 'RU', flag: '🇷🇺', name: 'Русский' },
-  { code: 'en', label: 'EN', flag: '🇺🇸', name: 'English' },
-  { code: 'de', label: 'DE', flag: '🇩🇪', name: 'Deutsch' },
-  { code: 'zh', label: 'ZH', flag: '🇨🇳', name: '中文' },
-];
+  const copyRef = () => { navigator.clipboard.writeText(user?.ref_code||''); setCopied(true); setTimeout(()=>setCopied(false),2000); };
 
-const SECTION = ({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) => (
-  <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
-    <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-800 bg-slate-800/40">
-      <span className="text-cyan-400">{icon}</span>
-      <h3 className="text-[11px] font-black uppercase tracking-[0.15em] text-slate-300">{title}</h3>
-    </div>
-    <div className="p-4">{children}</div>
-  </div>
-);
-
-export default function Profile({ user, lang, setLang, t, onUpgrade }: ProfileProps) {
-  // Stats (mock enriched data)
-  const winRate = user.trades > 0 ? Math.min(95, 70 + user.trades * 2) : 0;
-  const avgProfit = user.trades > 0 ? user.profit / user.trades : 0;
-
-  // Referral
-  const [copied, setCopied] = useState<'code' | 'link' | null>(null);
-  const refLink = `https://t.me/nexarb_bot?start=${user.ref_code}`;
-
-  const copyToClipboard = async (text: string, type: 'code' | 'link') => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(type);
-      setTimeout(() => setCopied(null), 2000);
-    } catch {
-      // fallback
-      const el = document.createElement('textarea');
-      el.value = text;
-      document.body.appendChild(el);
-      el.select();
-      document.execCommand('copy');
-      document.body.removeChild(el);
-      setCopied(type);
-      setTimeout(() => setCopied(null), 2000);
-    }
+  const saveAuto = async () => {
+    setSaving(true);
+    try { await axios.patch('/api/v1/account',{userId,auto_trading:autoEnabled,auto_amount:autoAmount,auto_min_spread:autoSpread,auto_risk:autoRisk}); } catch{}
+    setSaving(false);
   };
 
-  // API Keys
-  const [apiKeys, setApiKeys] = useState<ApiKey[]>([
-    { exchangeId: 'binance', keyMask: 'abcd...ef12', isActive: true },
-    { exchangeId: 'okx', keyMask: 'xxxx...3k9p', isActive: true },
-  ]);
-  const [addingKey, setAddingKey] = useState(false);
-  const [newKeyExchange, setNewKeyExchange] = useState('bybit');
-  const [newApiKey, setNewApiKey] = useState('');
-  const [newApiSecret, setNewApiSecret] = useState('');
-  const [showSecret, setShowSecret] = useState(false);
-
-  const handleSaveKey = () => {
-    if (!newApiKey || !newApiSecret) return;
-    const masked = maskKey(newApiKey);
-    setApiKeys(prev => [...prev, { exchangeId: newKeyExchange, keyMask: masked, isActive: true }]);
-    setNewApiKey('');
-    setNewApiSecret('');
-    setAddingKey(false);
-  };
-
-  const handleDeleteKey = (exchangeId: string) => {
-    setApiKeys(prev => prev.filter(k => k.exchangeId !== exchangeId));
-  };
-
-  // Auto-trading settings
-  const [autoSettings, setAutoSettings] = useState<AutoSettings>({
-    amount: 200,
-    minSpread: 0.5,
-    maxRisk: 'low',
-  });
-  const [autoSaved, setAutoSaved] = useState(false);
-
-  const saveAutoSettings = () => {
-    setAutoSaved(true);
-    setTimeout(() => setAutoSaved(false), 2000);
-  };
-
-  // VIP expiry
-  const vipExpiryStr = user.vip_expires
-    ? new Date(user.vip_expires * 1000).toLocaleDateString()
-    : null;
+  const tabs = [{id:'overview',icon:'◎',l:'Обзор'},{id:'trading',icon:'⚡',l:'Торговля'},{id:'api',icon:'🔑',l:'API'},{id:'ref',icon:'👥',l:'Рефералы'},{id:'settings',icon:'⚙',l:'Настройки'}];
 
   return (
     <div className="space-y-4">
-
-      {/* ── HERO CARD ─────────────────────────────── */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="relative overflow-hidden rounded-2xl border p-5 space-y-4"
-        style={{
-          background: user.vip
-            ? 'linear-gradient(135deg, rgba(245,166,35,0.08) 0%, rgba(10,15,30,1) 60%)'
-            : 'linear-gradient(135deg, rgba(34,211,238,0.06) 0%, rgba(10,15,30,1) 60%)',
-          borderColor: user.vip ? 'rgba(245,166,35,0.3)' : 'rgba(34,211,238,0.2)',
-        }}
-      >
-        {/* glow */}
-        <div
-          className="absolute -top-12 -right-12 w-40 h-40 rounded-full blur-3xl opacity-20"
-          style={{ background: user.vip ? '#f5a623' : '#22d3ee' }}
-        />
-
-        <div className="relative flex items-center gap-4">
-          <div
-            className="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl shadow-xl flex-shrink-0"
-            style={{
-              background: user.vip
-                ? 'linear-gradient(135deg,#f5a623,#e8890c)'
-                : 'linear-gradient(135deg,#22d3ee,#a855f7)',
-            }}
-          >
-            {user.vip ? '👑' : '👤'}
-          </div>
-          <div className="min-w-0">
-            <p className="text-[10px] text-slate-500 font-mono uppercase tracking-widest">
-              ID: {user.id}
-            </p>
-            <h2 className="text-lg font-black tracking-tight truncate">
-              {user.id === 'demo_user' ? 'Demo User' : user.id.replace('tg_', 'User #')}
-            </h2>
-            <div className="flex items-center gap-2 mt-1 flex-wrap">
-              {user.vip ? (
-                <span className="bg-amber-500/15 text-amber-400 text-[9px] font-bold px-2 py-0.5 rounded-full border border-amber-500/30">
-                  👑 VIP
-                  {vipExpiryStr && (
-                    <span className="opacity-70 ml-1">· {t('profile_vip_expires')} {vipExpiryStr}</span>
-                  )}
-                </span>
-              ) : (
-                <span className="bg-slate-700/50 text-slate-400 text-[9px] font-bold px-2 py-0.5 rounded-full border border-slate-700">
-                  FREE
-                </span>
-              )}
-              <span className="bg-cyan-500/10 text-cyan-400 text-[9px] font-bold px-2 py-0.5 rounded-full border border-cyan-500/20">
-                {user.trades} trades
-              </span>
+      {/* Hero */}
+      <div className="relative rounded-2xl border border-slate-800 overflow-hidden bg-gradient-to-br from-slate-900 to-slate-950">
+        {user?.vip && <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(251,191,36,.04),transparent_60%)]"/>}
+        <div className="relative p-5">
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <div className="w-16 h-16 rounded-2xl border-2 border-slate-700 overflow-hidden flex items-center justify-center bg-gradient-to-br from-cyan-500/20 to-purple-600/20">
+                {user?.tg_photo_url ? <img src={user.tg_photo_url} alt="" className="w-full h-full object-cover"/> : <span className="text-2xl font-black text-slate-400">{displayName.slice(0,1).toUpperCase()}</span>}
+              </div>
+              {user?.vip && <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-lg bg-amber-500/20 border border-amber-500/50 flex items-center justify-center"><Crown size={10} className="text-amber-400"/></div>}
+            </div>
+            <div className="flex-1">
+              <h2 className="font-black text-base leading-tight">{displayName}</h2>
+              {user?.tg_username && <p className="text-[10px] text-cyan-400/80 font-mono">@{user.tg_username}</p>}
+              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                <span className={`text-[7px] font-black px-2 py-0.5 rounded-md border uppercase ${user?.vip?'bg-amber-500/10 border-amber-500/30 text-amber-400':'bg-slate-800 border-slate-700 text-slate-500'}`}>{user?.vip?`👑 VIP·${vipDays}д`:'FREE'}</span>
+                <span className={`text-[7px] font-black px-2 py-0.5 rounded-md border uppercase ${tradingMode==='demo'?'bg-violet-500/10 border-violet-500/30 text-violet-400':'bg-cyan-500/10 border-cyan-500/30 text-cyan-400'}`}>{tradingMode==='demo'?'🧪 Demo':'⚡ Real'}</span>
+              </div>
             </div>
           </div>
+          <div className="grid grid-cols-3 gap-2 mt-4">
+            {[{l:'Баланс',v:`$${(user?.balance||0).toFixed(2)}`,c:'text-cyan-400'},{l:'Demo',v:`$${(user?.demo_balance||0).toFixed(2)}`,c:'text-violet-400'},{l:'Сделок',v:(user?.trades||0)+(user?.demo_trades||0),c:'text-emerald-400'}].map((s,i)=>(
+              <div key={i} className="bg-slate-800/30 rounded-xl p-2.5 text-center border border-slate-800/50">
+                <p className="text-[6px] text-slate-600 uppercase font-black tracking-wider mb-0.5">{s.l}</p>
+                <p className={`text-[12px] font-black font-mono ${s.c}`}>{s.v}</p>
+              </div>
+            ))}
+          </div>
+          {onModeSwitch && (
+            <div className="mt-3 flex items-center gap-2 bg-slate-800/30 rounded-xl p-1 border border-slate-800/50">
+              <button onClick={()=>onModeSwitch('demo')} className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${tradingMode==='demo'?'bg-violet-500/20 border border-violet-500/40 text-violet-400':'text-slate-600 hover:text-slate-400'}`}><FlaskConical size={10}/> Демо</button>
+              <button onClick={()=>user?.vip?onModeSwitch('real'):onUpgrade()} className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${tradingMode==='real'?'bg-cyan-500/20 border border-cyan-500/40 text-cyan-400':'text-slate-600 hover:text-slate-400'}`}><Zap size={10}/> Real {!user?.vip&&<span className="text-amber-500/70">👑</span>}</button>
+            </div>
+          )}
         </div>
+      </div>
 
-        {!user.vip && (
-          <button
-            onClick={onUpgrade}
-            className="relative w-full py-3 rounded-xl font-black text-sm text-slate-900 transition-all active:scale-[0.98]"
-            style={{ background: 'linear-gradient(90deg,#22d3ee,#a855f7)' }}
-          >
-            ⚡ {t('profile_upgrade')}
+      {/* Tabs */}
+      <div className="flex gap-1 bg-slate-900/60 border border-slate-800/50 rounded-2xl p-1 overflow-x-auto no-scrollbar">
+        {tabs.map(tb=>(
+          <button key={tb.id} onClick={()=>setTab(tb.id)} className={`flex-shrink-0 flex items-center gap-1 px-3 py-2 rounded-xl text-[8px] font-black uppercase tracking-wider transition-all ${tab===tb.id?'bg-slate-800 text-cyan-400 border border-slate-700':'text-slate-600 hover:text-slate-400'}`}>
+            <span>{tb.icon}</span>{tb.l}
           </button>
-        )}
-      </motion.div>
+        ))}
+      </div>
 
-      {/* ── STATISTICS ───────────────────────────── */}
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
-        <SECTION title={t('profile_stats')} icon={<BarChart3 size={14} />}>
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              {
-                label: t('profile_total_profit'),
-                value: `+$${user.profit.toFixed(2)}`,
-                color: 'text-emerald-400',
-                sub: user.vip ? '▲ VIP rate' : '▲ standard rate',
-              },
-              {
-                label: t('profile_total_trades'),
-                value: user.trades.toString(),
-                color: 'text-cyan-400',
-                sub: `${user.connected_exchanges.length} exchanges`,
-              },
-              {
-                label: t('profile_win_rate'),
-                value: `${winRate.toFixed(0)}%`,
-                color: winRate >= 70 ? 'text-emerald-400' : 'text-amber-400',
-                sub: winRate >= 80 ? '🔥 excellent' : '📈 good',
-              },
-              {
-                label: t('profile_avg_profit'),
-                value: `$${avgProfit.toFixed(2)}`,
-                color: 'text-purple-400',
-                sub: 'per trade',
-              },
-            ].map((s, i) => (
-              <div key={i} className="bg-slate-800/50 rounded-xl p-3 border border-slate-700/50 space-y-1">
-                <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{s.label}</p>
-                <p className={`text-xl font-black font-mono ${s.color}`}>{s.value}</p>
-                <p className="text-[9px] text-slate-600 font-mono">{s.sub}</p>
-              </div>
-            ))}
-          </div>
-        </SECTION>
-      </motion.div>
-
-      {/* ── REFERRAL ─────────────────────────────── */}
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-        <SECTION title={t('profile_ref')} icon={<Users size={14} />}>
-          <div className="space-y-3">
-            {/* Ref code */}
-            <div className="space-y-1.5">
-              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{t('profile_ref_code')}</p>
-              <div className="flex items-center gap-2">
-                <div className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 font-mono font-bold text-sm text-cyan-400 tracking-widest">
-                  {user.ref_code}
+      <AnimatePresence mode="wait">
+        {tab==='overview' && (
+          <motion.div key="ov" initial={{opacity:0}} animate={{opacity:1}} className="space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              {[{l:'Real Profit',v:`+$${(user?.profit||0).toFixed(2)}`,c:'text-cyan-400',bg:'from-cyan-500/5'},{l:'Demo Profit',v:`+$${(user?.demo_profit||0).toFixed(2)}`,c:'text-violet-400',bg:'from-violet-500/5'},{l:'Real Trades',v:user?.trades||0,c:'text-emerald-400',bg:'from-emerald-500/5'},{l:'Demo Trades',v:user?.demo_trades||0,c:'text-amber-400',bg:'from-amber-500/5'}].map((s,i)=>(
+                <div key={i} className={`bg-gradient-to-br ${s.bg} to-transparent border border-slate-800/50 rounded-2xl p-4`}>
+                  <p className="text-[7px] text-slate-600 uppercase font-black tracking-wider mb-1">{s.l}</p>
+                  <p className={`text-xl font-black font-mono ${s.c}`}>{s.v}</p>
                 </div>
-                <button
-                  onClick={() => copyToClipboard(user.ref_code, 'code')}
-                  className={`px-3 py-2.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 ${
-                    copied === 'code'
-                      ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400'
-                      : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'
-                  }`}
-                >
-                  {copied === 'code' ? <Check size={12} /> : <Copy size={12} />}
-                  {copied === 'code' ? t('profile_ref_copied') : t('profile_ref_copy')}
-                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-3 p-3 bg-slate-900/40 border border-slate-800/50 rounded-xl">
+              <Calendar size={13} className="text-slate-600 flex-shrink-0"/>
+              <div>
+                <p className="text-[7px] text-slate-600 uppercase font-black tracking-wider">Участник с</p>
+                <p className="text-[10px] text-slate-300 font-mono">{new Date((user?.created_at||Date.now()/1000)*1000).toLocaleDateString('ru',{day:'numeric',month:'long',year:'numeric'})}</p>
               </div>
             </div>
-
-            {/* Ref link */}
-            <div className="space-y-1.5">
-              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{t('profile_ref_link')}</p>
-              <div className="flex items-center gap-2">
-                <div className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 font-mono text-[10px] text-slate-400 truncate">
-                  {refLink}
-                </div>
-                <button
-                  onClick={() => copyToClipboard(refLink, 'link')}
-                  className={`px-3 py-2.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 flex-shrink-0 ${
-                    copied === 'link'
-                      ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400'
-                      : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'
-                  }`}
-                >
-                  {copied === 'link' ? <Check size={12} /> : <ExternalLink size={12} />}
-                  {copied === 'link' ? t('profile_ref_copied') : t('profile_ref_copy')}
-                </button>
-              </div>
-            </div>
-
-            {/* Stats row */}
-            <div className="grid grid-cols-2 gap-2 pt-1">
-              <div className="bg-slate-800/40 rounded-xl p-3 border border-slate-700/40 text-center">
-                <p className="text-[9px] font-bold text-slate-500 uppercase">{t('profile_ref_invited')}</p>
-                <p className="text-lg font-black font-mono text-slate-200">0</p>
-              </div>
-              <div className="bg-slate-800/40 rounded-xl p-3 border border-slate-700/40 text-center">
-                <p className="text-[9px] font-bold text-slate-500 uppercase">{t('profile_ref_earned')}</p>
-                <p className="text-lg font-black font-mono text-emerald-400">$0.00</p>
-              </div>
-            </div>
-          </div>
-        </SECTION>
-      </motion.div>
-
-      {/* ── API KEYS ─────────────────────────────── */}
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
-        <SECTION title={t('profile_api')} icon={<Key size={14} />}>
-          <div className="space-y-2">
-            {/* Existing keys */}
-            {apiKeys.map(key => {
-              const exch = EXCHS.find(e => e.id === key.exchangeId);
-              return (
-                <div
-                  key={key.exchangeId}
-                  className="flex items-center justify-between bg-slate-800/50 rounded-xl px-3 py-2.5 border border-slate-700/50"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-xl">{exch?.logo || '⬡'}</span>
-                    <div>
-                      <p className="text-xs font-bold">{exch?.name || key.exchangeId}</p>
-                      <p className="text-[10px] font-mono text-slate-500">{key.keyMask}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                      {t('profile_api_active')}
-                    </span>
-                    <button
-                      onClick={() => handleDeleteKey(key.exchangeId)}
-                      className="text-slate-600 hover:text-red-400 transition-colors"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-
-            {/* Add key form */}
-            <AnimatePresence>
-              {addingKey && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="overflow-hidden"
-                >
-                  <div className="bg-slate-800/30 rounded-xl border border-slate-700/50 p-3 space-y-3 mt-1">
-                    {/* Exchange selector */}
-                    <div className="space-y-1">
-                      <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Exchange</p>
-                      <div className="grid grid-cols-3 gap-1.5">
-                        {EXCHS.slice(0, 6).map(ex => (
-                          <button
-                            key={ex.id}
-                            onClick={() => setNewKeyExchange(ex.id)}
-                            className={`py-1.5 rounded-lg text-[10px] font-bold border transition-all flex items-center justify-center gap-1 ${
-                              newKeyExchange === ex.id
-                                ? 'bg-cyan-500/10 border-cyan-500/50 text-cyan-400'
-                                : 'bg-slate-800 border-slate-700 text-slate-500 hover:border-slate-600'
-                            }`}
-                          >
-                            <span>{ex.logo}</span>
-                            <span>{ex.name.split(' ')[0]}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* API Key */}
-                    <div className="space-y-1">
-                      <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">
-                        {t('profile_api_key')}
-                      </p>
-                      <input
-                        value={newApiKey}
-                        onChange={e => setNewApiKey(e.target.value)}
-                        placeholder={t('profile_api_placeholder_key')}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs font-mono focus:border-cyan-500 outline-none placeholder:text-slate-700"
-                      />
-                    </div>
-
-                    {/* API Secret */}
-                    <div className="space-y-1">
-                      <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">
-                        {t('profile_api_secret')}
-                      </p>
-                      <div className="relative">
-                        <input
-                          type={showSecret ? 'text' : 'password'}
-                          value={newApiSecret}
-                          onChange={e => setNewApiSecret(e.target.value)}
-                          placeholder={t('profile_api_placeholder_secret')}
-                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 pr-10 text-xs font-mono focus:border-cyan-500 outline-none placeholder:text-slate-700"
-                        />
-                        <button
-                          onClick={() => setShowSecret(!showSecret)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-400"
-                        >
-                          {showSecret ? <EyeOff size={14} /> : <Eye size={14} />}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <button
-                        onClick={handleSaveKey}
-                        disabled={!newApiKey || !newApiSecret}
-                        className="flex-1 bg-cyan-500 disabled:bg-slate-700 disabled:text-slate-500 text-slate-900 font-black py-2 rounded-xl text-xs transition-all"
-                      >
-                        {t('profile_api_save')}
-                      </button>
-                      <button
-                        onClick={() => { setAddingKey(false); setNewApiKey(''); setNewApiSecret(''); }}
-                        className="px-4 bg-slate-800 text-slate-400 font-bold py-2 rounded-xl text-xs border border-slate-700 hover:border-slate-600 transition-all"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {!addingKey && (
-              <button
-                onClick={() => setAddingKey(true)}
-                className="w-full py-2.5 rounded-xl border border-dashed border-slate-700 text-slate-500 hover:border-cyan-500/40 hover:text-cyan-400 transition-all text-xs font-bold flex items-center justify-center gap-1.5 mt-1"
-              >
-                <Plus size={12} />
-                {t('profile_api_add')}
-              </button>
+            {!user?.vip && (
+              <motion.div whileTap={{scale:0.98}} onClick={onUpgrade} className="cursor-pointer rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 flex items-center justify-between">
+                <div><p className="font-black text-amber-400 text-sm">Перейти на VIP</p><p className="text-[8px] text-slate-600 mt-0.5">40+ бирж · 60+ токенов · 14 сетей</p></div>
+                <div className="flex items-center gap-1 text-amber-400"><Crown size={16}/><ChevronRight size={12}/></div>
+              </motion.div>
             )}
-          </div>
-        </SECTION>
-      </motion.div>
+          </motion.div>
+        )}
 
-      {/* ── AUTO-TRADING SETTINGS ─────────────────── */}
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-        <SECTION title={t('profile_auto')} icon={<Bot size={14} />}>
-          <div className="space-y-4">
-            {/* Amount */}
-            <div className="space-y-1.5">
-              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">
-                {t('profile_auto_amount')}
-              </p>
-              <div className="relative">
-                <input
-                  type="number"
-                  value={autoSettings.amount}
-                  onChange={e => setAutoSettings(s => ({ ...s, amount: Number(e.target.value) }))}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm font-mono font-bold focus:border-cyan-500 outline-none"
-                />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-500">
-                  USDT
-                </span>
-              </div>
-              {/* Quick presets */}
-              <div className="flex gap-1.5">
-                {[100, 200, 500, 1000].map(v => (
-                  <button
-                    key={v}
-                    onClick={() => setAutoSettings(s => ({ ...s, amount: v }))}
-                    className={`flex-1 py-1 rounded-lg text-[10px] font-bold border transition-all ${
-                      autoSettings.amount === v
-                        ? 'bg-cyan-500/10 border-cyan-500/40 text-cyan-400'
-                        : 'bg-slate-800 border-slate-700 text-slate-500 hover:border-slate-600'
-                    }`}
-                  >
-                    ${v}
+        {tab==='trading' && (
+          <motion.div key="tr" initial={{opacity:0}} animate={{opacity:1}} className="space-y-4">
+            <div className="rounded-2xl border border-slate-800 overflow-hidden">
+              <div className="px-4 py-3 border-b border-slate-800 bg-slate-900/40"><p className="text-[8px] font-black uppercase tracking-[.15em] text-slate-500">Режим торговли</p></div>
+              <div className="p-4 space-y-3">
+                {[{id:'demo',icon:<FlaskConical size={14}/>,title:'Демо режим',desc:'Виртуальные средства. Идеально для изучения стратегий без риска.',col:'text-violet-400',bg:'bg-violet-500/8',brd:'border-violet-500/25'},{id:'real',icon:<Zap size={14}/>,title:'Реальная торговля',desc:'Реальные средства через API ключи. Только VIP.',col:'text-cyan-400',bg:'bg-cyan-500/8',brd:'border-cyan-500/25'}].map(m=>(
+                  <button key={m.id} onClick={()=>m.id==='real'&&!user?.vip?onUpgrade():onModeSwitch?.(m.id as any)} className={`w-full flex items-start gap-3 p-3.5 rounded-xl border transition-all ${tradingMode===m.id?`${m.bg} ${m.brd}`:'bg-slate-800/20 border-slate-800/50 hover:border-slate-700/50'}`}>
+                    <div className={`p-2 rounded-lg border mt-0.5 ${tradingMode===m.id?`${m.bg} ${m.brd}`:'bg-slate-800 border-slate-700'}`}><span className={tradingMode===m.id?m.col:'text-slate-500'}>{m.icon}</span></div>
+                    <div className="flex-1 text-left">
+                      <div className="flex items-center gap-2"><p className={`text-sm font-black ${tradingMode===m.id?m.col:'text-slate-400'}`}>{m.title}</p>{m.id==='real'&&!user?.vip&&<span className="text-[7px] text-amber-500 font-black">👑 VIP</span>}{tradingMode===m.id&&<span className={`text-[7px] font-black px-1.5 py-0.5 rounded border ${m.bg} ${m.brd} ${m.col}`}>АКТИВЕН</span>}</div>
+                      <p className="text-[8px] text-slate-600 mt-0.5 leading-relaxed">{m.desc}</p>
+                    </div>
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Min spread */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">
-                  {t('profile_auto_min_spread')}
-                </p>
-                <span className="text-[10px] font-mono font-bold text-cyan-400">{autoSettings.minSpread}%</span>
+            <div className={`rounded-2xl border border-slate-800 overflow-hidden ${!user?.vip?'opacity-50 pointer-events-none':''}`}>
+              <div className="px-4 py-3 border-b border-slate-800 bg-slate-900/40 flex items-center justify-between">
+                <div className="flex items-center gap-2"><Bot size={11} className="text-slate-600"/><p className="text-[8px] font-black uppercase tracking-[.15em] text-slate-500">Авто-трейдинг</p>{!user?.vip&&<span className="text-[7px] text-amber-500 font-black">👑 VIP</span>}</div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" checked={autoEnabled} onChange={e=>setAutoEnabled(e.target.checked)} className="sr-only peer"/>
+                  <div className="w-9 h-5 bg-slate-800 border border-slate-700 rounded-full peer peer-checked:bg-cyan-500/20 peer-checked:border-cyan-500/50 after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:bg-white after:rounded-full after:h-[14px] after:w-[14px] after:transition-all peer-checked:after:translate-x-4"/>
+                </label>
               </div>
-              <input
-                type="range"
-                min="0.1"
-                max="2"
-                step="0.1"
-                value={autoSettings.minSpread}
-                onChange={e => setAutoSettings(s => ({ ...s, minSpread: Number(e.target.value) }))}
-                className="w-full accent-cyan-400 h-1.5 rounded-full appearance-none bg-slate-700 cursor-pointer"
-              />
-              <div className="flex justify-between text-[9px] text-slate-600 font-mono">
-                <span>0.1%</span><span>2.0%</span>
+              <div className="p-4 space-y-3 border border-slate-800">
+                {[{l:`Сумма на сделку ($)`,v:autoAmount,set:setAutoAmount,min:10,max:10000,step:10},{l:'Мин. спред (%)',v:autoSpread,set:setAutoSpread,min:0.05,max:2,step:0.05}].map((f,i)=>(
+                  <div key={i}>
+                    <div className="flex justify-between mb-1.5"><label className="text-[7px] font-black text-slate-600 uppercase tracking-wider">{f.l}</label><span className="text-[8px] font-mono text-cyan-400">{f.v}</span></div>
+                    <input type="range" min={f.min} max={f.max} step={f.step} value={f.v} onChange={e=>f.set(Number(e.target.value))} className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400"/>
+                  </div>
+                ))}
+                <div>
+                  <p className="text-[7px] font-black text-slate-600 uppercase tracking-wider mb-1.5">Риск-профиль</p>
+                  <div className="flex gap-2">
+                    {[{id:'low',l:'Низкий',c:'text-emerald-400',bg:'bg-emerald-500/10',bd:'border-emerald-500/40'},{id:'medium',l:'Средний',c:'text-amber-400',bg:'bg-amber-500/10',bd:'border-amber-500/40'},{id:'high',l:'Высокий',c:'text-red-400',bg:'bg-red-500/10',bd:'border-red-500/40'}].map(r=>(
+                      <button key={r.id} onClick={()=>setAutoRisk(r.id)} className={`flex-1 py-1.5 rounded-xl text-[8px] font-black uppercase border transition-all ${autoRisk===r.id?`${r.bg} ${r.bd} ${r.c}`:'bg-transparent border-slate-800 text-slate-600'}`}>{r.l}</button>
+                    ))}
+                  </div>
+                </div>
+                <button onClick={saveAuto} className="w-full py-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-[9px] font-black uppercase tracking-wider hover:bg-cyan-500/15 transition-colors">{saving?'Сохранение...':'✓ Сохранить'}</button>
               </div>
             </div>
+          </motion.div>
+        )}
 
-            {/* Risk */}
-            <div className="space-y-1.5">
-              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">
-                {t('profile_auto_max_risk')}
-              </p>
+        {tab==='api' && (
+          <motion.div key="api" initial={{opacity:0}} animate={{opacity:1}} className="rounded-2xl border border-slate-800 overflow-hidden">
+            <div className="px-4 py-3 border-b border-slate-800 bg-slate-900/40"><p className="text-[8px] font-black uppercase tracking-[.15em] text-slate-500">API ключи бирж</p></div>
+            <div className="p-4">
+              {!user?.vip ? (
+                <div className="text-center py-8 space-y-3"><Key size={24} className="text-slate-700 mx-auto"/><p className="text-[10px] text-slate-600">Только VIP тариф</p><button onClick={onUpgrade} className="text-[9px] text-amber-400 font-black underline">Обновиться →</button></div>
+              ) : (
+                <div className="space-y-2">
+                  {(user?.connected_exchanges||[]).map((ex: string)=>(
+                    <div key={ex} className="flex items-center justify-between p-3 bg-slate-800/30 rounded-xl border border-slate-800/50">
+                      <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-emerald-400"/><span className="text-[10px] font-bold capitalize">{ex}</span></div>
+                      <span className="text-[8px] text-slate-600 font-mono">••••••••</span>
+                    </div>
+                  ))}
+                  <p className="text-[8px] text-slate-600 text-center pt-2">Добавьте биржи в разделе Стратегии</p>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+
+        {tab==='ref' && (
+          <motion.div key="ref" initial={{opacity:0}} animate={{opacity:1}} className="rounded-2xl border border-slate-800 overflow-hidden">
+            <div className="px-4 py-3 border-b border-slate-800 bg-slate-900/40"><p className="text-[8px] font-black uppercase tracking-[.15em] text-slate-500">Реферальная программа</p></div>
+            <div className="p-4 space-y-4">
               <div className="grid grid-cols-3 gap-2">
-                {[
-                  { id: 'low', label: t('profile_auto_risk_low'), color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/40' },
-                  { id: 'medium', label: t('profile_auto_risk_med'), color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/40' },
-                  { id: 'high', label: t('profile_auto_risk_high'), color: 'text-red-400', bg: 'bg-red-500/10 border-red-500/40' },
-                ].map(r => (
-                  <button
-                    key={r.id}
-                    onClick={() => setAutoSettings(s => ({ ...s, maxRisk: r.id as any }))}
-                    className={`py-2 rounded-xl border text-xs font-bold transition-all ${
-                      autoSettings.maxRisk === r.id
-                        ? `${r.bg} ${r.color}`
-                        : 'bg-slate-800 border-slate-700 text-slate-500 hover:border-slate-600'
-                    }`}
-                  >
-                    {r.label}
+                {[{l:'Рефералов',v:user?.referred_users?.length||0,c:'text-cyan-400'},{l:'Заработано',v:`$${(user?.ref_earned||0).toFixed(2)}`,c:'text-emerald-400'},{l:'% профит',v:'10%',c:'text-amber-400'}].map((s,i)=>(
+                  <div key={i} className="bg-slate-800/30 rounded-xl p-2.5 text-center border border-slate-800/50">
+                    <p className="text-[6px] text-slate-600 uppercase font-black tracking-wider mb-0.5">{s.l}</p>
+                    <p className={`text-sm font-black font-mono ${s.c}`}>{s.v}</p>
+                  </div>
+                ))}
+              </div>
+              <div>
+                <p className="text-[7px] font-black text-slate-600 uppercase tracking-wider mb-2">Ваш код</p>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-3 font-mono text-sm font-black text-cyan-400 tracking-widest">{user?.ref_code||'REFXXXXX'}</div>
+                  <button onClick={copyRef} className={`p-3 rounded-xl border transition-all ${copied?'bg-emerald-500/10 border-emerald-500/30 text-emerald-400':'bg-slate-800 border-slate-700 text-slate-500 hover:text-slate-300'}`}>{copied?<Check size={14}/>:<Copy size={14}/>}</button>
+                </div>
+              </div>
+              <p className="text-[8px] text-slate-600 leading-relaxed p-3 bg-slate-800/20 rounded-xl border border-slate-800/40">Приглашайте друзей и получайте 10% от их комиссий навсегда.</p>
+            </div>
+          </motion.div>
+        )}
+
+        {tab==='settings' && (
+          <motion.div key="st" initial={{opacity:0}} animate={{opacity:1}} className="space-y-3">
+            <div className="rounded-2xl border border-slate-800 overflow-hidden">
+              <div className="px-4 py-3 border-b border-slate-800 bg-slate-900/40 flex items-center gap-2"><Globe size={11} className="text-slate-600"/><p className="text-[8px] font-black uppercase tracking-[.15em] text-slate-500">Язык</p></div>
+              <div className="p-3 grid grid-cols-2 gap-2">
+                {LANGS_LIST.map(l=>(
+                  <button key={l.code} onClick={()=>setLang(l.code)} className={`flex items-center gap-2 p-3 rounded-xl border transition-all ${lang===l.code?'bg-cyan-500/8 border-cyan-500/30 text-cyan-400':'bg-slate-800/20 border-slate-800/50 text-slate-500 hover:border-slate-700'}`}>
+                    <span className="text-lg">{l.flag}</span><span className="text-[9px] font-black">{l.name}</span>{lang===l.code&&<Check size={9} className="ml-auto text-cyan-400"/>}
                   </button>
                 ))}
               </div>
             </div>
-
-            {/* Save button */}
-            <button
-              onClick={saveAutoSettings}
-              className={`w-full py-3 rounded-xl font-black text-sm transition-all active:scale-[0.98] flex items-center justify-center gap-2 ${
-                autoSaved
-                  ? 'bg-emerald-500/10 border border-emerald-500/40 text-emerald-400'
-                  : 'bg-gradient-to-r from-cyan-500 to-purple-600 text-slate-900 shadow-lg shadow-cyan-500/20'
-              }`}
-            >
-              {autoSaved ? <><Check size={14} /> {t('profile_auto_saved')}</> : t('profile_auto_save')}
-            </button>
-          </div>
-        </SECTION>
-      </motion.div>
-
-      {/* ── LANGUAGE ─────────────────────────────── */}
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
-        <SECTION title={t('profile_lang')} icon={<Globe size={14} />}>
-          <div className="grid grid-cols-4 gap-2">
-            {LANG_OPTIONS.map(l => (
-              <button
-                key={l.code}
-                onClick={() => setLang(l.code)}
-                className={`relative py-3 rounded-xl border flex flex-col items-center gap-1 transition-all active:scale-95 ${
-                  lang === l.code
-                    ? 'bg-cyan-500/10 border-cyan-500/50 shadow-[0_0_12px_rgba(34,211,238,0.1)]'
-                    : 'bg-slate-800/50 border-slate-700 hover:border-slate-600'
-                }`}
-              >
-                {lang === l.code && (
-                  <div className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-cyan-400" />
-                )}
-                <span className="text-xl">{l.flag}</span>
-                <span className={`text-[10px] font-black tracking-widest ${lang === l.code ? 'text-cyan-400' : 'text-slate-400'}`}>
-                  {l.label}
-                </span>
-                <span className="text-[8px] text-slate-600 font-medium">{l.name}</span>
-              </button>
-            ))}
-          </div>
-        </SECTION>
-      </motion.div>
-
+            <div className="rounded-2xl border border-slate-800 overflow-hidden">
+              <div className="px-4 py-3 border-b border-slate-800 bg-slate-900/40 flex items-center gap-2"><Shield size={11} className="text-slate-600"/><p className="text-[8px] font-black uppercase tracking-[.15em] text-slate-500">Аккаунт</p></div>
+              <div className="p-4 space-y-2">
+                {[{l:'ID',v:user?.id},{l:'Telegram',v:user?.tg_username?`@${user.tg_username}`:'—'},{l:'Тариф',v:user?.vip?`VIP (${vipDays}д)`:'Free'},{l:'Режим',v:tradingMode==='demo'?'🧪 Демо':'⚡ Реальный'}].map((row,i)=>(
+                  <div key={i} className="flex justify-between items-center py-1.5 border-b border-slate-800/30 last:border-0">
+                    <span className="text-[8px] text-slate-600 uppercase font-bold tracking-wider">{row.l}</span>
+                    <span className="text-[9px] text-slate-400 font-mono truncate max-w-[160px]">{row.v}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

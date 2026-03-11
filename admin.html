@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>NEXARB · Admin Control</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Syne:wght@400;600;700;800&display=swap');
+
+:root {
+  --bg0:#020408; --bg1:#060d14; --bg2:#0a1520; --bg3:#0f1e2e;
+  --border:#1a2d40; --border2:#2a4560;
+  --cyan:#00d4ff; --cyan2:#0099cc; --green:#00ff88; --red:#ff3355;
+  --amber:#ffaa00; --purple:#aa55ff;
+  --text:#e0f0ff; --text2:#6a9ab0; --text3:#3a5a70;
+  --font-display:'Syne',sans-serif; --font-mono:'JetBrains Mono',monospace;
+}
+
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg0);color:var(--text);font-family:var(--font-mono);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 50% at 50% -10%,rgba(0,212,255,.06),transparent),radial-gradient(ellipse 50% 80% at 100% 50%,rgba(170,85,255,.03),transparent);pointer-events:none;z-index:0}
+
+/* ── LAYOUT ── */
+#app{position:relative;z-index:1;display:flex;min-height:100vh}
+nav{width:220px;flex-shrink:0;background:var(--bg1);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto}
+main{flex:1;padding:28px;overflow-y:auto;min-width:0}
+
+/* ── NAV ── */
+.nav-logo{padding:24px 20px 16px;border-bottom:1px solid var(--border)}
+.nav-logo h1{font-family:var(--font-display);font-size:22px;font-weight:800;letter-spacing:.05em;background:linear-gradient(135deg,var(--cyan),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.nav-logo p{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.15em;margin-top:3px}
+.nav-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(255,51,85,.08);border:1px solid rgba(255,51,85,.2);color:#ff3355;font-size:9px;font-weight:700;padding:4px 10px;border-radius:6px;text-transform:uppercase;letter-spacing:.1em;margin:12px 20px}
+.nav-section{padding:16px 20px 8px;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.15em}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 20px;font-size:11px;font-weight:600;color:var(--text2);cursor:pointer;transition:all .15s;border-left:2px solid transparent;text-decoration:none}
+.nav-item:hover{color:var(--text);background:rgba(0,212,255,.04)}
+.nav-item.active{color:var(--cyan);background:rgba(0,212,255,.06);border-left-color:var(--cyan)}
+.nav-item svg{width:14px;height:14px;flex-shrink:0;opacity:.7}
+.nav-item.active svg{opacity:1}
+.nav-footer{margin-top:auto;padding:16px 20px;border-top:1px solid var(--border)}
+.nav-footer p{font-size:9px;color:var(--text3)}
+.online-dot{width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block;margin-right:6px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* ── HEADER ── */
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;gap:16px}
+.page-title{font-family:var(--font-display);font-size:20px;font-weight:800;letter-spacing:.02em}
+.page-title span{color:var(--text3)}
+.header-actions{display:flex;gap:8px}
+
+/* ── CARDS ── */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:24px}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:16px;position:relative;overflow:hidden;transition:border-color .2s}
+.stat-card:hover{border-color:var(--border2)}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.stat-card.cyan::before{background:linear-gradient(90deg,var(--cyan),transparent)}
+.stat-card.green::before{background:linear-gradient(90deg,var(--green),transparent)}
+.stat-card.amber::before{background:linear-gradient(90deg,var(--amber),transparent)}
+.stat-card.purple::before{background:linear-gradient(90deg,var(--purple),transparent)}
+.stat-card.red::before{background:linear-gradient(90deg,var(--red),transparent)}
+.stat-label{font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.12em;margin-bottom:8px}
+.stat-value{font-size:26px;font-weight:800;letter-spacing:-.02em;line-height:1}
+.stat-value.cyan{color:var(--cyan)}
+.stat-value.green{color:var(--green)}
+.stat-value.amber{color:var(--amber)}
+.stat-value.purple{color:var(--purple)}
+.stat-value.red{color:var(--red)}
+.stat-sub{font-size:9px;color:var(--text3);margin-top:6px}
+
+/* ── GRID SECTIONS ── */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px}
+@media(max-width:1100px){.grid-3{grid-template-columns:1fr 1fr}}
+@media(max-width:750px){.grid-2,.grid-3{grid-template-columns:1fr}}
+.section{background:var(--bg2);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:16px}
+.section-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.015)}
+.section-title{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:var(--text2)}
+.section-body{padding:18px}
+
+/* ── CHART ── */
+.chart-wrap{position:relative;height:180px}
+
+/* ── TABLE ── */
+table{width:100%;border-collapse:collapse}
+thead tr{background:rgba(0,212,255,.03)}
+th{padding:10px 14px;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;text-align:left;border-bottom:1px solid var(--border)}
+td{padding:10px 14px;font-size:11px;color:var(--text2);border-bottom:1px solid rgba(26,45,64,.5)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(0,212,255,.02);color:var(--text)}
+.td-id{font-weight:700;color:var(--text);font-family:var(--font-mono);font-size:11px}
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:5px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+.badge-vip{background:rgba(255,170,0,.1);border:1px solid rgba(255,170,0,.3);color:var(--amber)}
+.badge-free{background:rgba(106,154,176,.08);border:1px solid rgba(106,154,176,.2);color:var(--text3)}
+.badge-blocked{background:rgba(255,51,85,.1);border:1px solid rgba(255,51,85,.3);color:var(--red)}
+.badge-online{background:rgba(0,255,136,.08);border:1px solid rgba(0,255,136,.25);color:var(--green)}
+.badge-cex{background:rgba(0,212,255,.08);color:var(--cyan)}
+.badge-dex{background:rgba(0,255,136,.08);color:var(--green)}
+.badge-tri{background:rgba(170,85,255,.08);color:var(--purple)}
+.badge-cross{background:rgba(255,170,0,.08);color:var(--amber)}
+
+/* ── BUTTONS ── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;cursor:pointer;transition:all .15s;border:none;font-family:var(--font-mono)}
+.btn-primary{background:var(--cyan);color:#000}
+.btn-primary:hover{background:#33ddff}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text2)}
+.btn-ghost:hover{border-color:var(--border2);color:var(--text)}
+.btn-red{background:rgba(255,51,85,.1);border:1px solid rgba(255,51,85,.3);color:var(--red)}
+.btn-red:hover{background:rgba(255,51,85,.2)}
+.btn-green{background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.3);color:var(--green)}
+.btn-green:hover{background:rgba(0,255,136,.2)}
+.btn-amber{background:rgba(255,170,0,.1);border:1px solid rgba(255,170,0,.3);color:var(--amber)}
+.btn-sm{padding:5px 10px;font-size:9px}
+.btn-icon{width:32px;height:32px;padding:0;justify-content:center;border-radius:6px}
+
+/* ── FORMS ── */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-row{display:flex;flex-direction:column;gap:5px}
+.form-label{font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.1em}
+input,select,textarea{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:11px;color:var(--text);font-family:var(--font-mono);outline:none;transition:border-color .15s;width:100%}
+input:focus,select:focus,textarea:focus{border-color:var(--cyan2)}
+.search-wrap{position:relative}
+.search-wrap input{padding-left:34px}
+.search-icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text3);pointer-events:none;font-size:13px}
+.toggle{display:flex;align-items:center;gap:10px;cursor:pointer}
+.toggle input{display:none}
+.toggle-track{width:40px;height:22px;border-radius:11px;background:var(--bg3);border:1px solid var(--border);position:relative;transition:all .2s}
+.toggle input:checked+.toggle-track{background:rgba(0,212,255,.2);border-color:var(--cyan)}
+.toggle-thumb{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--text3);transition:all .2s}
+.toggle input:checked~.toggle-track .toggle-thumb,.toggle input:checked+.toggle-track+.toggle-thumb{display:none}
+
+/* ── USER MODAL ── */
+.overlay{position:fixed;inset:0;background:rgba(2,4,8,.85);backdrop-filter:blur(8px);z-index:100;display:none;align-items:center;justify-content:center;padding:20px}
+.overlay.open{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:18px;width:100%;max-width:680px;max-height:90vh;overflow-y:auto;position:relative}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg2);z-index:1}
+.modal-title{font-family:var(--font-display);font-size:16px;font-weight:700}
+.modal-body{padding:24px}
+.modal-close{background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer;line-height:1;padding:4px}
+.modal-close:hover{color:var(--text)}
+
+/* ── TABS ── */
+.tabs{display:flex;gap:2px;padding:4px;background:var(--bg3);border-radius:10px;margin-bottom:20px}
+.tab{padding:7px 14px;border-radius:7px;font-size:10px;font-weight:700;color:var(--text3);cursor:pointer;transition:all .15s;text-transform:uppercase;letter-spacing:.08em}
+.tab.active{background:var(--bg2);color:var(--cyan);border:1px solid var(--border)}
+
+/* ── NOTIFY ── */
+.toast{position:fixed;bottom:20px;right:20px;padding:12px 18px;border-radius:10px;font-size:11px;font-weight:600;z-index:200;transform:translateY(60px);opacity:0;transition:all .3s;border:1px solid}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.success{background:rgba(0,255,136,.1);border-color:rgba(0,255,136,.3);color:var(--green)}
+.toast.error{background:rgba(255,51,85,.1);border-color:rgba(255,51,85,.3);color:var(--red)}
+
+/* ── PAGES ── */
+.page{display:none}
+.page.active{display:block}
+
+/* ── STRATEGY BARS ── */
+.strat-bar{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.strat-name{font-size:10px;font-weight:700;width:60px;text-transform:uppercase;color:var(--text2)}
+.strat-track{flex:1;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden}
+.strat-fill{height:100%;border-radius:3px;transition:width .6s}
+.strat-val{font-size:10px;font-weight:700;width:50px;text-align:right;font-family:var(--font-mono)}
+
+/* ── SIGNAL TOP ── */
+.signal-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(26,45,64,.4)}
+.signal-row:last-child{border:none}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- NAV -->
+  <nav>
+    <div class="nav-logo">
+      <h1>NEXARB</h1>
+      <p>Control Panel v1.0</p>
+    </div>
+    <div class="nav-badge">
+      <span class="online-dot"></span> ADMIN ACCESS
+    </div>
+
+    <div class="nav-section">Overview</div>
+    <a class="nav-item active" onclick="showPage('dashboard')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      Dashboard
+    </a>
+    <a class="nav-item" onclick="showPage('analytics')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Analytics
+    </a>
+
+    <div class="nav-section">Management</div>
+    <a class="nav-item" onclick="showPage('users')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Users
+    </a>
+    <a class="nav-item" onclick="showPage('trades')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+      Trades
+    </a>
+
+    <div class="nav-section">System</div>
+    <a class="nav-item" onclick="showPage('config')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+      Config
+    </a>
+    <a class="nav-item" onclick="showPage('broadcast')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.67 3.45 2 2 0 0 1 3.66 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.93"/></svg>
+      Broadcast
+    </a>
+
+    <div class="nav-footer">
+      <p id="nav-secret" style="color:var(--text3);font-size:9px"></p>
+    </div>
+  </nav>
+
+  <!-- MAIN -->
+  <main>
+
+    <!-- DASHBOARD -->
+    <div id="page-dashboard" class="page active">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Dashboard <span>/ Overview</span></div>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-ghost" onclick="loadAll()">↻ Refresh</button>
+        </div>
+      </div>
+
+      <div class="stats-grid" id="stat-cards"></div>
+
+      <div class="grid-2">
+        <div class="section">
+          <div class="section-head"><span class="section-title">Platform Fees · 14 days</span></div>
+          <div class="section-body"><div class="chart-wrap"><canvas id="chart-fees"></canvas></div></div>
+        </div>
+        <div class="section">
+          <div class="section-head"><span class="section-title">Volume · 14 days</span></div>
+          <div class="section-body"><div class="chart-wrap"><canvas id="chart-volume"></canvas></div></div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="section">
+          <div class="section-head"><span class="section-title">Volume by Strategy</span></div>
+          <div class="section-body" id="strat-bars"></div>
+        </div>
+        <div class="section">
+          <div class="section-head"><span class="section-title">Top Executed Signals</span></div>
+          <div class="section-body" id="top-signals"></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-head"><span class="section-title">Top Users by Profit</span></div>
+        <div class="section-body" style="padding:0">
+          <table><thead><tr><th>#</th><th>User ID</th><th>Profit</th><th>Trades</th><th>Balance</th><th>Plan</th></tr></thead>
+          <tbody id="top-users-table"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ANALYTICS -->
+    <div id="page-analytics" class="page">
+      <div class="page-header"><div class="page-title">Analytics <span>/ Deep Stats</span></div></div>
+      <div class="grid-3">
+        <div class="section">
+          <div class="section-head"><span class="section-title">CEX Volume</span></div>
+          <div class="section-body"><div class="chart-wrap"><canvas id="chart-strat-vol"></canvas></div></div>
+        </div>
+        <div class="section">
+          <div class="section-head"><span class="section-title">Trades by Type</span></div>
+          <div class="section-body"><div class="chart-wrap"><canvas id="chart-strat-count"></canvas></div></div>
+        </div>
+        <div class="section">
+          <div class="section-head"><span class="section-title">Fees by Type</span></div>
+          <div class="section-body"><div class="chart-wrap"><canvas id="chart-strat-fees"></canvas></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- USERS -->
+    <div id="page-users" class="page">
+      <div class="page-header">
+        <div class="page-title">Users <span>/ Management</span></div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <div class="search-wrap">
+            <span class="search-icon">⌕</span>
+            <input id="user-search" placeholder="Search by ID or ref code..." style="width:240px" oninput="searchUsers()"/>
+          </div>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-body" style="padding:0">
+          <table>
+            <thead><tr><th>User ID</th><th>Balance</th><th>Profit</th><th>Trades</th><th>Plan</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody id="users-table"></tbody>
+          </table>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0">
+        <span id="users-count" style="font-size:10px;color:var(--text3)"></span>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-ghost btn-sm" onclick="usersPage(-1)">← Prev</button>
+          <button class="btn btn-ghost btn-sm" onclick="usersPage(1)">Next →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TRADES -->
+    <div id="page-trades" class="page">
+      <div class="page-header"><div class="page-title">Trades <span>/ History</span></div></div>
+      <p style="color:var(--text3);font-size:11px">Filter trades by user from the Users page → open user → Trade History tab.</p>
+    </div>
+
+    <!-- CONFIG -->
+    <div id="page-config" class="page">
+      <div class="page-header"><div class="page-title">Config <span>/ System Settings</span></div></div>
+      <div class="grid-2">
+        <div class="section">
+          <div class="section-head"><span class="section-title">Fee Settings</span></div>
+          <div class="section-body" id="config-fees"></div>
+        </div>
+        <div class="section">
+          <div class="section-head"><span class="section-title">Trade Limits</span></div>
+          <div class="section-body" id="config-limits"></div>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-head"><span class="section-title">Network Fees</span></div>
+        <div class="section-body" id="config-network"></div>
+      </div>
+      <div style="margin-top:16px">
+        <button class="btn btn-primary" onclick="saveConfig()">✓ Save All Config</button>
+      </div>
+    </div>
+
+    <!-- BROADCAST -->
+    <div id="page-broadcast" class="page">
+      <div class="page-header"><div class="page-title">Broadcast <span>/ Notifications</span></div></div>
+      <div class="section" style="max-width:560px">
+        <div class="section-head"><span class="section-title">Send to All Users</span></div>
+        <div class="section-body">
+          <div class="form-row" style="margin-bottom:14px">
+            <label class="form-label">Message</label>
+            <textarea id="broadcast-msg" rows="4" placeholder="Enter message for all users..."></textarea>
+          </div>
+          <button class="btn btn-primary" onclick="sendBroadcast()">📡 Send Broadcast</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- USER MODAL -->
+<div class="overlay" id="user-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="modal-title" id="modal-uid">User Details</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="tabs">
+        <div class="tab active" onclick="modalTab('info')">Info</div>
+        <div class="tab" onclick="modalTab('vip')">VIP</div>
+        <div class="tab" onclick="modalTab('balance')">Balance</div>
+        <div class="tab" onclick="modalTab('trades')">Trades</div>
+        <div class="tab" onclick="modalTab('notify')">Notify</div>
+        <div class="tab" onclick="modalTab('danger')">Danger</div>
+      </div>
+      <div id="modal-content"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── CONFIG ─────────────────────────────────────────────────
+const SECRET = new URLSearchParams(location.search).get('secret') || localStorage.getItem('nexarb_admin_secret') || '';
+if (SECRET) { localStorage.setItem('nexarb_admin_secret','nexarb-admin-2025'); document.getElementById('nav-secret').textContent = '🔐 '+SECRET.slice(0,8)+'...'; }
+
+const API = (path) => fetch(path, { headers: { 'x-admin-secret': SECRET } }).then(r => r.json());
+const POST = (path, body) => fetch(path, { method:'POST', headers:{ 'Content-Type':'application/json', 'x-admin-secret': SECRET }, body: JSON.stringify(body) }).then(r => r.json());
+
+let statsData = null;
+let usersData = { items:[], total:0 };
+let configData = {};
+let currentPage = 1;
+let currentUser = null;
+let feesChart = null, volChart = null;
+let stratVolChart = null, stratCountChart = null, stratFeesChart = null;
+
+// ── PAGES ──────────────────────────────────────────────────
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n=>{ if(n.getAttribute('onclick')?.includes(name)) n.classList.add('active'); });
+  if (name==='dashboard') renderDashboard();
+  if (name==='users') loadUsers();
+  if (name==='analytics') renderAnalytics();
+  if (name==='config') loadConfig();
+}
+
+// ── LOAD ALL ───────────────────────────────────────────────
+async function loadAll() {
+  statsData = await API('/api/admin/stats?secret='+SECRET);
+  renderDashboard();
+}
+
+// ── DASHBOARD ──────────────────────────────────────────────
+function renderDashboard() {
+  if (!statsData) return loadAll();
+  const s = statsData;
+
+  const cards = [
+    { label:'Total Users', value: s.total_users, cls:'cyan', sub: s.online_users+' online now' },
+    { label:'VIP Users', value: s.vip_users, cls:'amber', sub: '$'+(s.platform_fees_total||0).toFixed(2)+' fees total' },
+    { label:'Trades 24h', value: s.trades_24h, cls:'green', sub: s.total_trades+' all time' },
+    { label:'Volume 24h', value: '$'+(s.volume_24h||0).toLocaleString('en',{maximumFractionDigits:0}), cls:'purple', sub: '$'+(s.total_volume||0).toLocaleString('en',{maximumFractionDigits:0})+' total' },
+    { label:'Fees 24h', value: '$'+(s.platform_fees_24h||0).toFixed(2), cls:'green', sub: 'Platform income' },
+    { label:'Blocked', value: s.blocked_users||0, cls:'red', sub: 'Blocked accounts' },
+  ];
+
+  document.getElementById('stat-cards').innerHTML = cards.map(c=>`
+    <div class="stat-card ${c.cls}">
+      <div class="stat-label">${c.label}</div>
+      <div class="stat-value ${c.cls}">${c.value}</div>
+      <div class="stat-sub">${c.sub}</div>
+    </div>`).join('');
+
+  // Charts
+  const labels = (s.daily||[]).map(d=>d.date.slice(5));
+  const feesVals = (s.daily||[]).map(d=>d.fees);
+  const volVals = (s.daily||[]).map(d=>d.volume);
+
+  const chartCfg = (label, data, color) => ({
+    type:'line', data:{ labels, datasets:[{label, data, borderColor:color, backgroundColor:color+'18', fill:true, tension:.4, pointRadius:2, pointHoverRadius:5, borderWidth:2}]},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{grid:{color:'rgba(26,45,64,.4)'},ticks:{color:'#3a5a70',font:{size:9}}}, y:{grid:{color:'rgba(26,45,64,.4)'},ticks:{color:'#3a5a70',font:{size:9}}} }}
+  });
+
+  if (feesChart) feesChart.destroy();
+  if (volChart) volChart.destroy();
+  feesChart = new Chart(document.getElementById('chart-fees'), chartCfg('Fees', feesVals, '#00d4ff'));
+  volChart   = new Chart(document.getElementById('chart-volume'), chartCfg('Volume', volVals, '#aa55ff'));
+
+  // Strategy bars
+  const bs = s.by_strategy||{};
+  const totalVol = Object.values(bs).reduce((a,b)=>a+(b.volume||0),0)||1;
+  const stratColors = { cex:'#00d4ff', tri:'#aa55ff', dex:'#00ff88', cross:'#ffaa00' };
+  document.getElementById('strat-bars').innerHTML = Object.entries(bs).map(([type,d])=>`
+    <div class="strat-bar">
+      <span class="strat-name" style="color:${stratColors[type]}">${type.toUpperCase()}</span>
+      <div class="strat-track"><div class="strat-fill" style="width:${(d.volume/totalVol*100).toFixed(1)}%;background:${stratColors[type]}40;border-right:2px solid ${stratColors[type]}"></div></div>
+      <span class="strat-val" style="color:${stratColors[type]}">$${(d.volume||0).toFixed(0)}</span>
+    </div>`).join('');
+
+  // Top signals
+  document.getElementById('top-signals').innerHTML = (s.top_signals||[]).map((sig,i)=>{
+    const [type,sym] = sig.key.split(':');
+    return `<div class="signal-row">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:9px;color:var(--text3)">#${i+1}</span>
+        <span class="badge badge-${type}">${type.toUpperCase()}</span>
+        <span style="font-size:11px">${sym||'—'}</span>
+      </div>
+      <span style="font-size:12px;font-weight:700;color:var(--cyan)">${sig.count}×</span>
+    </div>`;}).join('');
+
+  // Top users
+  document.getElementById('top-users-table').innerHTML = (s.top_users||[]).map((u,i)=>`
+    <tr onclick="openUser('${u.id}')" style="cursor:pointer">
+      <td><span style="color:var(--text3)">#${i+1}</span></td>
+      <td class="td-id">${u.id}</td>
+      <td style="color:var(--green);font-weight:700">+$${(u.profit||0).toFixed(2)}</td>
+      <td>${u.trades}</td>
+      <td>$${(u.balance||0).toFixed(2)}</td>
+      <td><span class="badge ${u.vip?'badge-vip':'badge-free'}">${u.vip?'VIP':'FREE'}</span></td>
+    </tr>`).join('');
+}
+
+// ── ANALYTICS ─────────────────────────────────────────────
+function renderAnalytics() {
+  if (!statsData) { loadAll().then(renderAnalytics); return; }
+  const bs = statsData.by_strategy||{};
+  const labels = ['CEX','TRI','DEX','Cross'];
+  const colors = ['#00d4ff','#aa55ff','#00ff88','#ffaa00'];
+  const doughnutCfg = (data) => ({ type:'doughnut', data:{ labels, datasets:[{data, backgroundColor:colors.map(c=>c+'30'), borderColor:colors, borderWidth:2}]}, options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{labels:{color:'#6a9ab0',font:{size:9}}}}, cutout:'65%' }});
+  if (stratVolChart) stratVolChart.destroy();
+  if (stratCountChart) stratCountChart.destroy();
+  if (stratFeesChart) stratFeesChart.destroy();
+  stratVolChart   = new Chart(document.getElementById('chart-strat-vol'),   doughnutCfg([bs.cex?.volume||0, bs.tri?.volume||0, bs.dex?.volume||0, bs.cross?.volume||0]));
+  stratCountChart = new Chart(document.getElementById('chart-strat-count'), doughnutCfg([bs.cex?.count||0, bs.tri?.count||0, bs.dex?.count||0, bs.cross?.count||0]));
+  stratFeesChart  = new Chart(document.getElementById('chart-strat-fees'),  doughnutCfg([bs.cex?.fees||0, bs.tri?.fees||0, bs.dex?.fees||0, bs.cross?.fees||0]));
+}
+
+// ── USERS ──────────────────────────────────────────────────
+async function loadUsers(page=1) {
+  currentPage = page;
+  const q = document.getElementById('user-search')?.value||'';
+  const data = await API(`/api/admin/users?secret=${SECRET}&page=${page}&search=${encodeURIComponent(q)}`);
+  usersData = data;
+  renderUsersTable();
+}
+
+function renderUsersTable() {
+  const now = Date.now()/1000;
+  document.getElementById('users-count').textContent = `${usersData.total} users total`;
+  document.getElementById('users-table').innerHTML = (usersData.items||[]).map(u=>`
+    <tr onclick="openUser('${u.id}')" style="cursor:pointer">
+      <td class="td-id">${u.id} ${u.blocked?'<span class="badge badge-blocked">blocked</span>':''}</td>
+      <td>$${(u.balance||0).toFixed(2)}</td>
+      <td style="color:var(--green)">+$${(u.profit||0).toFixed(2)}</td>
+      <td>${u.trades}</td>
+      <td><span class="badge ${u.vip?'badge-vip':'badge-free'}">${u.vip?'VIP':'FREE'}</span></td>
+      <td><span class="badge ${u.last_seen>now-300?'badge-online':'badge-free'}">${u.last_seen>now-300?'online':'offline'}</span></td>
+      <td><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openUser('${u.id}')">Manage →</button></td>
+    </tr>`).join('');
+}
+
+let searchTimeout;
+function searchUsers() { clearTimeout(searchTimeout); searchTimeout=setTimeout(()=>loadUsers(1),400); }
+function usersPage(dir) { loadUsers(Math.max(1,currentPage+dir)); }
+
+// ── USER MODAL ─────────────────────────────────────────────
+async function openUser(uid) {
+  currentUser = await API(`/api/admin/users/${uid}?secret=${SECRET}`);
+  document.getElementById('modal-uid').textContent = uid;
+  modalTab('info');
+  document.getElementById('user-modal').classList.add('open');
+}
+
+function closeModal() { document.getElementById('user-modal').classList.remove('open'); }
+
+function modalTab(tab) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  event?.target?.classList?.add('active');
+  // Find by text
+  document.querySelectorAll('.tab').forEach(t=>{ if(t.textContent.toLowerCase()===tab) t.classList.add('active'); });
+  const u = currentUser;
+  if (!u) return;
+  const el = document.getElementById('modal-content');
+
+  if (tab==='info') {
+    const now = Date.now()/1000;
+    el.innerHTML = `
+      <div class="form-grid">
+        <div class="form-row"><label class="form-label">User ID</label><input value="${u.id}" readonly/></div>
+        <div class="form-row"><label class="form-label">Ref Code</label><input value="${u.ref_code}" readonly/></div>
+        <div class="form-row"><label class="form-label">Balance</label><input value="$${(u.balance||0).toFixed(2)}" readonly/></div>
+        <div class="form-row"><label class="form-label">Total Profit</label><input value="+$${(u.profit||0).toFixed(2)}" readonly/></div>
+        <div class="form-row"><label class="form-label">Trades</label><input value="${u.trades}" readonly/></div>
+        <div class="form-row"><label class="form-label">Status</label><input value="${u.blocked?'BLOCKED':'Active'}" readonly/></div>
+        <div class="form-row"><label class="form-label">VIP</label><input value="${u.vip?(u.vip_expires?'Active until '+new Date(u.vip_expires*1000).toLocaleDateString():'Active'):'No'}" readonly/></div>
+        <div class="form-row"><label class="form-label">Last Seen</label><input value="${new Date((u.last_seen||0)*1000).toLocaleString()}" readonly/></div>
+      </div>`;
+  }
+
+  if (tab==='vip') {
+    el.innerHTML = `
+      <p style="font-size:11px;color:var(--text2);margin-bottom:16px">Current: <strong style="color:${u.vip?'var(--amber)':'var(--text3)'}">${u.vip?'VIP ACTIVE':'FREE'}</strong></p>
+      <div class="form-row" style="margin-bottom:14px">
+        <label class="form-label">Grant VIP Plan</label>
+        <select id="vip-plan"><option value="week">1 Week</option><option value="month" selected>1 Month</option><option value="year">1 Year</option><option value="lifetime">Lifetime</option></select>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-amber" onclick="setVip('grant')">👑 Grant VIP</button>
+        <button class="btn btn-red" onclick="setVip('revoke')">✕ Revoke VIP</button>
+      </div>`;
+  }
+
+  if (tab==='balance') {
+    el.innerHTML = `
+      <p style="font-size:11px;color:var(--text2);margin-bottom:16px">Current balance: <strong style="color:var(--cyan)">$${(u.balance||0).toFixed(2)}</strong></p>
+      <div class="form-row" style="margin-bottom:14px">
+        <label class="form-label">New Balance (USDT)</label>
+        <input type="number" id="new-balance" value="${(u.balance||0).toFixed(2)}" min="0"/>
+      </div>
+      <button class="btn btn-primary" onclick="setBalance()">✓ Update Balance</button>`;
+  }
+
+  if (tab==='trades') {
+    const trades = u.trade_history||[];
+    el.innerHTML = trades.length===0
+      ? '<p style="color:var(--text3);font-size:11px">No trades yet.</p>'
+      : `<div style="overflow-x:auto"><table>
+          <thead><tr><th>ID</th><th>Type</th><th>Symbol</th><th>Amount</th><th>Net Profit</th><th>Fees</th><th>Date</th></tr></thead>
+          <tbody>${trades.slice().reverse().map(t=>`
+            <tr>
+              <td style="font-family:var(--font-mono);font-size:10px">${t.id}</td>
+              <td><span class="badge badge-${t.type}">${(t.type||'').toUpperCase()}</span></td>
+              <td>${t.symbol}</td>
+              <td>$${(t.amount||0).toFixed(2)}</td>
+              <td style="color:var(--green)">+$${(t.netProfit||0).toFixed(4)}</td>
+              <td style="color:var(--red)">-$${(t.totalFees||0).toFixed(4)}</td>
+              <td style="font-size:10px;color:var(--text3)">${new Date((t.created_at||0)*1000).toLocaleString()}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table></div>`;
+  }
+
+  if (tab==='notify') {
+    el.innerHTML = `
+      <div class="form-row" style="margin-bottom:14px">
+        <label class="form-label">Message</label>
+        <textarea id="notify-msg" rows="4" placeholder="Enter notification for this user..."></textarea>
+      </div>
+      <button class="btn btn-primary" onclick="sendNotify()">📩 Send Notification</button>`;
+  }
+
+  if (tab==='danger') {
+    el.innerHTML = `
+      <p style="font-size:11px;color:var(--text2);margin-bottom:20px">⚠️ Dangerous actions. These cannot be undone.</p>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border)">
+          <div><p style="font-size:11px;font-weight:700">${u.blocked?'Unblock User':'Block User'}</p><p style="font-size:10px;color:var(--text3)">${u.blocked?'Allow user to use the platform':'Prevent user from accessing the platform'}</p></div>
+          <button class="btn ${u.blocked?'btn-green':'btn-red'}" onclick="blockUser('${u.blocked?'unblock':'block'}')">${u.blocked?'✓ Unblock':'⊘ Block'}</button>
+        </div>
+      </div>`;
+  }
+}
+
+// ── MODAL ACTIONS ──────────────────────────────────────────
+async function setVip(action) {
+  const plan = document.getElementById('vip-plan').value;
+  await POST(`/api/admin/users/${currentUser.id}/vip?secret=${SECRET}`, { action, plan });
+  currentUser.vip = action==='grant';
+  toast('VIP '+action+'ed ✓', 'success');
+  loadUsers(currentPage);
+}
+
+async function setBalance() {
+  const amount = Number(document.getElementById('new-balance').value);
+  await POST(`/api/admin/users/${currentUser.id}/balance?secret=${SECRET}`, { amount });
+  currentUser.balance = amount;
+  toast('Balance updated ✓', 'success');
+}
+
+async function blockUser(action) {
+  await POST(`/api/admin/users/${currentUser.id}/block?secret=${SECRET}`, { action });
+  currentUser.blocked = action==='block';
+  modalTab('danger');
+  toast('User '+(action==='block'?'blocked':'unblocked')+' ✓', action==='block'?'error':'success');
+  loadUsers(currentPage);
+}
+
+async function sendNotify() {
+  const msg = document.getElementById('notify-msg').value.trim();
+  if (!msg) return;
+  await POST(`/api/admin/users/${currentUser.id}/notify?secret=${SECRET}`, { message:msg });
+  document.getElementById('notify-msg').value='';
+  toast('Notification sent ✓', 'success');
+}
+
+// ── CONFIG ─────────────────────────────────────────────────
+async function loadConfig() {
+  configData = await API('/api/admin/config?secret='+SECRET);
+  renderConfig();
+}
+
+function renderConfig() {
+  const c = configData;
+  const field = (key,label,unit='') => `<div class="form-row" style="margin-bottom:12px"><label class="form-label">${label}</label><div style="position:relative"><input type="number" id="cfg-${key}" value="${c[key]||0}" step="0.0001"/>${unit?`<span style="position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--text3)">${unit}</span>`:''}</div></div>`;
+
+  document.getElementById('config-fees').innerHTML =
+    field('fee_free','Free User Fee','%') + field('fee_vip','VIP User Fee','%') + field('referral_pct','Referral Commission','%');
+  document.getElementById('config-limits').innerHTML =
+    field('free_trades_max','Max Free Trades/Day') + field('min_trade_amount','Min Trade Amount','USDT') + field('max_trade_amount','Max Trade Amount','USDT');
+  document.getElementById('config-network').innerHTML =
+    field('network_fee_cross','Cross-chain Network Fee','%') + field('network_fee_dex','DEX Network Fee','%') + field('exchange_fee','Exchange Fee','%') + field('slippage_dex','DEX Slippage','%');
+}
+
+async function saveConfig() {
+  const keys = ['fee_free','fee_vip','referral_pct','free_trades_max','min_trade_amount','max_trade_amount','network_fee_cross','network_fee_dex','exchange_fee','slippage_dex'];
+  const body = {};
+  keys.forEach(k=>{ const el=document.getElementById('cfg-'+k); if(el) body[k]=Number(el.value); });
+  await POST('/api/admin/config?secret='+SECRET, body);
+  toast('Config saved ✓', 'success');
+}
+
+// ── BROADCAST ─────────────────────────────────────────────
+async function sendBroadcast() {
+  const msg = document.getElementById('broadcast-msg').value.trim();
+  if (!msg) return;
+  await POST('/api/admin/broadcast?secret='+SECRET, { message:msg });
+  document.getElementById('broadcast-msg').value='';
+  toast('Broadcast sent to all users ✓', 'success');
+}
+
+// ── TOAST ─────────────────────────────────────────────────
+function toast(msg, type='success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `toast ${type} show`;
+  setTimeout(()=>el.classList.remove('show'),3000);
+}
+
+// ── INIT ──────────────────────────────────────────────────
+loadAll();
+setInterval(loadAll, 30000);
+
+// Close modal on overlay click
+document.getElementById('user-modal').addEventListener('click', e=>{ if(e.target===e.currentTarget) closeModal(); });
+</script>
+</body>
+</html>

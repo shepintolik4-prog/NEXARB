@@ -44,8 +44,8 @@ async function startServer() {
         balance: 3000,
         profit: 0,
         trades: 0,
-        vip: false,
-        vip_expires: null,
+        vip: userId === "demo_user", // Demo user is VIP by default
+        vip_expires: userId === "demo_user" ? Date.now() / 1000 + 31536000 : null,
         connected_exchanges: ['binance', 'okx'],
         ref_code: 'REF' + Math.random().toString(36).substring(7).toUpperCase()
       };

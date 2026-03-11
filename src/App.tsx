@@ -53,7 +53,11 @@ export default function App() {
 
   const fetchAccount = async () => {
     try {
-      const res = await axios.get('/api/v1/account');
+      const tg = (window as any).Telegram?.WebApp;
+      const tgUser = tg?.initDataUnsafe?.user;
+      const userId = tgUser?.id ? `tg_${tgUser.id}` : "demo_user";
+      
+      const res = await axios.get(`/api/v1/account?userId=${userId}`);
       setUser(res.data);
       setLoading(false);
     } catch (err) {

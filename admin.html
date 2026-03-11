@@ -3,374 +3,323 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>NEXARB · Admin Control</title>
+<title>NEXARB · Панель управления</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Syne:wght@400;600;700;800&display=swap');
 
 :root {
-  --bg0:#020408; --bg1:#060d14; --bg2:#0a1520; --bg3:#0f1e2e;
-  --border:#1a2d40; --border2:#2a4560;
-  --cyan:#00d4ff; --cyan2:#0099cc; --green:#00ff88; --red:#ff3355;
-  --amber:#ffaa00; --purple:#aa55ff;
-  --text:#e0f0ff; --text2:#6a9ab0; --text3:#3a5a70;
-  --font-display:'Syne',sans-serif; --font-mono:'JetBrains Mono',monospace;
+  --bg0:#020408;--bg1:#060d14;--bg2:#0a1520;--bg3:#0f1e2e;
+  --border:#1a2d40;--border2:#2a4560;
+  --cyan:#00d4ff;--green:#00ff88;--red:#ff3355;--amber:#ffaa00;--purple:#aa55ff;
+  --text:#e0f0ff;--text2:#6a9ab0;--text3:#3a5a70;
+  --ff-d:'Syne',sans-serif;--ff-m:'JetBrains Mono',monospace;
 }
-
 *{margin:0;padding:0;box-sizing:border-box}
-html{scroll-behavior:smooth}
-body{background:var(--bg0);color:var(--text);font-family:var(--font-mono);min-height:100vh;overflow-x:hidden}
-body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 50% at 50% -10%,rgba(0,212,255,.06),transparent),radial-gradient(ellipse 50% 80% at 100% 50%,rgba(170,85,255,.03),transparent);pointer-events:none;z-index:0}
+body{background:var(--bg0);color:var(--text);font-family:var(--ff-m);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 40% at 50% -5%,rgba(0,212,255,.05),transparent),radial-gradient(ellipse 40% 60% at 95% 50%,rgba(170,85,255,.03),transparent);pointer-events:none}
+#app{position:relative;display:flex;min-height:100vh}
 
-/* ── LAYOUT ── */
-#app{position:relative;z-index:1;display:flex;min-height:100vh}
+/* NAV */
 nav{width:220px;flex-shrink:0;background:var(--bg1);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto}
-main{flex:1;padding:28px;overflow-y:auto;min-width:0}
+.nlogo{padding:22px 20px 14px;border-bottom:1px solid var(--border)}
+.nlogo h1{font-family:var(--ff-d);font-size:20px;font-weight:800;background:linear-gradient(135deg,var(--cyan),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.nlogo p{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.15em;margin-top:2px}
+.nbadge{display:flex;align-items:center;gap:6px;background:rgba(255,51,85,.08);border:1px solid rgba(255,51,85,.2);color:var(--red);font-size:9px;font-weight:700;padding:4px 10px;border-radius:6px;text-transform:uppercase;letter-spacing:.1em;margin:12px 16px}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0;animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.ns{padding:14px 20px 6px;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.15em}
+.ni{display:flex;align-items:center;gap:9px;padding:9px 20px;font-size:11px;font-weight:600;color:var(--text2);cursor:pointer;border-left:2px solid transparent;transition:all .15s;user-select:none}
+.ni:hover{color:var(--text);background:rgba(0,212,255,.04)}
+.ni.on{color:var(--cyan);background:rgba(0,212,255,.06);border-left-color:var(--cyan)}
+.ni svg{width:13px;height:13px;opacity:.6}
+.ni.on svg{opacity:1}
+.nfoot{margin-top:auto;padding:14px 18px;border-top:1px solid var(--border);font-size:9px;color:var(--text3)}
+.nstatus{display:flex;align-items:center;gap:6px;margin-bottom:4px}
 
-/* ── NAV ── */
-.nav-logo{padding:24px 20px 16px;border-bottom:1px solid var(--border)}
-.nav-logo h1{font-family:var(--font-display);font-size:22px;font-weight:800;letter-spacing:.05em;background:linear-gradient(135deg,var(--cyan),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.nav-logo p{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.15em;margin-top:3px}
-.nav-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(255,51,85,.08);border:1px solid rgba(255,51,85,.2);color:#ff3355;font-size:9px;font-weight:700;padding:4px 10px;border-radius:6px;text-transform:uppercase;letter-spacing:.1em;margin:12px 20px}
-.nav-section{padding:16px 20px 8px;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.15em}
-.nav-item{display:flex;align-items:center;gap:10px;padding:10px 20px;font-size:11px;font-weight:600;color:var(--text2);cursor:pointer;transition:all .15s;border-left:2px solid transparent;text-decoration:none}
-.nav-item:hover{color:var(--text);background:rgba(0,212,255,.04)}
-.nav-item.active{color:var(--cyan);background:rgba(0,212,255,.06);border-left-color:var(--cyan)}
-.nav-item svg{width:14px;height:14px;flex-shrink:0;opacity:.7}
-.nav-item.active svg{opacity:1}
-.nav-footer{margin-top:auto;padding:16px 20px;border-top:1px solid var(--border)}
-.nav-footer p{font-size:9px;color:var(--text3)}
-.online-dot{width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block;margin-right:6px;animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+/* MAIN */
+main{flex:1;padding:26px;overflow-y:auto;min-width:0}
+.ph{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
+.pt{font-family:var(--ff-d);font-size:19px;font-weight:800}
+.pt span{color:var(--text3);font-weight:600}
+.hact{display:flex;gap:8px}
 
-/* ── HEADER ── */
-.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;gap:16px}
-.page-title{font-family:var(--font-display);font-size:20px;font-weight:800;letter-spacing:.02em}
-.page-title span{color:var(--text3)}
-.header-actions{display:flex;gap:8px}
+/* STAT GRID */
+.sg{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:12px;margin-bottom:20px}
+.sc{background:var(--bg2);border:1px solid var(--border);border-radius:13px;padding:15px;position:relative;overflow:hidden;transition:border-color .2s}
+.sc:hover{border-color:var(--border2)}
+.sc::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.sc.c::before{background:linear-gradient(90deg,var(--cyan),transparent)}
+.sc.g::before{background:linear-gradient(90deg,var(--green),transparent)}
+.sc.a::before{background:linear-gradient(90deg,var(--amber),transparent)}
+.sc.p::before{background:linear-gradient(90deg,var(--purple),transparent)}
+.sc.r::before{background:linear-gradient(90deg,var(--red),transparent)}
+.sl{font-size:8px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.12em;margin-bottom:7px}
+.sv{font-size:24px;font-weight:800;line-height:1;letter-spacing:-.02em}
+.sv.c{color:var(--cyan)}.sv.g{color:var(--green)}.sv.a{color:var(--amber)}.sv.p{color:var(--purple)}.sv.r{color:var(--red)}
+.ss{font-size:9px;color:var(--text3);margin-top:5px}
 
-/* ── CARDS ── */
-.stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:24px}
-.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:16px;position:relative;overflow:hidden;transition:border-color .2s}
-.stat-card:hover{border-color:var(--border2)}
-.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
-.stat-card.cyan::before{background:linear-gradient(90deg,var(--cyan),transparent)}
-.stat-card.green::before{background:linear-gradient(90deg,var(--green),transparent)}
-.stat-card.amber::before{background:linear-gradient(90deg,var(--amber),transparent)}
-.stat-card.purple::before{background:linear-gradient(90deg,var(--purple),transparent)}
-.stat-card.red::before{background:linear-gradient(90deg,var(--red),transparent)}
-.stat-label{font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.12em;margin-bottom:8px}
-.stat-value{font-size:26px;font-weight:800;letter-spacing:-.02em;line-height:1}
-.stat-value.cyan{color:var(--cyan)}
-.stat-value.green{color:var(--green)}
-.stat-value.amber{color:var(--amber)}
-.stat-value.purple{color:var(--purple)}
-.stat-value.red{color:var(--red)}
-.stat-sub{font-size:9px;color:var(--text3);margin-top:6px}
+/* LAYOUT GRIDS */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px}
+@media(max-width:1100px){.g3{grid-template-columns:1fr 1fr}}
+@media(max-width:740px){.g2,.g3{grid-template-columns:1fr}}
+.sec{background:var(--bg2);border:1px solid var(--border);border-radius:13px;overflow:hidden;margin-bottom:14px}
+.sh{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.012)}
+.st{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:var(--text2)}
+.sb{padding:16px}
 
-/* ── GRID SECTIONS ── */
-.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
-.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px}
-@media(max-width:1100px){.grid-3{grid-template-columns:1fr 1fr}}
-@media(max-width:750px){.grid-2,.grid-3{grid-template-columns:1fr}}
-.section{background:var(--bg2);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:16px}
-.section-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.015)}
-.section-title{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:var(--text2)}
-.section-body{padding:18px}
+/* CHARTS */
+.cw{position:relative;height:175px}
 
-/* ── CHART ── */
-.chart-wrap{position:relative;height:180px}
-
-/* ── TABLE ── */
+/* TABLE */
 table{width:100%;border-collapse:collapse}
-thead tr{background:rgba(0,212,255,.03)}
-th{padding:10px 14px;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;text-align:left;border-bottom:1px solid var(--border)}
-td{padding:10px 14px;font-size:11px;color:var(--text2);border-bottom:1px solid rgba(26,45,64,.5)}
+thead tr{background:rgba(0,212,255,.025)}
+th{padding:9px 12px;font-size:8px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;text-align:left;border-bottom:1px solid var(--border)}
+td{padding:9px 12px;font-size:11px;color:var(--text2);border-bottom:1px solid rgba(26,45,64,.4)}
 tr:last-child td{border-bottom:none}
 tr:hover td{background:rgba(0,212,255,.02);color:var(--text)}
-.td-id{font-weight:700;color:var(--text);font-family:var(--font-mono);font-size:11px}
-.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:5px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
-.badge-vip{background:rgba(255,170,0,.1);border:1px solid rgba(255,170,0,.3);color:var(--amber)}
-.badge-free{background:rgba(106,154,176,.08);border:1px solid rgba(106,154,176,.2);color:var(--text3)}
-.badge-blocked{background:rgba(255,51,85,.1);border:1px solid rgba(255,51,85,.3);color:var(--red)}
-.badge-online{background:rgba(0,255,136,.08);border:1px solid rgba(0,255,136,.25);color:var(--green)}
-.badge-cex{background:rgba(0,212,255,.08);color:var(--cyan)}
-.badge-dex{background:rgba(0,255,136,.08);color:var(--green)}
-.badge-tri{background:rgba(170,85,255,.08);color:var(--purple)}
-.badge-cross{background:rgba(255,170,0,.08);color:var(--amber)}
+.tid{font-weight:700;color:var(--text);font-family:var(--ff-m)}
+.badge{display:inline-flex;align-items:center;padding:2px 7px;border-radius:4px;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.07em}
+.bvip{background:rgba(255,170,0,.1);border:1px solid rgba(255,170,0,.3);color:var(--amber)}
+.bfree{background:rgba(106,154,176,.06);border:1px solid rgba(106,154,176,.2);color:var(--text3)}
+.bblk{background:rgba(255,51,85,.1);border:1px solid rgba(255,51,85,.3);color:var(--red)}
+.bonl{background:rgba(0,255,136,.07);border:1px solid rgba(0,255,136,.25);color:var(--green)}
+.bcex{background:rgba(0,212,255,.08);color:var(--cyan)}
+.bdex{background:rgba(0,255,136,.08);color:var(--green)}
+.btri{background:rgba(170,85,255,.08);color:var(--purple)}
+.bxch{background:rgba(255,170,0,.08);color:var(--amber)}
 
-/* ── BUTTONS ── */
-.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;cursor:pointer;transition:all .15s;border:none;font-family:var(--font-mono)}
-.btn-primary{background:var(--cyan);color:#000}
-.btn-primary:hover{background:#33ddff}
-.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text2)}
-.btn-ghost:hover{border-color:var(--border2);color:var(--text)}
-.btn-red{background:rgba(255,51,85,.1);border:1px solid rgba(255,51,85,.3);color:var(--red)}
-.btn-red:hover{background:rgba(255,51,85,.2)}
-.btn-green{background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.3);color:var(--green)}
-.btn-green:hover{background:rgba(0,255,136,.2)}
-.btn-amber{background:rgba(255,170,0,.1);border:1px solid rgba(255,170,0,.3);color:var(--amber)}
-.btn-sm{padding:5px 10px;font-size:9px}
-.btn-icon{width:32px;height:32px;padding:0;justify-content:center;border-radius:6px}
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 13px;border-radius:7px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;cursor:pointer;transition:all .15s;border:none;font-family:var(--ff-m)}
+.bp{background:var(--cyan);color:#000}.bp:hover{background:#33ddff}
+.bg2{background:transparent;border:1px solid var(--border);color:var(--text2)}.bg2:hover{border-color:var(--border2);color:var(--text)}
+.br{background:rgba(255,51,85,.1);border:1px solid rgba(255,51,85,.3);color:var(--red)}.br:hover{background:rgba(255,51,85,.2)}
+.bgr{background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.3);color:var(--green)}.bgr:hover{background:rgba(0,255,136,.2)}
+.ba{background:rgba(255,170,0,.1);border:1px solid rgba(255,170,0,.3);color:var(--amber)}.ba:hover{background:rgba(255,170,0,.2)}
+.bsm{padding:4px 9px;font-size:8px}
 
-/* ── FORMS ── */
-.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.form-row{display:flex;flex-direction:column;gap:5px}
-.form-label{font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.1em}
-input,select,textarea{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:11px;color:var(--text);font-family:var(--font-mono);outline:none;transition:border-color .15s;width:100%}
-input:focus,select:focus,textarea:focus{border-color:var(--cyan2)}
-.search-wrap{position:relative}
-.search-wrap input{padding-left:34px}
-.search-icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text3);pointer-events:none;font-size:13px}
-.toggle{display:flex;align-items:center;gap:10px;cursor:pointer}
-.toggle input{display:none}
-.toggle-track{width:40px;height:22px;border-radius:11px;background:var(--bg3);border:1px solid var(--border);position:relative;transition:all .2s}
-.toggle input:checked+.toggle-track{background:rgba(0,212,255,.2);border-color:var(--cyan)}
-.toggle-thumb{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--text3);transition:all .2s}
-.toggle input:checked~.toggle-track .toggle-thumb,.toggle input:checked+.toggle-track+.toggle-thumb{display:none}
+/* FORMS */
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fr{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+.fl{font-size:8px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.1em}
+input,select,textarea{background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:8px 10px;font-size:11px;color:var(--text);font-family:var(--ff-m);outline:none;transition:border-color .15s;width:100%}
+input:focus,select:focus,textarea:focus{border-color:rgba(0,212,255,.5)}
+.sw{position:relative}.sw input{padding-left:30px}.si{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:13px;pointer-events:none}
 
-/* ── USER MODAL ── */
-.overlay{position:fixed;inset:0;background:rgba(2,4,8,.85);backdrop-filter:blur(8px);z-index:100;display:none;align-items:center;justify-content:center;padding:20px}
-.overlay.open{display:flex}
-.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:18px;width:100%;max-width:680px;max-height:90vh;overflow-y:auto;position:relative}
-.modal-head{display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg2);z-index:1}
-.modal-title{font-family:var(--font-display);font-size:16px;font-weight:700}
-.modal-body{padding:24px}
-.modal-close{background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer;line-height:1;padding:4px}
-.modal-close:hover{color:var(--text)}
+/* PAGES */
+.page{display:none}.page.on{display:block}
 
-/* ── TABS ── */
-.tabs{display:flex;gap:2px;padding:4px;background:var(--bg3);border-radius:10px;margin-bottom:20px}
-.tab{padding:7px 14px;border-radius:7px;font-size:10px;font-weight:700;color:var(--text3);cursor:pointer;transition:all .15s;text-transform:uppercase;letter-spacing:.08em}
-.tab.active{background:var(--bg2);color:var(--cyan);border:1px solid var(--border)}
+/* TABS */
+.tabs{display:flex;gap:2px;padding:3px;background:var(--bg3);border-radius:9px;margin-bottom:18px}
+.tab{padding:6px 12px;border-radius:6px;font-size:9px;font-weight:700;color:var(--text3);cursor:pointer;transition:all .15s;text-transform:uppercase;letter-spacing:.07em;flex:1;text-align:center}
+.tab.on{background:var(--bg2);color:var(--cyan);border:1px solid var(--border)}
 
-/* ── NOTIFY ── */
-.toast{position:fixed;bottom:20px;right:20px;padding:12px 18px;border-radius:10px;font-size:11px;font-weight:600;z-index:200;transform:translateY(60px);opacity:0;transition:all .3s;border:1px solid}
-.toast.show{transform:translateY(0);opacity:1}
-.toast.success{background:rgba(0,255,136,.1);border-color:rgba(0,255,136,.3);color:var(--green)}
-.toast.error{background:rgba(255,51,85,.1);border-color:rgba(255,51,85,.3);color:var(--red)}
+/* MODAL */
+.ov{position:fixed;inset:0;background:rgba(2,4,8,.88);backdrop-filter:blur(10px);z-index:100;display:none;align-items:center;justify-content:center;padding:16px}
+.ov.on{display:flex}
+.mod{background:var(--bg2);border:1px solid var(--border2);border-radius:16px;width:100%;max-width:660px;max-height:90vh;overflow-y:auto}
+.mh{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg2);z-index:1}
+.mt{font-family:var(--ff-d);font-size:15px;font-weight:700}
+.mc{background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer;line-height:1;padding:4px}
+.mc:hover{color:var(--text)}
+.mb{padding:20px 22px}
 
-/* ── PAGES ── */
-.page{display:none}
-.page.active{display:block}
+/* STRAT BARS */
+.sb2{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+.sn{font-size:9px;font-weight:700;width:55px;text-transform:uppercase}
+.st2{flex:1;height:5px;background:var(--bg3);border-radius:3px;overflow:hidden}
+.sf{height:100%;border-radius:3px;transition:width .7s}
+.sv2{font-size:9px;font-weight:700;width:55px;text-align:right}
 
-/* ── STRATEGY BARS ── */
-.strat-bar{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-.strat-name{font-size:10px;font-weight:700;width:60px;text-transform:uppercase;color:var(--text2)}
-.strat-track{flex:1;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden}
-.strat-fill{height:100%;border-radius:3px;transition:width .6s}
-.strat-val{font-size:10px;font-weight:700;width:50px;text-align:right;font-family:var(--font-mono)}
+/* SIGNAL ROWS */
+.sigr{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(26,45,64,.35)}
+.sigr:last-child{border:none}
 
-/* ── SIGNAL TOP ── */
-.signal-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(26,45,64,.4)}
-.signal-row:last-child{border:none}
+/* TOAST */
+.toast{position:fixed;bottom:18px;right:18px;padding:11px 16px;border-radius:9px;font-size:11px;font-weight:600;z-index:200;transform:translateY(50px);opacity:0;transition:all .3s;border:1px solid}
+.toast.on{transform:translateY(0);opacity:1}
+.toast.ok{background:rgba(0,255,136,.1);border-color:rgba(0,255,136,.3);color:var(--green)}
+.toast.err{background:rgba(255,51,85,.1);border-color:rgba(255,51,85,.3);color:var(--red)}
+
+/* FREE LIMIT BOX */
+.limit-box{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px}
+.limit-title{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text2);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.limit-title::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--amber)}
 </style>
 </head>
 <body>
-
 <div id="app">
-  <!-- NAV -->
-  <nav>
-    <div class="nav-logo">
-      <h1>NEXARB</h1>
-      <p>Control Panel v1.0</p>
+
+<!-- SIDEBAR NAV -->
+<nav>
+  <div class="nlogo">
+    <h1>NEXARB</h1>
+    <p>Панель управления v2.0</p>
+  </div>
+  <div class="nbadge"><span class="dot"></span> ADMIN</div>
+
+  <div class="ns">Обзор</div>
+  <div class="ni on" onclick="go('dash')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+    Дашборд
+  </div>
+  <div class="ni" onclick="go('analytics')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    Аналитика
+  </div>
+
+  <div class="ns">Управление</div>
+  <div class="ni" onclick="go('users')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    Пользователи
+  </div>
+  <div class="ni" onclick="go('trades')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+    Сделки
+  </div>
+
+  <div class="ns">Система</div>
+  <div class="ni" onclick="go('config')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+    Настройки
+  </div>
+  <div class="ni" onclick="go('broadcast')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.67 3.45 2 2 0 0 1 3.66 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.93"/></svg>
+    Рассылка
+  </div>
+
+  <div class="nfoot">
+    <div class="nstatus"><span class="dot"></span><span id="conn-status">Подключение...</span></div>
+    <div id="srv-url" style="word-break:break-all;margin-top:4px;color:rgba(0,212,255,.5);font-size:8px"></div>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<main>
+
+  <!-- ДАШБОРД -->
+  <div id="page-dash" class="page on">
+    <div class="ph">
+      <div><div class="pt">Дашборд <span>/ Обзор</span></div><div id="last-update" style="font-size:9px;color:var(--text3);margin-top:3px"></div></div>
+      <div class="hact"><button class="btn bg2" onclick="loadAll()">↻ Обновить</button></div>
     </div>
-    <div class="nav-badge">
-      <span class="online-dot"></span> ADMIN ACCESS
+    <div class="sg" id="stat-cards"></div>
+    <div class="g2">
+      <div class="sec"><div class="sh"><span class="st">Комиссии платформы · 14 дней</span></div><div class="sb"><div class="cw"><canvas id="ch-fees"></canvas></div></div></div>
+      <div class="sec"><div class="sh"><span class="st">Объём торгов · 14 дней</span></div><div class="sb"><div class="cw"><canvas id="ch-vol"></canvas></div></div></div>
     </div>
-
-    <div class="nav-section">Overview</div>
-    <a class="nav-item active" onclick="showPage('dashboard')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-      Dashboard
-    </a>
-    <a class="nav-item" onclick="showPage('analytics')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-      Analytics
-    </a>
-
-    <div class="nav-section">Management</div>
-    <a class="nav-item" onclick="showPage('users')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-      Users
-    </a>
-    <a class="nav-item" onclick="showPage('trades')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
-      Trades
-    </a>
-
-    <div class="nav-section">System</div>
-    <a class="nav-item" onclick="showPage('config')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
-      Config
-    </a>
-    <a class="nav-item" onclick="showPage('broadcast')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.67 3.45 2 2 0 0 1 3.66 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.93"/></svg>
-      Broadcast
-    </a>
-
-    <div class="nav-footer">
-      <p id="nav-secret" style="color:var(--text3);font-size:9px"></p>
+    <div class="g2">
+      <div class="sec"><div class="sh"><span class="st">Объём по стратегиям</span></div><div class="sb" id="strat-bars"></div></div>
+      <div class="sec"><div class="sh"><span class="st">Топ сигналов (по исполнению)</span></div><div class="sb" id="top-sigs"></div></div>
     </div>
-  </nav>
+    <div class="sec"><div class="sh"><span class="st">Топ пользователей по прибыли</span></div><div class="sb" style="padding:0"><table><thead><tr><th>#</th><th>ID</th><th>Прибыль</th><th>Сделок</th><th>Баланс</th><th>Тариф</th></tr></thead><tbody id="top-users"></tbody></table></div></div>
+  </div>
 
-  <!-- MAIN -->
-  <main>
-
-    <!-- DASHBOARD -->
-    <div id="page-dashboard" class="page active">
-      <div class="page-header">
-        <div>
-          <div class="page-title">Dashboard <span>/ Overview</span></div>
-        </div>
-        <div class="header-actions">
-          <button class="btn btn-ghost" onclick="loadAll()">↻ Refresh</button>
-        </div>
-      </div>
-
-      <div class="stats-grid" id="stat-cards"></div>
-
-      <div class="grid-2">
-        <div class="section">
-          <div class="section-head"><span class="section-title">Platform Fees · 14 days</span></div>
-          <div class="section-body"><div class="chart-wrap"><canvas id="chart-fees"></canvas></div></div>
-        </div>
-        <div class="section">
-          <div class="section-head"><span class="section-title">Volume · 14 days</span></div>
-          <div class="section-body"><div class="chart-wrap"><canvas id="chart-volume"></canvas></div></div>
-        </div>
-      </div>
-
-      <div class="grid-2">
-        <div class="section">
-          <div class="section-head"><span class="section-title">Volume by Strategy</span></div>
-          <div class="section-body" id="strat-bars"></div>
-        </div>
-        <div class="section">
-          <div class="section-head"><span class="section-title">Top Executed Signals</span></div>
-          <div class="section-body" id="top-signals"></div>
-        </div>
-      </div>
-
-      <div class="section">
-        <div class="section-head"><span class="section-title">Top Users by Profit</span></div>
-        <div class="section-body" style="padding:0">
-          <table><thead><tr><th>#</th><th>User ID</th><th>Profit</th><th>Trades</th><th>Balance</th><th>Plan</th></tr></thead>
-          <tbody id="top-users-table"></tbody></table>
-        </div>
-      </div>
+  <!-- АНАЛИТИКА -->
+  <div id="page-analytics" class="page">
+    <div class="ph"><div class="pt">Аналитика <span>/ Подробная статистика</span></div></div>
+    <div class="g3">
+      <div class="sec"><div class="sh"><span class="st">Объём CEX/DEX/Tri/Cross</span></div><div class="sb"><div class="cw"><canvas id="ch-sv"></canvas></div></div></div>
+      <div class="sec"><div class="sh"><span class="st">Кол-во сделок по типу</span></div><div class="sb"><div class="cw"><canvas id="ch-sc"></canvas></div></div></div>
+      <div class="sec"><div class="sh"><span class="st">Комиссии по типу</span></div><div class="sb"><div class="cw"><canvas id="ch-sf"></canvas></div></div></div>
     </div>
+    <div class="sec"><div class="sh"><span class="st">Сделки по дням</span></div><div class="sb"><div class="cw"><canvas id="ch-td"></canvas></div></div></div>
+  </div>
 
-    <!-- ANALYTICS -->
-    <div id="page-analytics" class="page">
-      <div class="page-header"><div class="page-title">Analytics <span>/ Deep Stats</span></div></div>
-      <div class="grid-3">
-        <div class="section">
-          <div class="section-head"><span class="section-title">CEX Volume</span></div>
-          <div class="section-body"><div class="chart-wrap"><canvas id="chart-strat-vol"></canvas></div></div>
-        </div>
-        <div class="section">
-          <div class="section-head"><span class="section-title">Trades by Type</span></div>
-          <div class="section-body"><div class="chart-wrap"><canvas id="chart-strat-count"></canvas></div></div>
-        </div>
-        <div class="section">
-          <div class="section-head"><span class="section-title">Fees by Type</span></div>
-          <div class="section-body"><div class="chart-wrap"><canvas id="chart-strat-fees"></canvas></div></div>
-        </div>
+  <!-- ПОЛЬЗОВАТЕЛИ -->
+  <div id="page-users" class="page">
+    <div class="ph">
+      <div class="pt">Пользователи <span>/ Управление</span></div>
+      <div class="sw"><span class="si">⌕</span><input id="usr-search" placeholder="Поиск по ID или ref-коду..." style="width:240px" oninput="searchUsers()"/></div>
+    </div>
+    <div class="sec"><div class="sb" style="padding:0"><table>
+      <thead><tr><th>Пользователь</th><th>Баланс</th><th>Прибыль</th><th>Сделок</th><th>Тариф</th><th>Статус</th><th>Действия</th></tr></thead>
+      <tbody id="users-tbl"></tbody>
+    </table></div></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0">
+      <span id="usr-count" style="font-size:9px;color:var(--text3)"></span>
+      <div style="display:flex;gap:6px">
+        <button class="btn bg2 bsm" onclick="uPage(-1)">← Назад</button>
+        <button class="btn bg2 bsm" onclick="uPage(1)">Вперёд →</button>
       </div>
     </div>
+  </div>
 
-    <!-- USERS -->
-    <div id="page-users" class="page">
-      <div class="page-header">
-        <div class="page-title">Users <span>/ Management</span></div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <div class="search-wrap">
-            <span class="search-icon">⌕</span>
-            <input id="user-search" placeholder="Search by ID or ref code..." style="width:240px" oninput="searchUsers()"/>
-          </div>
-        </div>
-      </div>
-      <div class="section">
-        <div class="section-body" style="padding:0">
-          <table>
-            <thead><tr><th>User ID</th><th>Balance</th><th>Profit</th><th>Trades</th><th>Plan</th><th>Status</th><th>Actions</th></tr></thead>
-            <tbody id="users-table"></tbody>
-          </table>
-        </div>
-      </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0">
-        <span id="users-count" style="font-size:10px;color:var(--text3)"></span>
-        <div style="display:flex;gap:6px">
-          <button class="btn btn-ghost btn-sm" onclick="usersPage(-1)">← Prev</button>
-          <button class="btn btn-ghost btn-sm" onclick="usersPage(1)">Next →</button>
-        </div>
-      </div>
+  <!-- СДЕЛКИ -->
+  <div id="page-trades" class="page">
+    <div class="ph"><div class="pt">Сделки <span>/ История</span></div></div>
+    <div class="sec"><div class="sb" style="padding:0"><table>
+      <thead><tr><th>ID</th><th>Юзер</th><th>Тип</th><th>Пара</th><th>Сумма</th><th>Прибыль</th><th>Комиссии</th><th>Дата</th></tr></thead>
+      <tbody id="trades-tbl"></tbody>
+    </table></div></div>
+  </div>
+
+  <!-- НАСТРОЙКИ -->
+  <div id="page-config" class="page">
+    <div class="ph">
+      <div class="pt">Настройки <span>/ Системные параметры</span></div>
+      <button class="btn bp" onclick="saveConfig()">✓ Сохранить всё</button>
     </div>
 
-    <!-- TRADES -->
-    <div id="page-trades" class="page">
-      <div class="page-header"><div class="page-title">Trades <span>/ History</span></div></div>
-      <p style="color:var(--text3);font-size:11px">Filter trades by user from the Users page → open user → Trade History tab.</p>
-    </div>
-
-    <!-- CONFIG -->
-    <div id="page-config" class="page">
-      <div class="page-header"><div class="page-title">Config <span>/ System Settings</span></div></div>
-      <div class="grid-2">
-        <div class="section">
-          <div class="section-head"><span class="section-title">Fee Settings</span></div>
-          <div class="section-body" id="config-fees"></div>
-        </div>
-        <div class="section">
-          <div class="section-head"><span class="section-title">Trade Limits</span></div>
-          <div class="section-body" id="config-limits"></div>
-        </div>
+    <div class="g2">
+      <!-- Комиссии -->
+      <div class="sec">
+        <div class="sh"><span class="st">💸 Комиссии</span></div>
+        <div class="sb" id="cfg-fees"></div>
       </div>
-      <div class="section">
-        <div class="section-head"><span class="section-title">Network Fees</span></div>
-        <div class="section-body" id="config-network"></div>
-      </div>
-      <div style="margin-top:16px">
-        <button class="btn btn-primary" onclick="saveConfig()">✓ Save All Config</button>
+      <!-- Free лимиты -->
+      <div class="sec">
+        <div class="sh"><span class="st">🔒 Лимиты Free-тарифа</span></div>
+        <div class="sb" id="cfg-free"></div>
       </div>
     </div>
-
-    <!-- BROADCAST -->
-    <div id="page-broadcast" class="page">
-      <div class="page-header"><div class="page-title">Broadcast <span>/ Notifications</span></div></div>
-      <div class="section" style="max-width:560px">
-        <div class="section-head"><span class="section-title">Send to All Users</span></div>
-        <div class="section-body">
-          <div class="form-row" style="margin-bottom:14px">
-            <label class="form-label">Message</label>
-            <textarea id="broadcast-msg" rows="4" placeholder="Enter message for all users..."></textarea>
-          </div>
-          <button class="btn btn-primary" onclick="sendBroadcast()">📡 Send Broadcast</button>
-        </div>
+    <div class="g2">
+      <!-- Сетевые комиссии -->
+      <div class="sec">
+        <div class="sh"><span class="st">⛽ Сетевые комиссии и DEX</span></div>
+        <div class="sb" id="cfg-net"></div>
+      </div>
+      <!-- Лимиты сделок -->
+      <div class="sec">
+        <div class="sh"><span class="st">📊 Лимиты сделок</span></div>
+        <div class="sb" id="cfg-trade"></div>
       </div>
     </div>
+  </div>
 
-  </main>
+  <!-- РАССЫЛКА -->
+  <div id="page-broadcast" class="page">
+    <div class="ph"><div class="pt">Рассылка <span>/ Уведомления</span></div></div>
+    <div class="sec" style="max-width:540px">
+      <div class="sh"><span class="st">Отправить всем пользователям</span></div>
+      <div class="sb">
+        <div class="fr"><label class="fl">Сообщение</label><textarea id="bc-msg" rows="4" placeholder="Введите сообщение для всех пользователей..."></textarea></div>
+        <button class="btn bp" onclick="sendBroadcast()">📡 Отправить рассылку</button>
+      </div>
+    </div>
+  </div>
+
+</main>
 </div>
 
 <!-- USER MODAL -->
-<div class="overlay" id="user-modal">
-  <div class="modal">
-    <div class="modal-head">
-      <span class="modal-title" id="modal-uid">User Details</span>
-      <button class="modal-close" onclick="closeModal()">✕</button>
+<div class="ov" id="user-modal" onclick="if(event.target===this)closeModal()">
+  <div class="mod">
+    <div class="mh">
+      <span class="mt" id="modal-uid">Пользователь</span>
+      <button class="mc" onclick="closeModal()">✕</button>
     </div>
-    <div class="modal-body">
+    <div class="mb">
       <div class="tabs">
-        <div class="tab active" onclick="modalTab('info')">Info</div>
-        <div class="tab" onclick="modalTab('vip')">VIP</div>
-        <div class="tab" onclick="modalTab('balance')">Balance</div>
-        <div class="tab" onclick="modalTab('trades')">Trades</div>
-        <div class="tab" onclick="modalTab('notify')">Notify</div>
-        <div class="tab" onclick="modalTab('danger')">Danger</div>
+        <div class="tab on" onclick="mtab(this,'info')">Инфо</div>
+        <div class="tab" onclick="mtab(this,'vip')">VIP</div>
+        <div class="tab" onclick="mtab(this,'balance')">Баланс</div>
+        <div class="tab" onclick="mtab(this,'trades')">Сделки</div>
+        <div class="tab" onclick="mtab(this,'notify')">Уведомление</div>
+        <div class="tab" onclick="mtab(this,'danger')">⚠️ Блок</div>
       </div>
-      <div id="modal-content"></div>
+      <div id="modal-cnt"></div>
     </div>
   </div>
 </div>
@@ -378,332 +327,418 @@ input:focus,select:focus,textarea:focus{border-color:var(--cyan2)}
 <div class="toast" id="toast"></div>
 
 <script>
-// ── CONFIG ─────────────────────────────────────────────────
-const SECRET = new URLSearchParams(location.search).get('secret') || localStorage.getItem('nexarb_admin_secret') || '';
-if (SECRET) { localStorage.setItem('nexarb_admin_secret','nexarb-admin-2025'); document.getElementById('nav-secret').textContent = '🔐 '+SECRET.slice(0,8)+'...'; }
+// ── DETECT BASE URL & SECRET ───────────────────────────────
+// The admin panel is served at /admin-{SECRET}
+// We extract the secret from the current URL path
+const pathParts = location.pathname.split('/');
+let SECRET = '';
+for (const p of pathParts) {
+  if (p.startsWith('admin-')) { SECRET = p.replace('admin-', ''); break; }
+}
+// Also check URL params
+if (!SECRET) SECRET = new URLSearchParams(location.search).get('secret') || '';
+// Fallback
+if (!SECRET) SECRET = 'nexarb-admin-2025';
 
-const API = (path) => fetch(path, { headers: { 'x-admin-secret': SECRET } }).then(r => r.json());
-const POST = (path, body) => fetch(path, { method:'POST', headers:{ 'Content-Type':'application/json', 'x-admin-secret': SECRET }, body: JSON.stringify(body) }).then(r => r.json());
+// Base URL — same origin as the page
+const BASE = location.origin;
 
-let statsData = null;
-let usersData = { items:[], total:0 };
-let configData = {};
-let currentPage = 1;
-let currentUser = null;
-let feesChart = null, volChart = null;
-let stratVolChart = null, stratCountChart = null, stratFeesChart = null;
+document.getElementById('srv-url').textContent = BASE;
+console.log('Admin panel — BASE:', BASE, 'SECRET:', SECRET);
 
-// ── PAGES ──────────────────────────────────────────────────
-function showPage(name) {
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
-  document.getElementById('page-'+name).classList.add('active');
-  document.querySelectorAll('.nav-item').forEach(n=>{ if(n.getAttribute('onclick')?.includes(name)) n.classList.add('active'); });
-  if (name==='dashboard') renderDashboard();
-  if (name==='users') loadUsers();
-  if (name==='analytics') renderAnalytics();
-  if (name==='config') loadConfig();
+// ── API ────────────────────────────────────────────────────
+async function api(path) {
+  const url = BASE + path + (path.includes('?') ? '&' : '?') + `secret=${encodeURIComponent(SECRET)}`;
+  try {
+    const r = await fetch(url, { headers: { 'x-admin-secret': SECRET } });
+    if (!r.ok) { console.error('API error', r.status, url); return null; }
+    return r.json();
+  } catch(e) { console.error('Fetch error:', e, url); return null; }
 }
 
-// ── LOAD ALL ───────────────────────────────────────────────
+async function post(path, body) {
+  const url = BASE + path + (path.includes('?') ? '&' : '?') + `secret=${encodeURIComponent(SECRET)}`;
+  try {
+    const r = await fetch(url, { method:'POST', headers:{ 'Content-Type':'application/json', 'x-admin-secret': SECRET }, body: JSON.stringify(body) });
+    return r.json();
+  } catch(e) { console.error('POST error:', e); return null; }
+}
+
+// ── STATE ─────────────────────────────────────────────────
+let stats = null, users = { items:[], total:0 }, cfg = {}, curUser = null, uCurPage = 1;
+let chFees=null, chVol=null, chSV=null, chSC=null, chSF=null, chTD=null;
+
+// ── NAV ───────────────────────────────────────────────────
+function go(p) {
+  document.querySelectorAll('.page').forEach(x=>x.classList.remove('on'));
+  document.querySelectorAll('.ni').forEach(x=>x.classList.remove('on'));
+  document.getElementById('page-'+p).classList.add('on');
+  document.querySelectorAll('.ni').forEach(x=>{ if(x.textContent.trim()==={dash:'Дашборд',analytics:'Аналитика',users:'Пользователи',trades:'Сделки',config:'Настройки',broadcast:'Рассылка'}[p]) x.classList.add('on'); });
+  if (p==='dash') renderDash();
+  if (p==='analytics') renderAnalytics();
+  if (p==='users') loadUsers();
+  if (p==='config') loadConfig();
+  if (p==='trades') renderTrades();
+}
+
+// ── LOAD ALL ──────────────────────────────────────────────
 async function loadAll() {
-  statsData = await API('/api/admin/stats?secret='+SECRET);
-  renderDashboard();
+  document.getElementById('conn-status').textContent = 'Загрузка...';
+  stats = await api('/api/admin/stats');
+  if (stats) {
+    document.getElementById('conn-status').textContent = 'Подключено ✓';
+    document.getElementById('last-update').textContent = 'Обновлено: ' + new Date().toLocaleTimeString('ru');
+    renderDash();
+  } else {
+    document.getElementById('conn-status').textContent = '❌ Ошибка подключения';
+    toast('Ошибка подключения к серверу', 'err');
+  }
 }
 
-// ── DASHBOARD ──────────────────────────────────────────────
-function renderDashboard() {
-  if (!statsData) return loadAll();
-  const s = statsData;
+// ── DASHBOARD ─────────────────────────────────────────────
+function renderDash() {
+  if (!stats) { loadAll(); return; }
+  const s = stats;
 
+  // Stat cards
   const cards = [
-    { label:'Total Users', value: s.total_users, cls:'cyan', sub: s.online_users+' online now' },
-    { label:'VIP Users', value: s.vip_users, cls:'amber', sub: '$'+(s.platform_fees_total||0).toFixed(2)+' fees total' },
-    { label:'Trades 24h', value: s.trades_24h, cls:'green', sub: s.total_trades+' all time' },
-    { label:'Volume 24h', value: '$'+(s.volume_24h||0).toLocaleString('en',{maximumFractionDigits:0}), cls:'purple', sub: '$'+(s.total_volume||0).toLocaleString('en',{maximumFractionDigits:0})+' total' },
-    { label:'Fees 24h', value: '$'+(s.platform_fees_24h||0).toFixed(2), cls:'green', sub: 'Platform income' },
-    { label:'Blocked', value: s.blocked_users||0, cls:'red', sub: 'Blocked accounts' },
+    { l:'Всего юзеров', v:s.total_users??'—', cls:'c', sub:(s.online_users??0)+' онлайн сейчас' },
+    { l:'VIP / Free', v:`${s.vip_users??0}/${s.free_users??0}`, cls:'a', sub:'Платный / бесплатный' },
+    { l:'Сделок 24ч', v:s.trades_24h??0, cls:'g', sub:'Всего: '+(s.total_trades??0) },
+    { l:'Объём 24ч', v:'$'+fmt(s.volume_24h??0), cls:'p', sub:'Всего: $'+fmt(s.total_volume??0) },
+    { l:'Комиссии 24ч', v:'$'+((s.platform_fees_24h??0).toFixed(2)), cls:'g', sub:'Всего: $'+((s.platform_fees_total??0).toFixed(2)) },
+    { l:'Заблокировано', v:s.blocked_users??0, cls:'r', sub:'Аккаунтов' },
   ];
-
   document.getElementById('stat-cards').innerHTML = cards.map(c=>`
-    <div class="stat-card ${c.cls}">
-      <div class="stat-label">${c.label}</div>
-      <div class="stat-value ${c.cls}">${c.value}</div>
-      <div class="stat-sub">${c.sub}</div>
+    <div class="sc ${c.cls}">
+      <div class="sl">${c.l}</div>
+      <div class="sv ${c.cls}">${c.v}</div>
+      <div class="ss">${c.sub}</div>
     </div>`).join('');
 
   // Charts
   const labels = (s.daily||[]).map(d=>d.date.slice(5));
-  const feesVals = (s.daily||[]).map(d=>d.fees);
-  const volVals = (s.daily||[]).map(d=>d.volume);
-
-  const chartCfg = (label, data, color) => ({
-    type:'line', data:{ labels, datasets:[{label, data, borderColor:color, backgroundColor:color+'18', fill:true, tension:.4, pointRadius:2, pointHoverRadius:5, borderWidth:2}]},
-    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{grid:{color:'rgba(26,45,64,.4)'},ticks:{color:'#3a5a70',font:{size:9}}}, y:{grid:{color:'rgba(26,45,64,.4)'},ticks:{color:'#3a5a70',font:{size:9}}} }}
+  const fees = (s.daily||[]).map(d=>d.fees);
+  const vols = (s.daily||[]).map(d=>d.volume);
+  const lineOpts = (label, data, col) => ({
+    type:'line', data:{ labels, datasets:[{ label, data, borderColor:col, backgroundColor:col+'15', fill:true, tension:.4, pointRadius:2, pointHoverRadius:5, borderWidth:2 }]},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{grid:{color:'rgba(26,45,64,.35)'},ticks:{color:'#3a5a70',font:{size:8}}}, y:{grid:{color:'rgba(26,45,64,.35)'},ticks:{color:'#3a5a70',font:{size:8}}} }}
   });
-
-  if (feesChart) feesChart.destroy();
-  if (volChart) volChart.destroy();
-  feesChart = new Chart(document.getElementById('chart-fees'), chartCfg('Fees', feesVals, '#00d4ff'));
-  volChart   = new Chart(document.getElementById('chart-volume'), chartCfg('Volume', volVals, '#aa55ff'));
+  if (chFees) chFees.destroy();
+  if (chVol) chVol.destroy();
+  chFees = new Chart(document.getElementById('ch-fees'), lineOpts('Комиссии', fees, '#00d4ff'));
+  chVol  = new Chart(document.getElementById('ch-vol'),  lineOpts('Объём', vols, '#aa55ff'));
 
   // Strategy bars
   const bs = s.by_strategy||{};
-  const totalVol = Object.values(bs).reduce((a,b)=>a+(b.volume||0),0)||1;
-  const stratColors = { cex:'#00d4ff', tri:'#aa55ff', dex:'#00ff88', cross:'#ffaa00' };
+  const total = Object.values(bs).reduce((a,b)=>a+(b.volume||0),0)||1;
+  const stCols = { cex:'#00d4ff', tri:'#aa55ff', dex:'#00ff88', cross:'#ffaa00' };
+  const stLbls = { cex:'CEX', tri:'TRI', dex:'DEX', cross:'CROSS' };
   document.getElementById('strat-bars').innerHTML = Object.entries(bs).map(([type,d])=>`
-    <div class="strat-bar">
-      <span class="strat-name" style="color:${stratColors[type]}">${type.toUpperCase()}</span>
-      <div class="strat-track"><div class="strat-fill" style="width:${(d.volume/totalVol*100).toFixed(1)}%;background:${stratColors[type]}40;border-right:2px solid ${stratColors[type]}"></div></div>
-      <span class="strat-val" style="color:${stratColors[type]}">$${(d.volume||0).toFixed(0)}</span>
+    <div class="sb2">
+      <span class="sn" style="color:${stCols[type]}">${stLbls[type]||type}</span>
+      <div class="st2"><div class="sf" style="width:${((d.volume||0)/total*100).toFixed(1)}%;background:${stCols[type]}35;border-right:2px solid ${stCols[type]}"></div></div>
+      <span class="sv2" style="color:${stCols[type]}">$${fmt(d.volume||0)}</span>
     </div>`).join('');
 
   // Top signals
-  document.getElementById('top-signals').innerHTML = (s.top_signals||[]).map((sig,i)=>{
-    const [type,sym] = sig.key.split(':');
-    return `<div class="signal-row">
-      <div style="display:flex;align-items:center;gap:8px">
-        <span style="font-size:9px;color:var(--text3)">#${i+1}</span>
-        <span class="badge badge-${type}">${type.toUpperCase()}</span>
+  document.getElementById('top-sigs').innerHTML = (s.top_signals||[]).map((sig,i)=>{
+    const [type,sym]=(sig.key||':').split(':');
+    return `<div class="sigr">
+      <div style="display:flex;align-items:center;gap:7px">
+        <span style="font-size:8px;color:var(--text3)">#${i+1}</span>
+        <span class="badge b${type||'cex'}">${(type||'cex').toUpperCase()}</span>
         <span style="font-size:11px">${sym||'—'}</span>
       </div>
-      <span style="font-size:12px;font-weight:700;color:var(--cyan)">${sig.count}×</span>
+      <span style="font-size:12px;font-weight:800;color:var(--cyan)">${sig.count}×</span>
     </div>`;}).join('');
 
   // Top users
-  document.getElementById('top-users-table').innerHTML = (s.top_users||[]).map((u,i)=>`
+  document.getElementById('top-users').innerHTML = (s.top_users||[]).map((u,i)=>`
     <tr onclick="openUser('${u.id}')" style="cursor:pointer">
       <td><span style="color:var(--text3)">#${i+1}</span></td>
-      <td class="td-id">${u.id}</td>
+      <td class="tid">${u.id}</td>
       <td style="color:var(--green);font-weight:700">+$${(u.profit||0).toFixed(2)}</td>
       <td>${u.trades}</td>
       <td>$${(u.balance||0).toFixed(2)}</td>
-      <td><span class="badge ${u.vip?'badge-vip':'badge-free'}">${u.vip?'VIP':'FREE'}</span></td>
+      <td><span class="badge ${u.vip?'bvip':'bfree'}">${u.vip?'VIP':'Free'}</span></td>
     </tr>`).join('');
 }
 
-// ── ANALYTICS ─────────────────────────────────────────────
+// ── ANALYTICS ────────────────────────────────────────────
 function renderAnalytics() {
-  if (!statsData) { loadAll().then(renderAnalytics); return; }
-  const bs = statsData.by_strategy||{};
-  const labels = ['CEX','TRI','DEX','Cross'];
-  const colors = ['#00d4ff','#aa55ff','#00ff88','#ffaa00'];
-  const doughnutCfg = (data) => ({ type:'doughnut', data:{ labels, datasets:[{data, backgroundColor:colors.map(c=>c+'30'), borderColor:colors, borderWidth:2}]}, options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{labels:{color:'#6a9ab0',font:{size:9}}}}, cutout:'65%' }});
-  if (stratVolChart) stratVolChart.destroy();
-  if (stratCountChart) stratCountChart.destroy();
-  if (stratFeesChart) stratFeesChart.destroy();
-  stratVolChart   = new Chart(document.getElementById('chart-strat-vol'),   doughnutCfg([bs.cex?.volume||0, bs.tri?.volume||0, bs.dex?.volume||0, bs.cross?.volume||0]));
-  stratCountChart = new Chart(document.getElementById('chart-strat-count'), doughnutCfg([bs.cex?.count||0, bs.tri?.count||0, bs.dex?.count||0, bs.cross?.count||0]));
-  stratFeesChart  = new Chart(document.getElementById('chart-strat-fees'),  doughnutCfg([bs.cex?.fees||0, bs.tri?.fees||0, bs.dex?.fees||0, bs.cross?.fees||0]));
+  if (!stats) { loadAll().then(renderAnalytics); return; }
+  const bs = stats.by_strategy||{};
+  const lbls = ['CEX','TRI','DEX','Cross'];
+  const cols = ['#00d4ff','#aa55ff','#00ff88','#ffaa00'];
+  const donut = (data) => ({
+    type:'doughnut',
+    data:{ labels:lbls, datasets:[{data, backgroundColor:cols.map(c=>c+'28'), borderColor:cols, borderWidth:2}]},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{labels:{color:'#6a9ab0',font:{size:9}}}}, cutout:'62%' }
+  });
+  if(chSV)chSV.destroy(); if(chSC)chSC.destroy(); if(chSF)chSF.destroy();
+  chSV=new Chart(document.getElementById('ch-sv'),donut([bs.cex?.volume||0,bs.tri?.volume||0,bs.dex?.volume||0,bs.cross?.volume||0]));
+  chSC=new Chart(document.getElementById('ch-sc'),donut([bs.cex?.count||0,bs.tri?.count||0,bs.dex?.count||0,bs.cross?.count||0]));
+  chSF=new Chart(document.getElementById('ch-sf'),donut([bs.cex?.fees||0,bs.tri?.fees||0,bs.dex?.fees||0,bs.cross?.fees||0]));
+
+  // Trades by day
+  const labels=(stats.daily||[]).map(d=>d.date.slice(5));
+  const trades=(stats.daily||[]).map(d=>d.trades||0);
+  if(chTD)chTD.destroy();
+  chTD=new Chart(document.getElementById('ch-td'),{type:'bar',data:{labels,datasets:[{label:'Сделок',data:trades,backgroundColor:'rgba(0,212,255,.2)',borderColor:'#00d4ff',borderWidth:1,borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(26,45,64,.3)'},ticks:{color:'#3a5a70',font:{size:8}}},y:{grid:{color:'rgba(26,45,64,.3)'},ticks:{color:'#3a5a70',font:{size:8}}}}}});
 }
 
-// ── USERS ──────────────────────────────────────────────────
-async function loadUsers(page=1) {
-  currentPage = page;
-  const q = document.getElementById('user-search')?.value||'';
-  const data = await API(`/api/admin/users?secret=${SECRET}&page=${page}&search=${encodeURIComponent(q)}`);
-  usersData = data;
+// ── USERS ────────────────────────────────────────────────
+async function loadUsers(p=1) {
+  uCurPage=p;
+  const q = document.getElementById('usr-search')?.value||'';
+  const d = await api(`/api/admin/users?page=${p}&search=${encodeURIComponent(q)}`);
+  if (!d) return;
+  users=d;
   renderUsersTable();
 }
 
 function renderUsersTable() {
-  const now = Date.now()/1000;
-  document.getElementById('users-count').textContent = `${usersData.total} users total`;
-  document.getElementById('users-table').innerHTML = (usersData.items||[]).map(u=>`
+  const now=Date.now()/1000;
+  document.getElementById('usr-count').textContent=`${users.total} пользователей`;
+  document.getElementById('users-tbl').innerHTML=(users.items||[]).map(u=>`
     <tr onclick="openUser('${u.id}')" style="cursor:pointer">
-      <td class="td-id">${u.id} ${u.blocked?'<span class="badge badge-blocked">blocked</span>':''}</td>
+      <td class="tid">${u.id}${u.blocked?' <span class="badge bblk">блок</span>':''}</td>
       <td>$${(u.balance||0).toFixed(2)}</td>
       <td style="color:var(--green)">+$${(u.profit||0).toFixed(2)}</td>
       <td>${u.trades}</td>
-      <td><span class="badge ${u.vip?'badge-vip':'badge-free'}">${u.vip?'VIP':'FREE'}</span></td>
-      <td><span class="badge ${u.last_seen>now-300?'badge-online':'badge-free'}">${u.last_seen>now-300?'online':'offline'}</span></td>
-      <td><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openUser('${u.id}')">Manage →</button></td>
+      <td><span class="badge ${u.vip?'bvip':'bfree'}">${u.vip?'VIP':'Free'}</span></td>
+      <td><span class="badge ${u.last_seen>now-300?'bonl':'bfree'}">${u.last_seen>now-300?'онлайн':'оффлайн'}</span></td>
+      <td><button class="btn bg2 bsm" onclick="event.stopPropagation();openUser('${u.id}')">Управление →</button></td>
     </tr>`).join('');
 }
 
-let searchTimeout;
-function searchUsers() { clearTimeout(searchTimeout); searchTimeout=setTimeout(()=>loadUsers(1),400); }
-function usersPage(dir) { loadUsers(Math.max(1,currentPage+dir)); }
+let st; function searchUsers(){clearTimeout(st);st=setTimeout(()=>loadUsers(1),400);}
+function uPage(d){loadUsers(Math.max(1,uCurPage+d));}
 
-// ── USER MODAL ─────────────────────────────────────────────
-async function openUser(uid) {
-  currentUser = await API(`/api/admin/users/${uid}?secret=${SECRET}`);
-  document.getElementById('modal-uid').textContent = uid;
-  modalTab('info');
-  document.getElementById('user-modal').classList.add('open');
+// ── TRADES TABLE ──────────────────────────────────────────
+function renderTrades() {
+  if (!stats) { loadAll().then(renderTrades); return; }
+  // We don't have separate trades endpoint, use seeded data from stats context
+  // Show top users trades note
+  document.getElementById('trades-tbl').innerHTML = `
+    <tr><td colspan="8" style="text-align:center;color:var(--text3);padding:24px">
+      Откройте пользователя из раздела <strong style="color:var(--cyan)">Пользователи → Сделки</strong> для просмотра его истории.
+    </td></tr>`;
 }
 
-function closeModal() { document.getElementById('user-modal').classList.remove('open'); }
+// ── CONFIG ────────────────────────────────────────────────
+async function loadConfig() {
+  cfg = await api('/api/admin/config') || {};
+  renderConfig();
+}
 
-function modalTab(tab) {
-  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-  event?.target?.classList?.add('active');
-  // Find by text
-  document.querySelectorAll('.tab').forEach(t=>{ if(t.textContent.toLowerCase()===tab) t.classList.add('active'); });
-  const u = currentUser;
-  if (!u) return;
-  const el = document.getElementById('modal-content');
+function cfgField(key, label, unit='', type='number', step='0.0001') {
+  return `<div class="fr">
+    <label class="fl">${label}${unit?` <span style="color:var(--text3)">[${unit}]</span>`:''}</label>
+    <input type="${type}" id="cfg-${key}" value="${cfg[key]??''}" step="${step}"/>
+  </div>`;
+}
 
-  if (tab==='info') {
-    const now = Date.now()/1000;
-    el.innerHTML = `
-      <div class="form-grid">
-        <div class="form-row"><label class="form-label">User ID</label><input value="${u.id}" readonly/></div>
-        <div class="form-row"><label class="form-label">Ref Code</label><input value="${u.ref_code}" readonly/></div>
-        <div class="form-row"><label class="form-label">Balance</label><input value="$${(u.balance||0).toFixed(2)}" readonly/></div>
-        <div class="form-row"><label class="form-label">Total Profit</label><input value="+$${(u.profit||0).toFixed(2)}" readonly/></div>
-        <div class="form-row"><label class="form-label">Trades</label><input value="${u.trades}" readonly/></div>
-        <div class="form-row"><label class="form-label">Status</label><input value="${u.blocked?'BLOCKED':'Active'}" readonly/></div>
-        <div class="form-row"><label class="form-label">VIP</label><input value="${u.vip?(u.vip_expires?'Active until '+new Date(u.vip_expires*1000).toLocaleDateString():'Active'):'No'}" readonly/></div>
-        <div class="form-row"><label class="form-label">Last Seen</label><input value="${new Date((u.last_seen||0)*1000).toLocaleString()}" readonly/></div>
+function renderConfig() {
+  document.getElementById('cfg-fees').innerHTML = `
+    ${cfgField('fee_free','Комиссия Free-юзера','% от суммы')}
+    ${cfgField('fee_vip','Комиссия VIP-юзера','% от суммы')}
+    ${cfgField('exchange_fee','Биржевая комиссия','% на биржу')}
+    ${cfgField('referral_pct','Реферальные выплаты','%')}`;
+
+  document.getElementById('cfg-free').innerHTML = `
+    <div class="limit-box">
+      <div class="limit-title">Ограничения для Free-тарифа</div>
+      ${cfgField('free_signals_max','Макс. видимых сигналов','шт',     'number','1')}
+      ${cfgField('free_trades_max','Макс. сделок в день','шт',         'number','1')}
+      ${cfgField('free_exchanges_max','Макс. бирж для подключения','шт','number','1')}
+    </div>
+    <div class="fr">
+      <label class="fl">Доступные стратегии (Free)</label>
+      <select id="cfg-free_strategies">
+        <option value="cex" ${cfg.free_strategies==='cex'?'selected':''}>Только CEX</option>
+        <option value="cex,tri" ${cfg.free_strategies==='cex,tri'?'selected':''}>CEX + Triangular</option>
+        <option value="all" ${cfg.free_strategies==='all'?'selected':''}>Все стратегии</option>
+      </select>
+    </div>`;
+
+  document.getElementById('cfg-net').innerHTML = `
+    ${cfgField('network_fee_cross','Газ Cross-chain','%')}
+    ${cfgField('network_fee_dex','Газ DEX','%')}
+    ${cfgField('slippage_dex','Slippage DEX','%')}`;
+
+  document.getElementById('cfg-trade').innerHTML = `
+    ${cfgField('min_trade_amount','Мин. сумма сделки','USDT','number','1')}
+    ${cfgField('max_trade_amount','Макс. сумма сделки','USDT','number','100')}`;
+}
+
+async function saveConfig() {
+  const keys=['fee_free','fee_vip','exchange_fee','referral_pct','free_signals_max','free_trades_max','free_exchanges_max','network_fee_cross','network_fee_dex','slippage_dex','min_trade_amount','max_trade_amount'];
+  const body={};
+  keys.forEach(k=>{ const el=document.getElementById('cfg-'+k); if(el)body[k]=Number(el.value); });
+  const sel=document.getElementById('cfg-free_strategies');
+  if(sel)body.free_strategies=sel.value;
+  const r=await post('/api/admin/config',body);
+  if(r?.ok) toast('✓ Конфигурация сохранена','ok');
+  else toast('Ошибка сохранения','err');
+}
+
+// ── USER MODAL ────────────────────────────────────────────
+async function openUser(uid) {
+  const d = await api(`/api/admin/users/${encodeURIComponent(uid)}`);
+  if (!d) { toast('Пользователь не найден','err'); return; }
+  curUser=d;
+  document.getElementById('modal-uid').textContent=uid;
+  // Reset tabs
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  document.querySelectorAll('.tab')[0].classList.add('on');
+  renderModal('info');
+  document.getElementById('user-modal').classList.add('on');
+}
+
+function closeModal(){ document.getElementById('user-modal').classList.remove('on'); }
+
+function mtab(el,name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  el.classList.add('on');
+  renderModal(name);
+}
+
+function renderModal(tab) {
+  const u=curUser; if(!u)return;
+  const el=document.getElementById('modal-cnt');
+  if(tab==='info') {
+    const online=u.last_seen>Date.now()/1000-300;
+    el.innerHTML=`<div class="fg">
+      <div class="fr"><label class="fl">ID пользователя</label><input value="${u.id}" readonly/></div>
+      <div class="fr"><label class="fl">Реф. код</label><input value="${u.ref_code||'—'}" readonly/></div>
+      <div class="fr"><label class="fl">Баланс</label><input value="$${(u.balance||0).toFixed(2)}" readonly/></div>
+      <div class="fr"><label class="fl">Прибыль</label><input value="+$${(u.profit||0).toFixed(2)}" readonly/></div>
+      <div class="fr"><label class="fl">Сделок</label><input value="${u.trades}" readonly/></div>
+      <div class="fr"><label class="fl">Тариф</label><input value="${u.vip?'VIP':'Free'}" readonly/></div>
+      <div class="fr"><label class="fl">VIP до</label><input value="${u.vip_expires?new Date(u.vip_expires*1000).toLocaleDateString('ru'):'—'}" readonly/></div>
+      <div class="fr"><label class="fl">Статус</label><input value="${u.blocked?'ЗАБЛОКИРОВАН':'Активен'}" readonly/></div>
+      <div class="fr"><label class="fl">Последний вход</label><input value="${new Date((u.last_seen||0)*1000).toLocaleString('ru')}" readonly/></div>
+      <div class="fr"><label class="fl">Онлайн</label><input value="${online?'Да ●':'Нет'}" readonly/></div>
+    </div>`;
+  }
+  if(tab==='vip') {
+    el.innerHTML=`
+      <p style="font-size:11px;color:var(--text2);margin-bottom:14px">Текущий тариф: <strong style="color:${u.vip?'var(--amber)':'var(--text3)'}">${u.vip?'VIP АКТИВЕН':'FREE'}</strong></p>
+      <div class="fr"><label class="fl">Выдать VIP на срок</label>
+        <select id="vip-plan"><option value="week">7 дней</option><option value="month" selected>1 месяц</option><option value="year">1 год</option><option value="lifetime">Навсегда</option></select>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn ba" onclick="setVip('grant')">👑 Выдать VIP</button>
+        <button class="btn br" onclick="setVip('revoke')">✕ Забрать VIP</button>
       </div>`;
   }
-
-  if (tab==='vip') {
-    el.innerHTML = `
-      <p style="font-size:11px;color:var(--text2);margin-bottom:16px">Current: <strong style="color:${u.vip?'var(--amber)':'var(--text3)'}">${u.vip?'VIP ACTIVE':'FREE'}</strong></p>
-      <div class="form-row" style="margin-bottom:14px">
-        <label class="form-label">Grant VIP Plan</label>
-        <select id="vip-plan"><option value="week">1 Week</option><option value="month" selected>1 Month</option><option value="year">1 Year</option><option value="lifetime">Lifetime</option></select>
-      </div>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-amber" onclick="setVip('grant')">👑 Grant VIP</button>
-        <button class="btn btn-red" onclick="setVip('revoke')">✕ Revoke VIP</button>
+  if(tab==='balance') {
+    el.innerHTML=`
+      <p style="font-size:11px;color:var(--text2);margin-bottom:12px">Текущий баланс: <strong style="color:var(--cyan)">$${(u.balance||0).toFixed(2)}</strong></p>
+      <div class="fr"><label class="fl">Новый баланс (USDT)</label><input type="number" id="new-bal" value="${(u.balance||0).toFixed(2)}" min="0"/></div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn bp" onclick="setBalance()">✓ Обновить баланс</button>
+        <button class="btn bgr" onclick="document.getElementById('new-bal').value=Number(document.getElementById('new-bal').value)+100">+$100</button>
+        <button class="btn br" onclick="document.getElementById('new-bal').value=Math.max(0,Number(document.getElementById('new-bal').value)-100)">-$100</button>
       </div>`;
   }
-
-  if (tab==='balance') {
-    el.innerHTML = `
-      <p style="font-size:11px;color:var(--text2);margin-bottom:16px">Current balance: <strong style="color:var(--cyan)">$${(u.balance||0).toFixed(2)}</strong></p>
-      <div class="form-row" style="margin-bottom:14px">
-        <label class="form-label">New Balance (USDT)</label>
-        <input type="number" id="new-balance" value="${(u.balance||0).toFixed(2)}" min="0"/>
+  if(tab==='trades') {
+    const ts=u.trade_history||[];
+    const typeMap={cex:'bcex',dex:'bdex',tri:'btri',cross:'bxch'};
+    const typeName={cex:'CEX',dex:'DEX',tri:'TRI',cross:'Cross'};
+    el.innerHTML=ts.length===0
+      ?'<p style="color:var(--text3);font-size:11px">Сделок нет.</p>'
+      :`<div style="overflow-x:auto"><table>
+        <thead><tr><th>ID</th><th>Тип</th><th>Пара</th><th>Сумма</th><th>Прибыль</th><th>Комиссии</th><th>Дата</th></tr></thead>
+        <tbody>${ts.slice().reverse().map(t=>`<tr>
+          <td style="font-size:9px;font-family:var(--ff-m)">${t.id}</td>
+          <td><span class="badge ${typeMap[t.type]||'bcex'}">${typeName[t.type]||t.type}</span></td>
+          <td>${t.symbol||'—'}</td>
+          <td>$${(t.amount||0).toFixed(2)}</td>
+          <td style="color:var(--green)">+$${(t.netProfit||0).toFixed(4)}</td>
+          <td style="color:var(--red)">-$${(t.totalFees||0).toFixed(4)}</td>
+          <td style="font-size:9px;color:var(--text3)">${new Date((t.created_at||0)*1000).toLocaleString('ru')}</td>
+        </tr>`).join('')}</tbody></table></div>`;
+  }
+  if(tab==='notify') {
+    el.innerHTML=`
+      <div class="fr"><label class="fl">Сообщение для пользователя</label>
+        <textarea id="n-msg" rows="4" placeholder="Введите уведомление..."></textarea>
       </div>
-      <button class="btn btn-primary" onclick="setBalance()">✓ Update Balance</button>`;
+      <button class="btn bp" style="margin-top:4px" onclick="sendNotify()">📩 Отправить уведомление</button>`;
   }
-
-  if (tab==='trades') {
-    const trades = u.trade_history||[];
-    el.innerHTML = trades.length===0
-      ? '<p style="color:var(--text3);font-size:11px">No trades yet.</p>'
-      : `<div style="overflow-x:auto"><table>
-          <thead><tr><th>ID</th><th>Type</th><th>Symbol</th><th>Amount</th><th>Net Profit</th><th>Fees</th><th>Date</th></tr></thead>
-          <tbody>${trades.slice().reverse().map(t=>`
-            <tr>
-              <td style="font-family:var(--font-mono);font-size:10px">${t.id}</td>
-              <td><span class="badge badge-${t.type}">${(t.type||'').toUpperCase()}</span></td>
-              <td>${t.symbol}</td>
-              <td>$${(t.amount||0).toFixed(2)}</td>
-              <td style="color:var(--green)">+$${(t.netProfit||0).toFixed(4)}</td>
-              <td style="color:var(--red)">-$${(t.totalFees||0).toFixed(4)}</td>
-              <td style="font-size:10px;color:var(--text3)">${new Date((t.created_at||0)*1000).toLocaleString()}</td>
-            </tr>`).join('')}
-          </tbody>
-        </table></div>`;
-  }
-
-  if (tab==='notify') {
-    el.innerHTML = `
-      <div class="form-row" style="margin-bottom:14px">
-        <label class="form-label">Message</label>
-        <textarea id="notify-msg" rows="4" placeholder="Enter notification for this user..."></textarea>
-      </div>
-      <button class="btn btn-primary" onclick="sendNotify()">📩 Send Notification</button>`;
-  }
-
-  if (tab==='danger') {
-    el.innerHTML = `
-      <p style="font-size:11px;color:var(--text2);margin-bottom:20px">⚠️ Dangerous actions. These cannot be undone.</p>
+  if(tab==='danger') {
+    el.innerHTML=`
+      <p style="font-size:11px;color:var(--text2);margin-bottom:16px">⚠️ Опасные действия. Применяются немедленно.</p>
       <div style="display:flex;flex-direction:column;gap:10px">
         <div style="display:flex;align-items:center;justify-content:space-between;padding:14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border)">
-          <div><p style="font-size:11px;font-weight:700">${u.blocked?'Unblock User':'Block User'}</p><p style="font-size:10px;color:var(--text3)">${u.blocked?'Allow user to use the platform':'Prevent user from accessing the platform'}</p></div>
-          <button class="btn ${u.blocked?'btn-green':'btn-red'}" onclick="blockUser('${u.blocked?'unblock':'block'}')">${u.blocked?'✓ Unblock':'⊘ Block'}</button>
+          <div>
+            <p style="font-size:11px;font-weight:700">${u.blocked?'Разблокировать':'Заблокировать'} пользователя</p>
+            <p style="font-size:9px;color:var(--text3);margin-top:3px">${u.blocked?'Снять блокировку и восстановить доступ':'Запретить доступ к платформе'}</p>
+          </div>
+          <button class="btn ${u.blocked?'bgr':'br'}" onclick="blockUser('${u.blocked?'unblock':'block'}')">${u.blocked?'✓ Разблокировать':'⊘ Заблокировать'}</button>
         </div>
       </div>`;
   }
 }
 
-// ── MODAL ACTIONS ──────────────────────────────────────────
+// ── MODAL ACTIONS ─────────────────────────────────────────
 async function setVip(action) {
-  const plan = document.getElementById('vip-plan').value;
-  await POST(`/api/admin/users/${currentUser.id}/vip?secret=${SECRET}`, { action, plan });
-  currentUser.vip = action==='grant';
-  toast('VIP '+action+'ed ✓', 'success');
-  loadUsers(currentPage);
+  const plan=document.getElementById('vip-plan')?.value||'month';
+  const r=await post(`/api/admin/users/${encodeURIComponent(curUser.id)}/vip`,{action,plan});
+  if(r?.ok){curUser.vip=action==='grant';toast(action==='grant'?'👑 VIP выдан':'VIP забран','ok');loadUsers(uCurPage);}
+  else toast('Ошибка','err');
 }
 
 async function setBalance() {
-  const amount = Number(document.getElementById('new-balance').value);
-  await POST(`/api/admin/users/${currentUser.id}/balance?secret=${SECRET}`, { amount });
-  currentUser.balance = amount;
-  toast('Balance updated ✓', 'success');
+  const amount=Number(document.getElementById('new-bal')?.value||0);
+  const r=await post(`/api/admin/users/${encodeURIComponent(curUser.id)}/balance`,{amount});
+  if(r?.ok){curUser.balance=amount;toast('✓ Баланс обновлён','ok');}
+  else toast('Ошибка','err');
 }
 
 async function blockUser(action) {
-  await POST(`/api/admin/users/${currentUser.id}/block?secret=${SECRET}`, { action });
-  currentUser.blocked = action==='block';
-  modalTab('danger');
-  toast('User '+(action==='block'?'blocked':'unblocked')+' ✓', action==='block'?'error':'success');
-  loadUsers(currentPage);
+  const r=await post(`/api/admin/users/${encodeURIComponent(curUser.id)}/block`,{action});
+  if(r?.ok){curUser.blocked=action==='block';renderModal('danger');toast(action==='block'?'⊘ Заблокирован':'✓ Разблокирован',action==='block'?'err':'ok');loadUsers(uCurPage);}
+  else toast('Ошибка','err');
 }
 
 async function sendNotify() {
-  const msg = document.getElementById('notify-msg').value.trim();
-  if (!msg) return;
-  await POST(`/api/admin/users/${currentUser.id}/notify?secret=${SECRET}`, { message:msg });
-  document.getElementById('notify-msg').value='';
-  toast('Notification sent ✓', 'success');
-}
-
-// ── CONFIG ─────────────────────────────────────────────────
-async function loadConfig() {
-  configData = await API('/api/admin/config?secret='+SECRET);
-  renderConfig();
-}
-
-function renderConfig() {
-  const c = configData;
-  const field = (key,label,unit='') => `<div class="form-row" style="margin-bottom:12px"><label class="form-label">${label}</label><div style="position:relative"><input type="number" id="cfg-${key}" value="${c[key]||0}" step="0.0001"/>${unit?`<span style="position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--text3)">${unit}</span>`:''}</div></div>`;
-
-  document.getElementById('config-fees').innerHTML =
-    field('fee_free','Free User Fee','%') + field('fee_vip','VIP User Fee','%') + field('referral_pct','Referral Commission','%');
-  document.getElementById('config-limits').innerHTML =
-    field('free_trades_max','Max Free Trades/Day') + field('min_trade_amount','Min Trade Amount','USDT') + field('max_trade_amount','Max Trade Amount','USDT');
-  document.getElementById('config-network').innerHTML =
-    field('network_fee_cross','Cross-chain Network Fee','%') + field('network_fee_dex','DEX Network Fee','%') + field('exchange_fee','Exchange Fee','%') + field('slippage_dex','DEX Slippage','%');
-}
-
-async function saveConfig() {
-  const keys = ['fee_free','fee_vip','referral_pct','free_trades_max','min_trade_amount','max_trade_amount','network_fee_cross','network_fee_dex','exchange_fee','slippage_dex'];
-  const body = {};
-  keys.forEach(k=>{ const el=document.getElementById('cfg-'+k); if(el) body[k]=Number(el.value); });
-  await POST('/api/admin/config?secret='+SECRET, body);
-  toast('Config saved ✓', 'success');
+  const msg=document.getElementById('n-msg')?.value?.trim();
+  if(!msg)return;
+  const r=await post(`/api/admin/users/${encodeURIComponent(curUser.id)}/notify`,{message:msg});
+  if(r?.ok){document.getElementById('n-msg').value='';toast('📩 Уведомление отправлено','ok');}
+  else toast('Ошибка','err');
 }
 
 // ── BROADCAST ─────────────────────────────────────────────
 async function sendBroadcast() {
-  const msg = document.getElementById('broadcast-msg').value.trim();
-  if (!msg) return;
-  await POST('/api/admin/broadcast?secret='+SECRET, { message:msg });
-  document.getElementById('broadcast-msg').value='';
-  toast('Broadcast sent to all users ✓', 'success');
+  const msg=document.getElementById('bc-msg')?.value?.trim();
+  if(!msg)return;
+  const r=await post('/api/admin/broadcast',{message:msg});
+  if(r?.ok){document.getElementById('bc-msg').value='';toast('📡 Рассылка отправлена всем','ok');}
+  else toast('Ошибка','err');
 }
 
-// ── TOAST ─────────────────────────────────────────────────
-function toast(msg, type='success') {
-  const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.className = `toast ${type} show`;
-  setTimeout(()=>el.classList.remove('show'),3000);
+// ── HELPERS ───────────────────────────────────────────────
+function fmt(n){
+  n=Number(n)||0;
+  if(n>=1000000) return (n/1000000).toFixed(1)+'M';
+  if(n>=1000) return (n/1000).toFixed(1)+'K';
+  return n.toFixed(0);
+}
+
+function toast(msg,type='ok'){
+  const el=document.getElementById('toast');
+  el.textContent=msg;el.className=`toast ${type} on`;
+  setTimeout(()=>el.classList.remove('on'),3500);
 }
 
 // ── INIT ──────────────────────────────────────────────────
 loadAll();
-setInterval(loadAll, 30000);
-
-// Close modal on overlay click
-document.getElementById('user-modal').addEventListener('click', e=>{ if(e.target===e.currentTarget) closeModal(); });
+setInterval(loadAll,30000);
 </script>
 </body>
 </html>

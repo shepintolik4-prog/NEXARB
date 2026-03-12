@@ -59,6 +59,7 @@ export const LANGS: Record<string, Record<string, string>> = {
     // Misc
     loading: 'Загрузка...',
     spread: 'Спред', profit: 'Профит', volume: 'Объём',
+    lang_title: 'Язык интерфейса',
   },
 
   en: {
@@ -113,6 +114,7 @@ export const LANGS: Record<string, Record<string, string>> = {
     no_referrals: 'No referrals yet · Share your link!',
     loading: 'Loading...',
     spread: 'Spread', profit: 'Profit', volume: 'Volume',
+    lang_title: 'Interface Language',
   },
 
   de: {
@@ -135,7 +137,7 @@ export const LANGS: Record<string, Record<string, string>> = {
     profile_total_trades: 'Trades gesamt',
     profile_win_rate: 'Gewinnquote',
     profile_avg_profit: 'Ø Gewinn',
-    profile_ref: 'Empfehlungsprogramm',
+    profile_ref: 'Empfehlungsprogramм',
     profile_ref_code: 'Ihr Ref-Code',
     profile_ref_link: 'Ref-Link',
     profile_ref_copy: 'Kopieren',
@@ -167,6 +169,7 @@ export const LANGS: Record<string, Record<string, string>> = {
     no_referrals: 'Noch keine Empfehlungen · Link teilen!',
     loading: 'Laden...',
     spread: 'Spread', profit: 'Gewinn', volume: 'Volumen',
+    lang_title: 'Sprache',
   },
 
   zh: {
@@ -221,5 +224,6 @@ export const LANGS: Record<string, Record<string, string>> = {
     no_referrals: '暂无推荐 · 分享您的链接!',
     loading: '加载中...',
     spread: '价差', profit: '收益', volume: '成交量',
+    lang_title: '界面语言',
   },
 };

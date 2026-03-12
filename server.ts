@@ -6,35 +6,106 @@ import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import fs from "fs";
 import ccxt from "ccxt";
-import CryptoJS from "crypto-js";
+import helmet from "helmet";
+import cors from "cors";
+import rateLimit from "express-rate-limit";
+import db from "./src/lib/db.js";
+import { encrypt, decrypt } from "./src/lib/crypto.js";
+import { authenticate, authorizeAdmin, AuthRequest } from "./src/lib/auth.js";
+import { tradeSchema, exchangeConnectSchema, vipInitiateSchema, vipConfirmSchema, accountUpdateSchema, notificationSchema, exchangeDeleteSchema } from "./src/lib/validation.js";
+
+import pino from "pino";
 
 dotenv.config();
+const logger = pino({
+  transport: {
+    target: 'pino-pretty',
+    options: { colorize: true }
+  }
+});
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const ADMIN_SECRET = process.env.ADMIN_SECRET || "nexarb-admin-2025";
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || "default-key-for-dev-only-change-in-prod";
-const DB_PATH = path.join(__dirname, "nexarb_db.json");
+const ADMIN_SECRET = process.env.ADMIN_SECRET;
+const DB_PATH = path.join(process.cwd(), 'nexarb.db');
 
-function encrypt(text: string): string {
-  return CryptoJS.AES.encrypt(text, ENCRYPTION_KEY).toString();
-}
+const app = express();
+const server = http.createServer(app);
 
-function decrypt(ciphertext: string): string {
-  const bytes = CryptoJS.AES.decrypt(ciphertext, ENCRYPTION_KEY);
-  return bytes.toString(CryptoJS.enc.Utf8);
-}
+// Security Middleware
+app.use(helmet({
+  contentSecurityPolicy: false, // Disable for development/iframe compatibility
+}));
+app.use(cors({
+  origin: process.env.APP_URL || "*",
+  credentials: true,
+}));
+app.use(express.json({ limit: '10kb' })); // Limit body size
 
-function loadDB() {
-  try { if (fs.existsSync(DB_PATH)) return JSON.parse(fs.readFileSync(DB_PATH,"utf-8")); }
-  catch(e) { console.log("DB load error"); }
-  return { users:{}, trades:[], notifications:[], config:{} };
-}
-function saveDB(db: any) {
-  try { fs.writeFileSync(DB_PATH, JSON.stringify(db,null,2)); } catch(e) {}
-}
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: { error: "Too many requests from this IP, please try again after 15 minutes" }
+});
+app.use("/api/", limiter);
 
-let db: any = loadDB();
-setInterval(() => saveDB(db), 10000);
+const io = new Server(server, {
+  cors: {
+    origin: process.env.APP_URL || "*",
+    methods: ["GET", "POST"]
+  }
+});
+
+const PORT = Number(process.env.PORT) || 3000;
+
+// Helper to get/create user from DB
+const getUserFromDB = (userId: string, tgData?: any) => {
+  let user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as any;
+  
+  if (!user) {
+    const refCode = "REF" + Math.random().toString(36).substring(2, 7).toUpperCase();
+    db.prepare(`
+      INSERT INTO users (id, tg_id, tg_username, tg_first_name, tg_last_name, tg_photo_url, created_at, last_seen, ref_code, filter_prefs)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      userId, 
+      tgData?.id || null, 
+      tgData?.username || "", 
+      tgData?.first_name || "User", 
+      tgData?.last_name || "", 
+      tgData?.photo_url || "",
+      Math.floor(Date.now() / 1000),
+      Math.floor(Date.now() / 1000),
+      refCode,
+      JSON.stringify({
+        strategies: ["cex", "tri", "dex", "cross"],
+        networks: ALL_NETWORKS.map(n => n.id),
+        exchanges: ALL_EXCHANGES.filter(e => e.type === "cex").slice(0, 8).map(e => e.id),
+        min_spread: 0, min_ai_score: 0, tokens: [],
+      })
+    );
+    user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+  } else if (tgData) {
+    db.prepare(`
+      UPDATE users SET 
+        tg_id = ?, tg_username = ?, tg_first_name = ?, tg_last_name = ?, tg_photo_url = ?, last_seen = ?
+      WHERE id = ?
+    `).run(
+      tgData.id || user.tg_id,
+      tgData.username || user.tg_username,
+      tgData.first_name || user.tg_first_name,
+      tgData.last_name || user.tg_last_name,
+      tgData.photo_url || user.tg_photo_url,
+      Math.floor(Date.now() / 1000),
+      userId
+    );
+  }
+
+  // Parse JSON fields
+  if (user.filter_prefs) user.filter_prefs = JSON.parse(user.filter_prefs);
+  if (user.api_keys) user.api_keys = JSON.parse(user.api_keys);
+  
+  return user;
+};
 
 const DEFAULT_CONFIG = {
   fee_free:0.008, fee_vip:0.003, exchange_fee:0.001,
@@ -192,100 +263,102 @@ async function startServer() {
     min_spread:0, min_ai_score:0, tokens:[],
   });
 
-  const getUser = (userId: string, tgData?: any) => {
-    if (!db.users[userId]) {
-      db.users[userId] = {
-        id:userId, tg_id:tgData?.id, tg_username:tgData?.username||"",
-        tg_first_name:tgData?.first_name||"User", tg_last_name:tgData?.last_name||"",
-        tg_photo_url:tgData?.photo_url||"",
-        balance:0, demo_balance:db.config.demo_start_balance||10000,
-        profit:0, demo_profit:0, trades:0, demo_trades:0,
-        vip:userId==="demo_user",
-        vip_expires:userId==="demo_user"?Date.now()/1000+31536000:null,
-        connected_exchanges:["binance"], api_keys:[],
-        ref_code:"REF"+Math.random().toString(36).substring(2,7).toUpperCase(),
-        referred_users:[], ref_earned:0, blocked:false,
-        trade_mode:"demo", auto_trading:false, auto_amount:100,
-        auto_min_spread:0.2, auto_risk:"medium",
-        filter_prefs:defaultFilterPrefs(),
-        created_at:Date.now()/1000, last_seen:Date.now()/1000, online:false,
-      };
-    } else if (tgData) {
-      Object.assign(db.users[userId],{
-        tg_id:tgData.id,
-        tg_username:tgData.username||db.users[userId].tg_username,
-        tg_first_name:tgData.first_name||db.users[userId].tg_first_name,
-        tg_last_name:tgData.last_name||db.users[userId].tg_last_name,
-        ...(tgData.photo_url?{tg_photo_url:tgData.photo_url}:{}),
-      });
+  const mkLimits = (u: any) => {
+    const config = JSON.parse(db.prepare('SELECT value FROM config WHERE key = "settings"').get()?.value || '{}');
+    const mergedConfig = { ...DEFAULT_CONFIG, ...config };
+    return {
+      signals_max: u.vip ? 9999 : mergedConfig.free_signals_max,
+      trades_max: u.vip ? 9999 : mergedConfig.free_trades_max,
+      exchanges_max: u.vip ? 9999 : mergedConfig.free_exchanges_max,
+      strategies: u.vip ? "all" : mergedConfig.free_strategies,
+    };
+  };
+
+  app.get("/api/health", (_req, res) => res.json({ status: "ok", tokens: Object.keys(realPrices).length, exchanges: ALL_EXCHANGES.length, networks: ALL_NETWORKS.length }));
+  app.get("/api/v1/exchanges", authenticate, (_req, res) => res.json(ALL_EXCHANGES));
+  app.get("/api/v1/networks", authenticate, (_req, res) => res.json(ALL_NETWORKS));
+  app.get("/api/v1/prices", authenticate, (_req, res) => res.json(realPrices));
+  app.get("/api/v1/tokens", authenticate, (_req, res) => res.json(Object.keys(realPrices)));
+
+  app.post("/api/v1/auth", authenticate, (req: AuthRequest, res) => {
+    const userId = req.user!.uid;
+    const tg = req.body.user || req.body.tg_data?.user;
+    const u = getUserFromDB(userId, tg);
+    res.json({ ...u, limits: mkLimits(u) });
+  });
+
+  app.get("/api/v1/account", authenticate, (req: AuthRequest, res) => {
+    const userId = req.user!.uid;
+    const u = getUserFromDB(userId);
+    if (u.blocked) return res.status(403).json({ error: "Заблокирован" });
+    res.json({ ...u, limits: mkLimits(u) });
+  });
+
+  app.patch("/api/v1/account", authenticate, (req: AuthRequest, res) => {
+    const userId = req.user!.uid;
+    const validation = accountUpdateSchema.safeParse(req.body);
+    if (!validation.success) return res.status(400).json({ error: validation.error });
+    
+    const u = getUserFromDB(userId);
+    const data = validation.data;
+    
+    const updates: string[] = [];
+    const params: any[] = [];
+    
+    const fields = ["trade_mode", "auto_trading", "auto_amount", "auto_min_spread", "auto_risk"];
+    fields.forEach(k => {
+      if ((data as any)[k] !== undefined) {
+        updates.push(`${k} = ?`);
+        params.push((data as any)[k]);
+      }
+    });
+
+    if (data.filter_prefs) {
+      const newPrefs = JSON.stringify({ ...u.filter_prefs, ...data.filter_prefs });
+      updates.push("filter_prefs = ?");
+      params.push(newPrefs);
     }
-    if (!db.users[userId].filter_prefs) db.users[userId].filter_prefs = defaultFilterPrefs();
-    db.users[userId].last_seen = Date.now()/1000;
-    db.users[userId].online = true;
-    return db.users[userId];
-  };
 
-  const mkLimits = (u: any) => ({
-    signals_max: u.vip?9999:db.config.free_signals_max,
-    trades_max:  u.vip?9999:db.config.free_trades_max,
-    exchanges_max:u.vip?9999:db.config.free_exchanges_max,
-    strategies:  u.vip?"all":db.config.free_strategies,
+    if (updates.length > 0) {
+      params.push(userId);
+      db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+    }
+    
+    res.json({ ok: true });
   });
 
-  const adminAuth = (req: any, res: any, next: any) => {
-    if ((req.headers["x-admin-secret"]||req.query.secret) !== ADMIN_SECRET) return res.status(403).json({error:"Forbidden"});
-    next();
-  };
+  app.post("/api/v1/trades", authenticate, (req: AuthRequest, res) => {
+    const userId = req.user!.uid;
+    const validation = tradeSchema.safeParse(req.body);
+    if (!validation.success) return res.status(400).json({ error: validation.error });
+    
+    const { symbol, amount, spread, buyExchange, sellExchange, type, mode } = validation.data;
+    const u = getUserFromDB(userId);
+    if (u.blocked) return res.status(403).json({ error: "Заблокирован" });
+    
+    const config = JSON.parse(db.prepare('SELECT value FROM config WHERE key = "settings"').get()?.value || '{}');
+    const mergedConfig = { ...DEFAULT_CONFIG, ...config };
+    
+    const tMode = mode || u.trade_mode || "demo";
+    const bal = tMode === "real" ? u.balance : u.demo_balance;
+    
+    if (!u.vip && u.trades >= mergedConfig.free_trades_max) {
+      return res.status(403).json({ error: `Лимит ${mergedConfig.free_trades_max} сделок` });
+    }
+    
+    if (amount > bal) return res.status(400).json({ error: "Недостаточно средств" });
+    
+    const feeRate = u.vip ? mergedConfig.fee_vip : mergedConfig.fee_free;
+    const nFee = type === "cross" ? amount * mergedConfig.network_fee_cross : type === "dex" ? amount * mergedConfig.network_fee_dex : 0;
+    const exA = amount * mergedConfig.exchange_fee, exB = amount * mergedConfig.exchange_fee;
+    const slip = type === "dex" ? amount * mergedConfig.slippage_dex : 0;
+    const platFee = amount * feeRate;
+    const totalFees = platFee + nFee + exA + exB + slip;
+    const gross = amount * (spread / 100), net = gross - totalFees;
 
-  app.get("/api/health",(_req,res)=>res.json({status:"ok",tokens:Object.keys(realPrices).length,exchanges:ALL_EXCHANGES.length,networks:ALL_NETWORKS.length}));
-  app.get("/api/v1/exchanges",(_req,res)=>res.json(ALL_EXCHANGES));
-  app.get("/api/v1/networks",(_req,res)=>res.json(ALL_NETWORKS));
-  app.get("/api/v1/prices",(_req,res)=>res.json(realPrices));
-  app.get("/api/v1/tokens",(_req,res)=>res.json(Object.keys(realPrices)));
-
-  app.post("/api/v1/auth",(req,res)=>{
-    const tg = req.body.user||req.body.tg_data?.user;
-    const userId = tg?.id?`tg_${tg.id}`:"demo_user";
-    const u = getUser(userId,tg);
-    saveDB(db);
-    res.json({...u,limits:mkLimits(u)});
-  });
-
-  app.get("/api/v1/account",(req,res)=>{
-    const u = getUser((req.query.userId as string)||"demo_user");
-    if(u.blocked) return res.status(403).json({error:"Заблокирован"});
-    res.json({...u,limits:mkLimits(u)});
-  });
-
-  app.patch("/api/v1/account",(req,res)=>{
-    const u = getUser(req.body.userId||"demo_user");
-    const f=["trade_mode","filter_prefs","auto_trading","auto_amount","auto_min_spread","auto_risk"];
-    f.forEach(k=>{if(req.body[k]!==undefined){
-      if(k==="filter_prefs") u.filter_prefs={...u.filter_prefs,...req.body[k]};
-      else (u as any)[k]=req.body[k];
-    }});
-    saveDB(db); res.json({ok:true});
-  });
-
-  app.post("/api/v1/trades",(req,res)=>{
-    const {userId,symbol,amount,spread,buyExchange,sellExchange,type,mode}=req.body;
-    const u=getUser(userId||"demo_user");
-    if(u.blocked) return res.status(403).json({error:"Заблокирован"});
-    const tMode=mode||u.trade_mode||"demo";
-    const bal=tMode==="real"?u.balance:u.demo_balance;
-    if(!u.vip&&u.trades>=db.config.free_trades_max) return res.status(403).json({error:`Лимит ${db.config.free_trades_max} сделок`});
-    if(amount>bal) return res.status(400).json({error:"Недостаточно средств"});
-    const cfg=db.config;
-    const feeRate=u.vip?cfg.fee_vip:cfg.fee_free;
-    const nFee=type==="cross"?amount*cfg.network_fee_cross:type==="dex"?amount*cfg.network_fee_dex:0;
-    const exA=amount*cfg.exchange_fee,exB=amount*cfg.exchange_fee;
-    const slip=type==="dex"?amount*cfg.slippage_dex:0;
-    const platFee=amount*feeRate;
-    const totalFees=platFee+nFee+exA+exB+slip;
-    const gross=amount*(spread/100),net=gross-totalFees;
-    if(tMode==="real"){
+    if (tMode === "real") {
       // Real trade execution logic placeholder
-      const keys = u.api_keys?.find((k:any)=>k.exchange === buyExchange);
+      const keys = u.api_keys?.find((k: any) => k.exchange === buyExchange);
       if (keys) {
         try {
           const realKey = decrypt(keys.key);
@@ -295,127 +368,186 @@ async function startServer() {
           console.error("Real trade decryption failed", e);
         }
       }
-      u.balance+=net;u.profit+=net;u.trades++;
+      db.prepare('UPDATE users SET balance = balance + ?, profit = profit + ?, trades = trades + 1 WHERE id = ?').run(net, net, userId);
+    } else {
+      db.prepare('UPDATE users SET demo_balance = demo_balance + ?, demo_profit = demo_profit + ?, demo_trades = demo_trades + 1 WHERE id = ?').run(net, net, userId);
     }
-    else{u.demo_balance+=net;u.demo_profit+=net;u.demo_trades++;}
-    const t={id:Math.random().toString(36).substring(2,10),userId:u.id,symbol,amount,spread,type,mode:tMode,buyExchange,sellExchange,gross,net,totalFees,fees:{platform:platFee,network:nFee,exchangeA:exA,exchangeB:exB,slippage:slip},feeRates:{platform:feeRate},status:"completed",created_at:Date.now()/1000};
-    db.trades.push(t);
-    saveDB(db);
-    res.json({...t,newBalance:tMode==="real"?u.balance:u.demo_balance});
+
+    const tId = Math.random().toString(36).substring(2, 10);
+    const t = {
+      id: tId, userId, symbol, amount, spread, type, mode: tMode, buyExchange, sellExchange, gross, net, totalFees,
+      fees: JSON.stringify({ platform: platFee, network: nFee, exchangeA: exA, exchangeB: exB, slippage: slip }),
+      feeRates: JSON.stringify({ platform: feeRate }),
+      status: "completed", created_at: Math.floor(Date.now() / 1000)
+    };
+
+    db.prepare(`
+      INSERT INTO trades (id, userId, symbol, amount, spread, type, mode, buyExchange, sellExchange, gross, net, totalFees, fees, feeRates, status, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(t.id, t.userId, t.symbol, t.amount, t.spread, t.type, t.mode, t.buyExchange, t.sellExchange, t.gross, t.net, t.totalFees, t.fees, t.feeRates, t.status, t.created_at);
+
+    const updatedUser = getUserFromDB(userId);
+    res.json({ ...t, newBalance: tMode === "real" ? updatedUser.balance : updatedUser.demo_balance });
   });
 
-  app.post("/api/v1/vip/initiate",(req,res)=>{
-    const {plan="month", method="stars"}=req.body;
-    const prices: any={
-      week:{stars:150,ton:"0.25",usd:9},
-      month:{stars:450,ton:"0.80",usd:29},
-      year:{stars:1999,ton:"3.50",usd:149},
+  app.post("/api/v1/vip/initiate", authenticate, (req: AuthRequest, res) => {
+    const validation = vipInitiateSchema.safeParse(req.body);
+    if (!validation.success) return res.status(400).json({ error: validation.error });
+    
+    const { plan = "month", method = "stars" } = validation.data;
+    const prices: any = {
+      week: { stars: 150, ton: "0.25", usd: 9 },
+      month: { stars: 450, ton: "0.80", usd: 29 },
+      year: { stars: 1999, ton: "3.50", usd: 149 },
     };
-    const p=prices[plan]||prices.month;
-    const invoiceId=`inv_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
-    res.json({ok:true,invoiceId,plan,method,prices:p,
-      stars_link:`tg://invoice?...`,
-      ton_address:"UQBvI0aFLnw2QbZgjMPCLRdtRHxhUyinQudg19Xoc3GGzHRR",
-      ton_memo:invoiceId,
+    const p = prices[plan] || prices.month;
+    const invoiceId = `inv_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    res.json({
+      ok: true, invoiceId, plan, method, prices: p,
+      stars_link: `tg://invoice?...`,
+      ton_address: "UQBvI0aFLnw2QbZgjMPCLRdtRHxhUyinQudg19Xoc3GGzHRR",
+      ton_memo: invoiceId,
     });
   });
 
-  app.post("/api/v1/vip/confirm",(req,res)=>{
-    const {userId,invoiceId,plan="month",method}=req.body;
-    if(!userId||!invoiceId) return res.status(400).json({error:"Missing params"});
-    const u=getUser(userId);
-    u.vip=true;
-    const dur: any={week:604800,month:2592000,year:31536000};
-    u.vip_expires=Date.now()/1000+(dur[plan]||dur.month);
-    u.vip_payment={method,plan,invoiceId,ts:Date.now()/1000};
-    saveDB(db);
-    res.json({ok:true,expires_at:u.vip_expires,vip:true});
+  app.post("/api/v1/vip/confirm", authenticate, (req: AuthRequest, res) => {
+    const userId = req.user!.uid;
+    const validation = vipConfirmSchema.safeParse(req.body);
+    if (!validation.success) return res.status(400).json({ error: validation.error });
+    
+    const { invoiceId, plan = "month", method } = validation.data;
+    
+    // TODO: Verify payment via blockchain/provider
+    console.log(`Verifying payment for ${userId}, invoice ${invoiceId}`);
+    
+    const dur: any = { week: 604800, month: 2592000, year: 31536000 };
+    const expires = Math.floor(Date.now() / 1000) + (dur[plan] || dur.month);
+    
+    db.prepare('UPDATE users SET vip = 1, vip_expires = ? WHERE id = ?').run(expires, userId);
+    
+    res.json({ ok: true, expires_at: expires, vip: true });
   });
 
-  app.post("/api/v1/exchange/connect",(req,res)=>{
-    const {userId,exchange,apiKey,apiSecret}=req.body;
-    if(!userId||!exchange||!apiKey||!apiSecret) return res.status(400).json({error:"Missing fields"});
-    const u=getUser(userId);
-    if(!u.vip) return res.status(403).json({error:"VIP required"});
-    if(!u.api_keys) u.api_keys=[];
-    if(!u.connected_exchanges) u.connected_exchanges=[];
-    u.api_keys=u.api_keys.filter((k:any)=>k.exchange!==exchange);
-    u.api_keys.push({
+  app.post("/api/v1/exchange/connect", authenticate, (req: AuthRequest, res) => {
+    const userId = req.user!.uid;
+    const validation = exchangeConnectSchema.safeParse(req.body);
+    if (!validation.success) return res.status(400).json({ error: validation.error });
+    
+    const { exchange, apiKey, apiSecret } = validation.data;
+    const u = getUserFromDB(userId);
+    
+    if (!u.vip) return res.status(403).json({ error: "VIP required" });
+    
+    const apiKeys = u.api_keys || [];
+    const filteredKeys = apiKeys.filter((k: any) => k.exchange !== exchange);
+    
+    filteredKeys.push({
       exchange,
       key: encrypt(apiKey),
       secret: encrypt(apiSecret),
       active: true,
-      ts: Date.now()/1000
+      ts: Math.floor(Date.now() / 1000)
     });
-    if(!u.connected_exchanges.includes(exchange)) u.connected_exchanges.push(exchange);
-    saveDB(db);
-    res.json({ok:true,connected:u.connected_exchanges});
+    
+    db.prepare('UPDATE users SET api_keys = ? WHERE id = ?').run(JSON.stringify(filteredKeys), userId);
+    
+    res.json({ ok: true });
   });
 
-  app.delete("/api/v1/exchange/connect",(req,res)=>{
-    const {userId,exchange}=req.body;
-    if(!userId||!exchange) return res.status(400).json({error:"Missing fields"});
-    const u=getUser(userId);
-    if(!u.api_keys) u.api_keys=[];
-    u.api_keys=u.api_keys.filter((k:any)=>k.exchange!==exchange);
-    u.connected_exchanges=(u.connected_exchanges||[]).filter((e:string)=>e!==exchange);
-    saveDB(db);
-    res.json({ok:true,connected:u.connected_exchanges});
+  app.delete("/api/v1/exchange/connect", authenticate, (req: AuthRequest, res) => {
+    const userId = req.user!.uid;
+    const validation = exchangeDeleteSchema.safeParse(req.body);
+    if (!validation.success) return res.status(400).json({ error: validation.error });
+    
+    const { exchange } = validation.data;
+    const u = getUserFromDB(userId);
+    const apiKeys = u.api_keys || [];
+    const filteredKeys = apiKeys.filter((k: any) => k.exchange !== exchange);
+    
+    db.prepare('UPDATE users SET api_keys = ? WHERE id = ?').run(JSON.stringify(filteredKeys), userId);
+    
+    res.json({ ok: true });
   });
 
-  app.get("/api/admin/stats",adminAuth,(_req,res)=>{
-    const users=Object.values(db.users) as any[];
-    const now=Date.now()/1000;
-    const daily: any={};
-    for(let i=13;i>=0;i--){const d=new Date(Date.now()-i*86400000).toISOString().slice(0,10);daily[d]={fees:0,volume:0,trades:0};}
-    db.trades.forEach((t:any)=>{const d=new Date(t.created_at*1000).toISOString().slice(0,10);if(daily[d]){daily[d].fees+=t.fees?.platform||0;daily[d].volume+=t.amount||0;daily[d].trades++;}});
-    const bs: any={cex:{c:0,v:0,f:0},tri:{c:0,v:0,f:0},dex:{c:0,v:0,f:0},cross:{c:0,v:0,f:0}};
-    db.trades.forEach((t:any)=>{if(bs[t.type]){bs[t.type].c++;bs[t.type].v+=t.amount||0;bs[t.type].f+=t.fees?.platform||0;}});
-    const sc: any={};
-    db.trades.forEach((t:any)=>{const k=`${t.type}:${t.symbol}`;sc[k]=(sc[k]||0)+1;});
-    res.json({
-      total_users:users.length,online_users:users.filter((u:any)=>u.last_seen>now-300).length,
-      vip_users:users.filter((u:any)=>u.vip).length,free_users:users.filter((u:any)=>!u.vip).length,
-      blocked_users:users.filter((u:any)=>u.blocked).length,
-      total_trades:db.trades.length,trades_24h:db.trades.filter((t:any)=>t.created_at>now-86400).length,
-      total_volume:db.trades.reduce((a:number,b:any)=>a+(b.amount||0),0),
-      volume_24h:db.trades.filter((t:any)=>t.created_at>now-86400).reduce((a:number,b:any)=>a+(b.amount||0),0),
-      platform_fees_total:db.trades.reduce((a:number,b:any)=>a+(b.fees?.platform||0),0),
-      platform_fees_24h:db.trades.filter((t:any)=>t.created_at>now-86400).reduce((a:number,b:any)=>a+(b.fees?.platform||0),0),
-      daily:Object.entries(daily).map(([date,v]:any)=>({date,fees:+v.fees.toFixed(2),volume:+v.volume.toFixed(2),trades:v.trades})),
-      by_strategy:bs,
-      top_users:[...users].sort((a:any,b:any)=>b.profit-a.profit).slice(0,10).map((u:any)=>({id:u.id,username:u.tg_username,profit:u.profit,trades:u.trades,vip:u.vip,balance:u.balance})),
-      top_signals:Object.entries(sc).sort((a:any,b:any)=>b[1]-a[1]).slice(0,8).map(([key,count])=>({key,count})),
+  app.get("/api/admin/stats", authorizeAdmin, (_req, res) => {
+    const users = db.prepare('SELECT * FROM users').all() as any[];
+    const trades = db.prepare('SELECT * FROM trades').all() as any[];
+    const now = Math.floor(Date.now() / 1000);
+    
+    const stats = {
+      total_users: users.length,
+      online_users: users.filter((u: any) => u.last_seen > now - 300).length,
+      vip_users: users.filter((u: any) => u.vip).length,
+      total_trades: trades.length,
+      total_volume: trades.reduce((a: number, b: any) => a + (b.amount || 0), 0),
+      platform_fees_total: trades.reduce((a: number, b: any) => a + (JSON.parse(b.fees || '{}').platform || 0), 0),
+    };
+    res.json(stats);
+  });
+
+  app.get("/api/admin/users", authorizeAdmin, (req, res) => {
+    const { search, page = "1", limit = "25" } = req.query as any;
+    let users = db.prepare('SELECT * FROM users').all() as any[];
+    
+    if (search) {
+      const q = search.toLowerCase();
+      users = users.filter((u: any) => 
+        u.id.toLowerCase().includes(q) || 
+        u.tg_username?.toLowerCase().includes(q) || 
+        u.ref_code?.toLowerCase().includes(q)
+      );
+    }
+    
+    const total = users.length;
+    const offset = (Number(page) - 1) * Number(limit);
+    const items = users.sort((a: any, b: any) => b.created_at - a.created_at).slice(offset, offset + Number(limit));
+    
+    res.json({ 
+      total, 
+      items: items.map(u => ({
+        ...u,
+        filter_prefs: JSON.parse(u.filter_prefs || '{}'),
+        api_keys: JSON.parse(u.api_keys || '[]')
+      }))
     });
   });
 
-  app.get("/api/admin/users",adminAuth,(req,res)=>{
-    const {search,page="1",limit="25"}=req.query as any;
-    let users=Object.values(db.users) as any[];
-    if(search){const q=search.toLowerCase();users=users.filter((u:any)=>u.id.toLowerCase().includes(q)||u.tg_username?.toLowerCase().includes(q)||u.ref_code?.toLowerCase().includes(q));}
-    const total=users.length;
-    const offset=(Number(page)-1)*Number(limit);
-    res.json({total,items:users.sort((a:any,b:any)=>b.created_at-a.created_at).slice(offset,offset+Number(limit))});
+  app.post("/api/admin/users/:uid/notify", authorizeAdmin, (req, res) => {
+    const validation = notificationSchema.safeParse(req.body);
+    if (!validation.success) return res.status(400).json({ error: validation.error });
+
+    const n = { 
+      id: Math.random().toString(36).substring(2, 9), 
+      userId: req.params.uid, 
+      message: validation.data.message, 
+      created_at: Math.floor(Date.now() / 1000) 
+    };
+    db.prepare('INSERT INTO notifications (id, userId, message, created_at) VALUES (?, ?, ?, ?)').run(n.id, n.userId, n.message, n.created_at);
+    io.emit(`notify:${req.params.uid}`, n);
+    res.json({ ok: true });
   });
 
-  app.post("/api/admin/users/:uid/notify",adminAuth,(req,res)=>{
-    const n={id:Math.random().toString(36).substring(2,9),userId:req.params.uid,message:req.body.message,created_at:Date.now()/1000};
-    db.notifications.push(n);
-    io.emit(`notify:${req.params.uid}`,n);
-    saveDB(db);res.json({ok:true});
+  app.get("/api/admin/config", authorizeAdmin, (_req, res) => {
+    const config = JSON.parse(db.prepare('SELECT value FROM config WHERE key = "settings"').get()?.value || '{}');
+    res.json({ ...DEFAULT_CONFIG, ...config });
   });
 
-  app.get("/api/admin/config",adminAuth,(_req,res)=>res.json(db.config));
-  app.post("/api/admin/config",adminAuth,(req,res)=>{
-    db.config={...db.config,...req.body};saveDB(db);res.json({ok:true,config:db.config});
+  app.post("/api/admin/config", authorizeAdmin, (req, res) => {
+    db.prepare('INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)').run("settings", JSON.stringify(req.body));
+    res.json({ ok: true });
   });
 
-  app.get(`/admin-${ADMIN_SECRET}`,(_req,res)=>res.sendFile(path.resolve(__dirname,"src","admin.html")));
+  app.get(`/admin-${ADMIN_SECRET}`, (_req, res) => {
+    if (!ADMIN_SECRET || ADMIN_SECRET.length < 32) {
+      return res.status(500).send("Admin secret not configured securely");
+    }
+    res.sendFile(path.resolve(__dirname, "src", "admin.html"));
+  });
 
   // Real-time CCXT Scanner
   const CEX_IDS = ["binance", "okx", "bybit", "kraken", "gateio"];
   const exchanges = CEX_IDS.map(id => new (ccxt as any)[id]({ enableRateLimit: true }));
-  const cexPrices: any={};
+  const cexPrices: any = {};
 
   async function scanRealMarkets() {
     const syms = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "XRP/USDT", "ADA/USDT", "AVAX/USDT", "DOT/USDT"];
@@ -427,9 +559,9 @@ async function startServer() {
         try {
           const ticker = await ex.fetchTicker(sym);
           prices.push({ exchange: ex.id, bid: ticker.bid, ask: ticker.ask, price: ticker.last, ts: Date.now() });
-          if(!cexPrices[ex.id]) cexPrices[ex.id] = {};
+          if (!cexPrices[ex.id]) cexPrices[ex.id] = {};
           cexPrices[ex.id][sym.split('/')[0]] = { exchange: ex.id, pair: sym, bid: ticker.bid, ask: ticker.ask, price: ticker.last, ts: Date.now() };
-        } catch (e) {}
+        } catch (e) { }
       }));
 
       for (const p1 of prices) {
@@ -449,23 +581,27 @@ async function startServer() {
       }
     }
 
-    // Add some simulated TRI/DEX/CROSS for variety (as in user's original)
-    Object.entries(TRI_CHAINS).forEach(([ex,chains])=>chains.forEach(chain=>{
-      const spread=Math.random()*.45+.05;
-      if(spread>.1)sigs.push({id:`tri-${ex}-${chain[0]}-${Date.now()}`,type:"tri",sym:chain.join("→"),bx:ex,sx:ex,spread:+spread.toFixed(4),net:+(spread-.08).toFixed(4),buyPrice:0,sellPrice:0,aiScore:Math.floor(Math.random()*25)+70,hot:spread>.3,vipOnly:true,ts:Date.now()});
+    Object.entries(TRI_CHAINS).forEach(([ex, chains]) => chains.forEach(chain => {
+      const spread = Math.random() * .45 + .05;
+      if (spread > .1) sigs.push({ id: `tri-${ex}-${chain[0]}-${Date.now()}`, type: "tri", sym: chain.join("→"), bx: ex, sx: ex, spread: +spread.toFixed(4), net: +(spread - .08).toFixed(4), buyPrice: 0, sellPrice: 0, aiScore: Math.floor(Math.random() * 25) + 70, hot: spread > .3, vipOnly: true, ts: Date.now() });
     }));
 
-    return sigs.sort((a,b)=>b.net-a.net).slice(0,50);
+    return sigs.sort((a, b) => b.net - a.net).slice(0, 50);
   }
 
   setInterval(async () => {
     const sigs = await scanRealMarkets();
     io.emit("signals", sigs);
-    io.emit("prices", Object.values(cexPrices).flatMap((ex:any)=>Object.values(ex)));
+    io.emit("prices", Object.values(cexPrices).flatMap((ex: any) => Object.values(ex)));
   }, 5000);
 
-  io.on("connection",socket=>{
-    socket.emit("meta",{exchanges:ALL_EXCHANGES,networks:ALL_NETWORKS,tokenCount:Object.keys(realPrices).length});
+  io.on("connection", socket => {
+    const userId = socket.handshake.query.userId as string;
+    if (userId) {
+      db.prepare('UPDATE users SET last_seen = ? WHERE id = ?').run(Math.floor(Date.now() / 1000), userId);
+      socket.join(`user_${userId}`);
+    }
+    socket.emit("meta", { exchanges: ALL_EXCHANGES, networks: ALL_NETWORKS, tokenCount: Object.keys(realPrices).length });
   });
 
   // Vite middleware for development
@@ -477,6 +613,12 @@ async function startServer() {
     app.use(express.static(path.join(__dirname,"dist")));
     app.get("*",(_req,res)=>res.sendFile(path.join(__dirname,"dist","index.html")));
   }
+
+  // Global Error Handler
+  app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    logger.error(err);
+    res.status(500).json({ error: "Internal Server Error" });
+  });
 
   server.listen(PORT,"0.0.0.0",()=>{
     console.log(`✅ NEXARB :${PORT} | Admin: /admin-${ADMIN_SECRET} | DB: ${DB_PATH}`);

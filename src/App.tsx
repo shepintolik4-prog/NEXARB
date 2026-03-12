@@ -15,7 +15,8 @@ import {
   History, 
   LayoutDashboard,
   ShieldCheck,
-  Settings
+  Settings,
+  LogIn
 } from 'lucide-react';
 
 // Components
@@ -24,14 +25,17 @@ import Wallet from './components/Wallet';
 import Strategies from './components/Strategies';
 import Profile from './components/Profile';
 import Admin from './Admin';
+import { signInWithGoogle } from './firebase';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 // Types & Constants
-import { Signal, User } from './types';
+import { Signal, User as AppUser } from './types';
 import { LANGS } from './i18n';
 
 const socket = io();
 
-export default function App() {
+function AppContent() {
+  const { user, loading: authLoading, token } = useAuth();
   const [activeTab, setActiveTab] = useState<'signals' | 'wallet' | 'strategies' | 'profile' | 'admin'>('signals');
   const [lang, setLang] = useState<'ru' | 'en'>('ru');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -41,15 +45,54 @@ export default function App() {
   const t = (key: string) => LANGS[lang][key] || key;
 
   useEffect(() => {
-    socket.on('signals', (newSignals: Signal[]) => {
-      setSignals(newSignals);
-      setLoading(false);
-    });
+    if (user && token) {
+      socket.io.opts.query = { userId: user.uid };
+      socket.connect();
+      
+      socket.on('signals', (newSignals: Signal[]) => {
+        setSignals(newSignals);
+        setLoading(false);
+      });
+    }
 
     return () => {
       socket.off('signals');
     };
-  }, []);
+  }, [user, token]);
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#050505] flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="max-w-md w-full bg-zinc-900/50 border border-white/5 p-8 rounded-3xl text-center backdrop-blur-xl"
+        >
+          <div className="w-16 h-16 bg-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-emerald-500/20">
+            <Zap className="text-black w-8 h-8 fill-current" />
+          </div>
+          <h1 className="text-3xl font-black mb-2 tracking-tight">NEXARB</h1>
+          <p className="text-zinc-400 mb-8">{t('welcome_desc') || 'Advanced HFT Arbitrage Platform'}</p>
+          
+          <button 
+            onClick={signInWithGoogle}
+            className="w-full bg-white text-black font-bold py-4 rounded-2xl flex items-center justify-center gap-3 hover:bg-zinc-200 transition-colors"
+          >
+            <LogIn className="w-5 h-5" />
+            Sign in with Google
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
 
   const renderContent = () => {
     switch (activeTab) {
@@ -167,6 +210,14 @@ export default function App() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 

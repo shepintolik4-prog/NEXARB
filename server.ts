@@ -280,12 +280,74 @@ async function startServer() {
     res.json({...t,newBalance:tMode==="real"?u.balance:u.demo_balance});
   });
 
+  // VIP: initiate payment — returns invoice/instructions
+  app.post("/api/v1/vip/initiate",(req,res)=>{
+    const {plan="month", method="stars"}=req.body;
+    const prices: any={
+      week:{stars:150,ton:"0.25",usd:9},
+      month:{stars:450,ton:"0.80",usd:29},
+      year:{stars:1999,ton:"3.50",usd:149},
+    };
+    const p=prices[plan]||prices.month;
+    const invoiceId=`inv_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+    res.json({ok:true,invoiceId,plan,method,prices:p,
+      // Telegram Stars invoice link (real bot needed in production)
+      stars_link:`tg://invoice?...`,
+      ton_address:"UQBvI0aFLnw2QbZgjMPCLRdtRHxhUyinQudg19Xoc3GGzHRR",
+      ton_memo:invoiceId,
+    });
+  });
+
+  // VIP: confirm payment (called after user sends TON/Stars)
+  app.post("/api/v1/vip/confirm",(req,res)=>{
+    const {userId,invoiceId,plan="month",method}=req.body;
+    if(!userId||!invoiceId) return res.status(400).json({error:"Missing params"});
+    // In production: verify TON tx or Telegram Stars receipt
+    // For now: accept any invoiceId as valid (replace with real verification)
+    const u=getUser(userId);
+    u.vip=true;
+    const dur: any={week:604800,month:2592000,year:31536000};
+    u.vip_expires=Date.now()/1000+(dur[plan]||dur.month);
+    u.vip_payment={method,plan,invoiceId,ts:Date.now()/1000};
+    saveDB(db);
+    res.json({ok:true,expires_at:u.vip_expires,vip:true});
+  });
+
+  // VIP subscribe (legacy/admin bypass)
   app.post("/api/v1/vip/subscribe",(req,res)=>{
     const u=getUser(req.body.userId||"demo_user");
     u.vip=true;
     const dur: any={week:604800,month:2592000,year:31536000};
     u.vip_expires=Date.now()/1000+(dur[req.body.plan]||dur.month);
     saveDB(db); res.json({ok:true,expires_at:u.vip_expires});
+  });
+
+  // Exchange: connect API key
+  app.post("/api/v1/exchange/connect",(req,res)=>{
+    const {userId,exchange,apiKey,apiSecret}=req.body;
+    if(!userId||!exchange||!apiKey||!apiSecret) return res.status(400).json({error:"Missing fields"});
+    const u=getUser(userId);
+    if(!u.vip) return res.status(403).json({error:"VIP required"});
+    if(!u.api_keys) u.api_keys=[];
+    if(!u.connected_exchanges) u.connected_exchanges=[];
+    // Remove existing key for same exchange
+    u.api_keys=u.api_keys.filter((k:any)=>k.exchange!==exchange);
+    u.api_keys.push({exchange,key:apiKey,secret:"***hidden***",active:true,ts:Date.now()/1000});
+    if(!u.connected_exchanges.includes(exchange)) u.connected_exchanges.push(exchange);
+    saveDB(db);
+    res.json({ok:true,connected:u.connected_exchanges});
+  });
+
+  // Exchange: disconnect
+  app.delete("/api/v1/exchange/connect",(req,res)=>{
+    const {userId,exchange}=req.body;
+    if(!userId||!exchange) return res.status(400).json({error:"Missing fields"});
+    const u=getUser(userId);
+    if(!u.api_keys) u.api_keys=[];
+    u.api_keys=u.api_keys.filter((k:any)=>k.exchange!==exchange);
+    u.connected_exchanges=(u.connected_exchanges||[]).filter((e:string)=>e!==exchange);
+    saveDB(db);
+    res.json({ok:true,connected:u.connected_exchanges});
   });
 
   // ADMIN

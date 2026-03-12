@@ -1,0 +1,83 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and subscription status",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "isVip": { "type": "boolean" },
+        "vipUntil": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "ApiKey": {
+      "title": "Exchange API Key",
+      "description": "Encrypted API keys for exchanges",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "exchangeId": { "type": "string" },
+        "apiKey": { "type": "string" },
+        "encryptedSecret": { "type": "string" },
+        "iv": { "type": "string" },
+        "tag": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "exchangeId", "apiKey", "encryptedSecret"]
+    },
+    "Trade": {
+      "title": "Trade Execution",
+      "description": "History of executed arbitrage trades",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "symbol": { "type": "string" },
+        "buyExchange": { "type": "string" },
+        "sellExchange": { "type": "string" },
+        "buyPrice": { "type": "number" },
+        "sellPrice": { "type": "number" },
+        "amount": { "type": "number" },
+        "profit": { "type": "number" },
+        "status": { "type": "string", "enum": ["success", "failed", "partial"] },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "symbol", "buyExchange", "sellExchange", "status"]
+    },
+    "Payment": {
+      "title": "Payment Transaction",
+      "description": "Subscription payments (TON or Stars)",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "method": { "type": "string", "enum": ["ton", "stars"] },
+        "txHash": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "confirmed", "failed"] },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "method", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/apiKeys/{keyId}": {
+      "schema": "ApiKey",
+      "description": "Encrypted exchange credentials"
+    },
+    "/trades/{tradeId}": {
+      "schema": "Trade",
+      "description": "Trade history"
+    },
+    "/payments/{paymentId}": {
+      "schema": "Payment",
+      "description": "Payment records"
+    }
+  }
+}

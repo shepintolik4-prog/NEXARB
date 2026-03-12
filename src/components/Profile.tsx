@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   User, 
@@ -16,21 +16,39 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { EXCHS } from '../constants';
+import { useAuth } from '../contexts/AuthContext';
+import { logout } from '../firebase';
 
 export default function Profile() {
+  const { user, token } = useAuth();
+  const [userData, setUserData] = useState<any>(null);
   const [copied, setCopied] = useState(false);
   const [showAddExchange, setShowAddExchange] = useState(false);
   const [newExchange, setNewExchange] = useState({ id: 'binance', key: '', secret: '' });
   const [connecting, setConnecting] = useState(false);
 
+  useEffect(() => {
+    if (token) {
+      fetch('/api/v1/account', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      .then(res => res.json())
+      .then(data => setUserData(data))
+      .catch(err => console.error('Error fetching account:', err));
+    }
+  }, [token]);
+
   const connectExchange = async () => {
+    if (!token) return;
     setConnecting(true);
     try {
       const res = await fetch('/api/v1/exchange/connect', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
-          userId: 'demo_user', // In real app, get from auth
           exchange: newExchange.id,
           apiKey: newExchange.key,
           apiSecret: newExchange.secret
@@ -38,7 +56,9 @@ export default function Profile() {
       });
       if (res.ok) {
         setShowAddExchange(false);
-        alert('Exchange connected successfully!');
+        // Refresh data
+        const fresh = await fetch('/api/v1/account', { headers: { 'Authorization': `Bearer ${token}` } });
+        setUserData(await fresh.json());
       } else {
         const err = await res.json();
         alert(`Error: ${err.error}`);
@@ -50,11 +70,36 @@ export default function Profile() {
     }
   };
 
+  const disconnectExchange = async (exchange: string) => {
+    if (!token) return;
+    if (!confirm(`Disconnect ${exchange}?`)) return;
+    
+    try {
+      const res = await fetch('/api/v1/exchange/connect', {
+        method: 'DELETE',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ exchange })
+      });
+      if (res.ok) {
+        const fresh = await fetch('/api/v1/account', { headers: { 'Authorization': `Bearer ${token}` } });
+        setUserData(await fresh.json());
+      }
+    } catch (e) {
+      console.error('Disconnect failed', e);
+    }
+  };
+
   const copyRef = () => {
-    navigator.clipboard.writeText('https://nexarb.app/ref/USER123');
+    if (!userData?.ref_code) return;
+    navigator.clipboard.writeText(`https://nexarb.app/ref/${userData.ref_code}`);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  if (!userData) return <div className="flex justify-center p-20"><div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>;
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-20">
@@ -121,18 +166,22 @@ export default function Profile() {
       {/* User Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-zinc-900/30 border border-zinc-800 p-8 rounded-3xl">
         <div className="flex items-center gap-6">
-          <div className="w-20 h-20 bg-gradient-to-br from-emerald-500 to-blue-600 rounded-2xl flex items-center justify-center text-3xl font-bold border border-white/10 shadow-2xl">
-            A
+          <div className="w-20 h-20 bg-gradient-to-br from-emerald-500 to-blue-600 rounded-2xl flex items-center justify-center text-3xl font-bold border border-white/10 shadow-2xl overflow-hidden">
+            {user?.photoURL ? <img src={user.photoURL} alt="" referrerPolicy="no-referrer" className="w-full h-full object-cover" /> : (user?.displayName?.[0] || 'U')}
           </div>
           <div>
-            <h2 className="text-3xl font-bold tracking-tight">Alex Crypto</h2>
+            <h2 className="text-3xl font-bold tracking-tight">{user?.displayName || 'User'}</h2>
             <div className="flex items-center gap-2 text-zinc-500 mt-1">
-              <span className="text-sm">@alexcrypto</span>
+              <span className="text-sm">{user?.email}</span>
               <span className="w-1 h-1 bg-zinc-700 rounded-full" />
-              <span className="text-sm">Member since Mar 2024</span>
+              <span className="text-sm">ID: {user?.uid.slice(0, 8)}...</span>
             </div>
             <div className="flex items-center gap-2 mt-3">
-              <span className="bg-emerald-500/10 text-emerald-400 text-[10px] font-black px-2 py-0.5 rounded-full border border-emerald-500/20 uppercase tracking-wider">VIP Lifetime</span>
+              {userData.vip ? (
+                <span className="bg-emerald-500/10 text-emerald-400 text-[10px] font-black px-2 py-0.5 rounded-full border border-emerald-500/20 uppercase tracking-wider">VIP Active</span>
+              ) : (
+                <span className="bg-zinc-500/10 text-zinc-500 text-[10px] font-black px-2 py-0.5 rounded-full border border-zinc-500/20 uppercase tracking-wider">Free Plan</span>
+              )}
               <span className="bg-blue-500/10 text-blue-400 text-[10px] font-black px-2 py-0.5 rounded-full border border-blue-500/20 uppercase tracking-wider">Verified</span>
             </div>
           </div>
@@ -161,9 +210,21 @@ export default function Profile() {
           </div>
           
           <div className="space-y-3">
-            <ExchangeCard name="Binance" logo="🟡" status="connected" />
-            <ExchangeCard name="OKX" logo="⚫" status="connected" />
-            <ExchangeCard name="Bybit" logo="🔵" status="disconnected" />
+            {userData.api_keys?.length > 0 ? (
+              userData.api_keys.map((k: any) => (
+                <ExchangeCard 
+                  key={k.exchange} 
+                  name={k.exchange.toUpperCase()} 
+                  logo={k.exchange[0].toUpperCase()} 
+                  status="connected" 
+                  onDelete={() => disconnectExchange(k.exchange)}
+                />
+              ))
+            ) : (
+              <div className="p-8 text-center bg-zinc-900/20 border border-zinc-800/50 rounded-2xl text-zinc-500 text-sm font-bold">
+                No exchanges connected
+              </div>
+            )}
           </div>
         </div>
 
@@ -177,11 +238,11 @@ export default function Profile() {
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-zinc-950/50 p-4 rounded-2xl border border-zinc-800/50">
                 <div className="text-[10px] text-zinc-500 uppercase font-bold mb-1">Invited</div>
-                <div className="text-xl font-bold">12 Users</div>
+                <div className="text-xl font-bold">0 Users</div>
               </div>
               <div className="bg-zinc-950/50 p-4 rounded-2xl border border-zinc-800/50">
                 <div className="text-[10px] text-zinc-500 uppercase font-bold mb-1">Earned</div>
-                <div className="text-xl font-bold text-emerald-400">$450.20</div>
+                <div className="text-xl font-bold text-emerald-400">${userData.ref_earned?.toFixed(2) || '0.00'}</div>
               </div>
             </div>
             
@@ -189,7 +250,7 @@ export default function Profile() {
               <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Your Referral Link</label>
               <div className="flex gap-2">
                 <div className="flex-1 bg-zinc-950/50 border border-zinc-800 rounded-xl px-4 py-3 text-sm font-mono text-zinc-400 truncate">
-                  nexarb.app/ref/USER123
+                  nexarb.app/ref/{userData.ref_code}
                 </div>
                 <button 
                   onClick={copyRef}
@@ -217,7 +278,10 @@ export default function Profile() {
         </div>
       </div>
 
-      <button className="w-full py-4 text-red-500 font-bold hover:bg-red-500/5 rounded-2xl transition-all flex items-center justify-center gap-2">
+      <button 
+        onClick={logout}
+        className="w-full py-4 text-red-500 font-bold hover:bg-red-500/5 rounded-2xl transition-all flex items-center justify-center gap-2"
+      >
         <LogOut className="w-5 h-5" />
         Logout Session
       </button>
@@ -225,11 +289,11 @@ export default function Profile() {
   );
 }
 
-function ExchangeCard({ name, logo, status }: { name: string, logo: string, status: 'connected' | 'disconnected' }) {
+function ExchangeCard({ name, logo, status, onDelete }: { name: string, logo: string, status: 'connected' | 'disconnected', onDelete?: () => any, key?: any }) {
   return (
     <div className="flex items-center justify-between p-4 bg-zinc-900/30 border border-zinc-800 rounded-2xl hover:border-zinc-700 transition-all group">
       <div className="flex items-center gap-4">
-        <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center text-xl">
+        <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center text-xl font-bold">
           {logo}
         </div>
         <div>
@@ -243,7 +307,10 @@ function ExchangeCard({ name, logo, status }: { name: string, logo: string, stat
         <button className="p-2 hover:bg-zinc-800 rounded-lg text-zinc-400">
           <Settings className="w-4 h-4" />
         </button>
-        <button className="p-2 hover:bg-zinc-800 rounded-lg text-red-400">
+        <button 
+          onClick={onDelete}
+          className="p-2 hover:bg-zinc-800 rounded-lg text-red-400"
+        >
           <Trash2 className="w-4 h-4" />
         </button>
       </div>

@@ -1,25 +1,16 @@
-import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, User } from 'firebase/auth';
-import firebaseConfig from '../firebase-applet-config.json';
+// Firebase has been replaced with Telegram WebApp authentication.
+// This file is kept as a stub to avoid breaking any remaining imports.
 
-const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-export const googleProvider = new GoogleAuthProvider();
+export const auth = null;
+export const googleProvider = null;
 
 export const signInWithGoogle = async () => {
-  try {
-    const result = await signInWithPopup(auth, googleProvider);
-    return result.user;
-  } catch (error) {
-    console.error('Error signing in with Google:', error);
-    throw error;
-  }
+  throw new Error('Google auth removed. Use Telegram WebApp.');
 };
 
-export const logout = () => auth.signOut();
-
-export const getAuthToken = async () => {
-  const user = auth.currentUser;
-  if (!user) return null;
-  return await user.getIdToken();
+export const logout = () => {
+  // In Telegram WebApp context, closing the app = "logout"
+  window.Telegram?.WebApp?.close();
 };
+
+export const getAuthToken = async (): Promise<string | null> => null;

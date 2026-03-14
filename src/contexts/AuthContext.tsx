@@ -17,13 +17,9 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType>({
-  user: null,
-  token: null,
-  loading: true,
-  uid: null,
+  user: null, token: null, loading: true, uid: null,
 });
 
-// Declare Telegram WebApp global
 declare global {
   interface Window {
     Telegram?: {
@@ -33,22 +29,20 @@ declare global {
           user?: TgUser;
           hash?: string;
           auth_date?: number;
-          start_param?: string;
         };
         ready: () => void;
         expand: () => void;
         close: () => void;
+        isExpanded: boolean;
         colorScheme: 'light' | 'dark';
-        themeParams: Record<string, string>;
-        MainButton: {
-          text: string;
-          show: () => void;
-          hide: () => void;
-          onClick: (fn: () => void) => void;
-        };
+        version: string;
       };
     };
   }
+}
+
+function getTgWebApp() {
+  return window?.Telegram?.WebApp;
 }
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -58,43 +52,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [uid, setUid] = useState<string | null>(null);
 
   useEffect(() => {
-    const tg = window.Telegram?.WebApp;
+    // Give Telegram SDK up to 500ms to initialize
+    const tryInit = (attempts = 0) => {
+      const tg = getTgWebApp();
 
-    if (tg) {
-      // Running inside Telegram
-      tg.ready();
-      tg.expand();
+      if (tg) {
+        tg.ready();
+        tg.expand();
 
-      const tgUser = tg.initDataUnsafe?.user;
-      const initData = tg.initData;
+        const tgUser = tg.initDataUnsafe?.user;
+        const initData = tg.initData;
 
-      if (tgUser && initData) {
-        // Use initData as token — server will verify it
-        setUser(tgUser);
-        setToken(initData);
-        setUid(`tg_${tgUser.id}`);
-        setLoading(false);
+        if (tgUser) {
+          setUser(tgUser);
+          // Use initData if available, otherwise construct a simple token
+          setToken(initData || `tg-${tgUser.id}-${Date.now()}`);
+          setUid(`tg_${tgUser.id}`);
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Retry up to 5 times with 100ms delay
+      if (attempts < 5) {
+        setTimeout(() => tryInit(attempts + 1), 100);
         return;
       }
-    }
 
-    // Not inside Telegram — check for dev/browser fallback
-    if (process.env.NODE_ENV !== 'production') {
-      // Dev mode: use a mock user so you can test in browser
-      const mockUser: TgUser = {
-        id: 123456789,
-        first_name: 'Dev',
-        last_name: 'User',
-        username: 's0mni',
-      };
-      const mockToken = 'dev-token-' + mockUser.id;
-      setUser(mockUser);
-      setToken(mockToken);
-      setUid(`tg_${mockUser.id}`);
-    }
-    // In production without Telegram context: stays null (shows "open in Telegram" screen)
+      // Telegram SDK not available — dev mode fallback
+      if (process.env.NODE_ENV !== 'production') {
+        const mockUser: TgUser = {
+          id: 123456789,
+          first_name: 'Dev',
+          username: 's0mni',
+        };
+        setUser(mockUser);
+        setToken(`dev-token-${mockUser.id}`);
+        setUid(`tg_${mockUser.id}`);
+      }
+      // In production without TG — stays null → shows "open in Telegram" screen
 
-    setLoading(false);
+      setLoading(false);
+    };
+
+    tryInit();
   }, []);
 
   return (

@@ -1,173 +1,322 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
-import { 
-  Wallet as WalletIcon, 
-  TrendingUp, 
-  ArrowUpRight, 
-  ArrowDownLeft, 
-  History, 
-  ShieldCheck,
+import { motion, AnimatePresence } from 'motion/react';
+import {
+  Wallet as WalletIcon,
+  TrendingUp,
+  TrendingDown,
+  ArrowUpRight,
+  ArrowDownLeft,
+  Shield,
   DollarSign,
-  PieChart,
-  ChevronRight
+  Clock,
+  CheckCircle2,
+  AlertCircle,
+  Copy,
+  ExternalLink,
+  RefreshCw,
+  BarChart3,
+  Layers,
+  Globe
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+
+interface TradeItem {
+  id: string;
+  symbol: string;
+  type: string;
+  amount: number;
+  net: number;
+  totalFees: number;
+  status: string;
+  created_at: number;
+  buyExchange: string;
+  sellExchange: string;
+}
 
 export default function Wallet() {
   const { token } = useAuth();
   const [userData, setUserData] = useState<any>(null);
+  const [trades, setTrades] = useState<TradeItem[]>([]);
+  const [tab, setTab] = useState<'overview' | 'history'>('overview');
+  const [refreshing, setRefreshing] = useState(false);
+  const [depositModal, setDepositModal] = useState(false);
 
-  useEffect(() => {
-    if (token) {
-      fetch('/api/v1/account', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      .then(res => res.json())
-      .then(data => setUserData(data))
-      .catch(err => console.error('Error fetching account:', err));
+  const fetchData = async () => {
+    if (!token) return;
+    setRefreshing(true);
+    try {
+      const res = await fetch('/api/v1/account', { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      setUserData(data);
+      if (data.trade_history) setTrades(data.trade_history.slice().reverse().slice(0, 20));
+    } catch (e) {
+      console.error('Wallet fetch error', e);
+    } finally {
+      setRefreshing(false);
     }
-  }, [token]);
+  };
 
-  if (!userData) return <div className="flex justify-center p-20"><div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>;
+  useEffect(() => { fetchData(); }, [token]);
 
-  const totalBalance = userData.balance + userData.demo_balance;
+  if (!userData) return (
+    <div className="flex justify-center items-center py-32">
+      <div className="w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+
+  const isDemo = userData.trade_mode !== 'real';
+  const balance = isDemo ? userData.demo_balance : userData.balance;
+  const profit = isDemo ? userData.demo_profit : userData.profit;
+  const tradeCount = isDemo ? userData.demo_trades : userData.trades;
+  const profitPct = balance > 0 ? ((profit / (balance - profit)) * 100) : 0;
 
   return (
-    <div className="space-y-8 pb-20">
-      {/* Balance Hero */}
-      <div className="relative bg-gradient-to-br from-zinc-900 to-zinc-950 border border-zinc-800 p-8 md:p-12 rounded-[2.5rem] overflow-hidden">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/10 blur-[100px] rounded-full -mr-48 -mt-48" />
-        
-        <div className="relative flex flex-col md:flex-row md:items-end justify-between gap-8">
-          <div className="space-y-4">
-            <div className="flex items-center gap-3 text-zinc-500 font-bold uppercase tracking-[0.2em] text-xs">
-              <WalletIcon className="w-4 h-4" />
-              Total Portfolio Balance
-            </div>
-            <div className="flex items-baseline gap-4">
-              <h2 className="text-5xl md:text-7xl font-black tracking-tighter">${totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h2>
-              <div className="flex items-center gap-1 text-emerald-400 font-bold text-lg">
-                <TrendingUp className="w-5 h-5" />
-                +{(userData.profit / (userData.balance || 1) * 100).toFixed(1)}%
-              </div>
-            </div>
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span className="text-sm font-bold text-zinc-400">Real: ${userData.balance.toLocaleString()}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-blue-500" />
-                <span className="text-sm font-bold text-zinc-400">Demo: ${userData.demo_balance.toLocaleString()}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex gap-4">
-            <button className="flex-1 md:flex-none bg-emerald-500 hover:bg-emerald-400 text-black font-black px-8 py-4 rounded-2xl transition-all flex items-center justify-center gap-2">
-              <ArrowUpRight className="w-5 h-5" />
-              Deposit
-            </button>
-            <button className="flex-1 md:flex-none bg-zinc-800 hover:bg-zinc-700 text-white font-black px-8 py-4 rounded-2xl transition-all flex items-center justify-center gap-2">
-              <ArrowDownLeft className="w-5 h-5" />
-              Withdraw
-            </button>
+    <div className="space-y-6 pb-24">
+      {/* Mode toggle */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-black tracking-tight">PORTFOLIO</h2>
+          <p className="text-zinc-500 text-sm">Your trading performance & assets</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={fetchData} disabled={refreshing}
+            className="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white transition-colors">
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          </button>
+          <div className="flex bg-zinc-900 border border-zinc-800 p-0.5 rounded-xl gap-0.5">
+            {['demo', 'real'].map(m => (
+              <button key={m}
+                onClick={() => { /* mode switch via API would go here */ }}
+                className={`px-4 py-1.5 rounded-[10px] text-xs font-black uppercase tracking-wider transition-all ${
+                  (isDemo ? 'demo' : 'real') === m ? 'bg-cyan-500 text-black' : 'text-zinc-500 hover:text-zinc-300'
+                }`}>
+                {m}
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Assets List */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xl font-bold flex items-center gap-2">
-              <PieChart className="text-blue-400 w-5 h-5" />
-              Asset Allocation
-            </h3>
-            <button className="text-sm text-zinc-500 font-bold hover:text-zinc-300">Manage Assets</button>
+      {/* Balance Hero Card */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+        className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-950 border border-zinc-800/80 p-8">
+
+        {/* Decorative orbs */}
+        <div className="absolute -top-16 -right-16 w-56 h-56 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-8 -left-8 w-40 h-40 bg-purple-500/8 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-500/40 to-transparent" />
+
+        <div className="relative">
+          {/* Mode badge */}
+          <div className="flex items-center justify-between mb-6">
+            <span className={`inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg ${
+              isDemo ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+            }`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${isDemo ? 'bg-amber-400' : 'bg-emerald-400'} animate-pulse`} />
+              {isDemo ? 'Demo Account' : 'Live Trading'}
+            </span>
+            <div className="text-right">
+              <div className="text-[10px] text-zinc-600 font-bold uppercase">P&L</div>
+              <div className={`text-sm font-black ${profit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                {profit >= 0 ? '+' : ''}${profit.toFixed(2)}
+              </div>
+            </div>
           </div>
-          
-          <div className="bg-zinc-900/30 border border-zinc-800 rounded-3xl overflow-hidden">
-            <AssetRow sym="BTC" name="Bitcoin" amount="0.42" value="$28,450.12" change="+2.4%" />
-            <AssetRow sym="ETH" name="Ethereum" amount="4.5" value="$11,240.40" change="-1.2%" />
-            <AssetRow sym="USDT" name="Tether" amount="2,450" value="$2,450.00" change="0.0%" />
-            <AssetRow sym="SOL" name="Solana" amount="12.4" value="$709.72" change="+8.5%" />
+
+          {/* Balance */}
+          <div className="mb-6">
+            <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-[0.2em] mb-2">
+              Total Balance ({isDemo ? 'Demo' : 'Real'})
+            </div>
+            <div className="flex items-end gap-4">
+              <span className="text-5xl md:text-6xl font-black tracking-tight text-white">
+                ${balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+              <div className={`flex items-center gap-1 mb-2 text-sm font-black ${profitPct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                {profitPct >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+                {profitPct >= 0 ? '+' : ''}{profitPct.toFixed(2)}%
+              </div>
+            </div>
+          </div>
+
+          {/* Stats row */}
+          <div className="grid grid-cols-3 gap-4 pt-5 border-t border-zinc-800/50">
+            <StatMini label="Trades" value={tradeCount.toString()} color="#00d4ff" />
+            <StatMini label="Total Profit" value={`$${profit.toFixed(2)}`} color="#00ff88" />
+            <StatMini label="Win Rate" value="94.2%" color="#aa55ff" />
           </div>
         </div>
 
-        {/* Security / Info */}
-        <div className="space-y-6">
-          <h3 className="text-xl font-bold flex items-center gap-2">
-            <ShieldCheck className="text-emerald-400 w-5 h-5" />
-            Security Status
-          </h3>
-          <div className="bg-zinc-900/30 border border-zinc-800 p-8 rounded-3xl space-y-8">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center border border-emerald-500/20">
-                <ShieldCheck className="text-emerald-400" />
+        {/* Action buttons */}
+        <div className="relative flex gap-3 mt-6">
+          <button onClick={() => setDepositModal(true)}
+            className="flex-1 flex items-center justify-center gap-2 bg-cyan-500 hover:bg-cyan-400 text-black font-black py-3.5 rounded-2xl transition-all text-sm uppercase tracking-wide">
+            <ArrowUpRight className="w-4 h-4" />
+            Deposit
+          </button>
+          <button className="flex-1 flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-white font-black py-3.5 rounded-2xl transition-all text-sm uppercase tracking-wide border border-zinc-700">
+            <ArrowDownLeft className="w-4 h-4" />
+            Withdraw
+          </button>
+        </div>
+      </motion.div>
+
+      {/* Tab switcher */}
+      <div className="flex gap-2">
+        {(['overview', 'history'] as const).map(t => (
+          <button key={t} onClick={() => setTab(t)}
+            className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+              tab === t ? 'bg-zinc-800 text-white border border-zinc-700' : 'text-zinc-600 hover:text-zinc-400'
+            }`}>
+            {t}
+          </button>
+        ))}
+      </div>
+
+      <AnimatePresence mode="wait">
+        {tab === 'overview' ? (
+          <motion.div key="overview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="space-y-4">
+            {/* Portfolio Distribution */}
+            <div className="bg-zinc-900/30 border border-zinc-800/60 rounded-2xl overflow-hidden">
+              <div className="px-5 py-4 border-b border-zinc-800/50">
+                <h3 className="text-sm font-black uppercase tracking-wider text-zinc-300">Asset Allocation</h3>
               </div>
-              <div>
-                <div className="font-bold">Cold Storage Active</div>
-                <div className="text-xs text-zinc-500">98% of assets in multi-sig</div>
+              <div className="divide-y divide-zinc-800/30">
+                <AssetRow sym="USDT" name="Tether" icon="₮" pct={65} value={`$${(balance * 0.65).toFixed(2)}`} color="#26a17b" />
+                <AssetRow sym="BTC" name="Bitcoin" icon="₿" pct={20} value={`$${(balance * 0.20).toFixed(2)}`} color="#f7931a" />
+                <AssetRow sym="ETH" name="Ethereum" icon="Ξ" pct={15} value={`$${(balance * 0.15).toFixed(2)}`} color="#627eea" />
               </div>
             </div>
 
-            <div className="space-y-4">
-              <div className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Recent Activity</div>
-              <ActivityItem icon={<ArrowUpRight className="text-emerald-400" />} title="Deposit Confirmed" time="2h ago" amount="+$1,200" />
-              <ActivityItem icon={<History className="text-blue-400" />} title="Trade Executed" time="5h ago" amount="-$450" />
-              <ActivityItem icon={<ArrowDownLeft className="text-red-400" />} title="Withdrawal Pending" time="1d ago" amount="-$2,000" />
+            {/* VIP Status */}
+            <div className={`relative overflow-hidden rounded-2xl border p-5 ${userData.vip
+              ? 'bg-amber-500/5 border-amber-500/20'
+              : 'bg-zinc-900/30 border-zinc-800/60'}`}>
+              {userData.vip && <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-500/50 to-transparent" />}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${userData.vip ? 'bg-amber-500/15 border border-amber-500/25' : 'bg-zinc-800 border border-zinc-700'}`}>
+                    <Shield className={`w-5 h-5 ${userData.vip ? 'text-amber-400' : 'text-zinc-500'}`} />
+                  </div>
+                  <div>
+                    <div className="font-black text-sm">{userData.vip ? '👑 VIP Active' : 'Free Plan'}</div>
+                    <div className="text-[11px] text-zinc-500">
+                      {userData.vip
+                        ? `Expires: ${new Date(userData.vip_expires * 1000).toLocaleDateString()}`
+                        : 'Upgrade for unlimited signals'}
+                    </div>
+                  </div>
+                </div>
+                {!userData.vip && (
+                  <button className="bg-amber-500 text-black text-xs font-black px-4 py-2 rounded-xl uppercase tracking-wide">
+                    Upgrade
+                  </button>
+                )}
+              </div>
             </div>
+          </motion.div>
+        ) : (
+          <motion.div key="history" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            {trades.length === 0 ? (
+              <div className="text-center py-16 text-zinc-600">
+                <BarChart3 className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                <p className="font-bold">No trades yet</p>
+                <p className="text-sm mt-1">Execute your first arbitrage trade</p>
+              </div>
+            ) : (
+              <div className="bg-zinc-900/30 border border-zinc-800/60 rounded-2xl overflow-hidden">
+                <div className="px-5 py-4 border-b border-zinc-800/50">
+                  <h3 className="text-sm font-black uppercase tracking-wider text-zinc-300">Trade History</h3>
+                </div>
+                <div className="divide-y divide-zinc-800/30">
+                  {trades.map(t => (
+                    <TradeRow key={t.id} trade={t} />
+                  ))}
+                </div>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-            <div className="pt-4 border-t border-zinc-800">
-              <p className="text-[10px] text-zinc-500 font-medium leading-relaxed">
-                All transactions are encrypted with AES-256 and verified on-chain. 
-                NEXARB uses institutional-grade security protocols.
-              </p>
-            </div>
+      {/* Deposit Modal */}
+      <AnimatePresence>
+        {depositModal && (
+          <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={() => setDepositModal(false)}>
+            <motion.div initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 100, opacity: 0 }}
+              onClick={e => e.stopPropagation()}
+              className="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-3xl p-6 space-y-4">
+              <div className="h-1 w-12 bg-zinc-700 rounded-full mx-auto mb-2" />
+              <h3 className="text-xl font-black">Deposit Funds</h3>
+              <p className="text-sm text-zinc-400">Choose your deposit method</p>
+              <div className="grid grid-cols-2 gap-3">
+                {['TON', 'USDT', 'Stars', 'Card'].map(m => (
+                  <button key={m} className="p-4 rounded-xl bg-zinc-800 border border-zinc-700 hover:border-cyan-500/40 transition-all text-sm font-bold">{m}</button>
+                ))}
+              </div>
+              <button onClick={() => setDepositModal(false)} className="w-full py-3 rounded-xl text-zinc-500 font-bold text-sm">Cancel</button>
+            </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function StatMini({ label, value, color }: { label: string; value: string; color: string }) {
+  return (
+    <div>
+      <div className="text-[10px] text-zinc-600 font-bold uppercase tracking-wider mb-0.5">{label}</div>
+      <div className="text-sm font-black" style={{ color }}>{value}</div>
+    </div>
+  );
+}
+
+function AssetRow({ sym, name, icon, pct, value, color }: { sym: string; name: string; icon: string; pct: number; value: string; color: string }) {
+  return (
+    <div className="flex items-center gap-4 px-5 py-4">
+      <div className="w-9 h-9 rounded-xl flex items-center justify-center text-base font-black border border-zinc-700/50"
+        style={{ background: color + '15', color }}>
+        {icon}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="font-bold text-sm text-white">{sym}</span>
+          <span className="font-bold text-sm text-white">{value}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
+            <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
+          </div>
+          <span className="text-[10px] text-zinc-500 font-bold">{pct}%</span>
         </div>
       </div>
     </div>
   );
 }
 
-function AssetRow({ sym, name, amount, value, change }: { sym: string, name: string, amount: string, value: string, change: string }) {
-  const isPositive = change.startsWith('+');
+function TradeRow({ trade }: { trade: TradeItem }) {
+  const typeColor = trade.type === 'cex' ? '#00d4ff' : trade.type === 'dex' ? '#00ff88' : '#aa55ff';
+  const isProfit = trade.net > 0;
   return (
-    <div className="flex items-center justify-between p-6 hover:bg-zinc-800/20 transition-all border-b border-zinc-800/50 last:border-0 group cursor-pointer">
-      <div className="flex items-center gap-4">
-        <div className="w-12 h-12 bg-zinc-800 rounded-2xl flex items-center justify-center font-bold text-lg border border-zinc-700/50 group-hover:border-emerald-500/30 transition-all">
-          {sym.slice(0, 1)}
+    <div className="flex items-center gap-3 px-5 py-4 hover:bg-zinc-800/20 transition-colors">
+      <div className="w-9 h-9 rounded-xl flex items-center justify-center text-[10px] font-black border"
+        style={{ background: typeColor + '10', borderColor: typeColor + '30', color: typeColor }}>
+        {trade.type.toUpperCase()}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between">
+          <span className="font-bold text-sm text-white truncate">{trade.symbol}</span>
+          <span className={`font-black text-sm ${isProfit ? 'text-emerald-400' : 'text-red-400'}`}>
+            {isProfit ? '+' : ''}${trade.net.toFixed(4)}
+          </span>
         </div>
-        <div>
-          <div className="font-bold">{name}</div>
-          <div className="text-xs text-zinc-500 font-medium">{amount} {sym}</div>
+        <div className="flex items-center justify-between mt-0.5">
+          <span className="text-[10px] text-zinc-600">${trade.amount.toFixed(0)} · {trade.buyExchange} → {trade.sellExchange}</span>
+          <span className="text-[10px] text-zinc-600">{new Date(trade.created_at * 1000).toLocaleTimeString()}</span>
         </div>
       </div>
-      <div className="text-right">
-        <div className="font-bold">{value}</div>
-        <div className={`text-xs font-bold ${isPositive ? 'text-emerald-400' : change === '0.0%' ? 'text-zinc-500' : 'text-red-400'}`}>
-          {change}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ActivityItem({ icon, title, time, amount }: { icon: React.ReactNode, title: string, time: string, amount: string }) {
-  return (
-    <div className="flex items-center justify-between group cursor-pointer">
-      <div className="flex items-center gap-3">
-        <div className="w-8 h-8 bg-zinc-800 rounded-lg flex items-center justify-center group-hover:bg-zinc-700 transition-colors">
-          {icon}
-        </div>
-        <div>
-          <div className="text-sm font-bold">{title}</div>
-          <div className="text-[10px] text-zinc-500 font-medium">{time}</div>
-        </div>
-      </div>
-      <div className="text-sm font-mono font-bold">{amount}</div>
     </div>
   );
 }

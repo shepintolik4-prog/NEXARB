@@ -590,9 +590,13 @@ async function startServer() {
   }
 
   setInterval(async () => {
-    const sigs = await scanRealMarkets();
-    io.emit("signals", sigs);
-    io.emit("prices", Object.values(cexPrices).flatMap((ex: any) => Object.values(ex)));
+    try {
+      const sigs = await scanRealMarkets();
+      io.emit("signals", sigs);
+      io.emit("prices", Object.values(cexPrices).flatMap((ex: any) => Object.values(ex)));
+    } catch (e) {
+      logger.error({ err: e }, "Market scan error");
+    }
   }, 5000);
 
   io.on("connection", socket => {

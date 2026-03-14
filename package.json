@@ -12,7 +12,6 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@google/genai": "^1.29.0",
     "@orbs-network/ton-access": "^2.3.3",
     "@tailwindcss/vite": "^4.1.14",
     "@ton/core": "^0.63.1",
@@ -23,6 +22,7 @@
     "better-sqlite3": "^12.4.1",
     "ccxt": "^4.5.43",
     "clsx": "^2.1.1",
+    "cors": "^2.8.5",
     "crypto-js": "^4.2.0",
     "dotenv": "^17.3.1",
     "express": "^4.22.1",
@@ -43,6 +43,8 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
     "autoprefixer": "^10.4.21",

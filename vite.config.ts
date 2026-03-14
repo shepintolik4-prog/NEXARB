@@ -8,12 +8,10 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react(), tailwindcss()],
     define: {
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+      'process.env.NODE_ENV': JSON.stringify(mode),
     },
     resolve: {
-      alias: {
-        '@': path.resolve(__dirname, '.'),
-      },
+      alias: { '@': path.resolve(__dirname, '.') },
     },
     server: {
       hmr: process.env.DISABLE_HMR !== 'true',
@@ -23,16 +21,10 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         output: {
           manualChunks: {
-            // React core
-            'vendor-react': ['react', 'react-dom'],
-            // Animation
+            'vendor-react':  ['react', 'react-dom'],
             'vendor-motion': ['motion'],
-            // Firebase (large)
-            'vendor-firebase': ['firebase/app', 'firebase/auth'],
-            // Socket.IO client
             'vendor-socket': ['socket.io-client'],
-            // Icons
-            'vendor-icons': ['lucide-react'],
+            'vendor-icons':  ['lucide-react'],
           },
         },
       },

@@ -79,7 +79,7 @@ function AppContent() {
         </div>
         <h1 className="text-3xl font-black tracking-tighter text-white mb-3">NEXARB</h1>
         <p className="text-zinc-500 text-sm mb-6">Откройте приложение через Telegram</p>
-        <a href="https://t.me/your_bot_username"
+        <a href="https://t.me/nexarb_bot"
           className="inline-flex items-center gap-2 bg-cyan-500 text-black font-black px-6 py-3 rounded-2xl text-sm uppercase tracking-wide">
           Открыть в Telegram
         </a>

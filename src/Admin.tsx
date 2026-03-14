@@ -14,6 +14,8 @@ import {
   DollarSign
 } from 'lucide-react';
 
+import { useAuth } from './contexts/AuthContext';
+
 interface Stats {
   total_users: number;
   vip_users: number;
@@ -22,36 +24,64 @@ interface Stats {
 }
 
 export default function Admin() {
+  const { token } = useAuth();
   const [stats, setStats] = useState<any>(null);
   const [users, setUsers] = useState<any[]>([]);
   const [adminSecret, setAdminSecret] = useState(localStorage.getItem('admin_secret') || '');
   const [isAuthorized, setIsAuthorized] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isFetching, setIsFetching] = useState(false);
 
   const fetchAdminData = async () => {
+    setError(null);
+    setIsFetching(true);
     try {
-      const statsRes = await fetch('/api/admin/stats', { headers: { 'x-admin-secret': adminSecret } });
+      const headers: any = {};
+      if (adminSecret) headers['x-admin-secret'] = adminSecret;
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const statsRes = await fetch('/api/admin/stats', { headers });
       if (statsRes.ok) {
         const statsData = await statsRes.json();
         setStats(statsData);
         setIsAuthorized(true);
-        localStorage.setItem('admin_secret', adminSecret);
+        if (adminSecret) localStorage.setItem('admin_secret', adminSecret);
       } else {
+        let errorMessage = `Error: ${statsRes.status}`;
+        try {
+          const contentType = statsRes.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const errData = await statsRes.json();
+            errorMessage = errData.error || errorMessage;
+          } else {
+            const text = await statsRes.text();
+            errorMessage = text || errorMessage;
+          }
+        } catch (e) {
+          // Fallback to status
+        }
+        setError(errorMessage);
         setIsAuthorized(false);
       }
 
-      const usersRes = await fetch('/api/admin/users', { headers: { 'x-admin-secret': adminSecret } });
-      if (usersRes.ok) {
-        const usersData = await usersRes.json();
-        setUsers(usersData.items);
+      if (statsRes.ok) {
+        const usersRes = await fetch('/api/admin/users', { headers });
+        if (usersRes.ok) {
+          const usersData = await usersRes.json();
+          setUsers(usersData.items);
+        }
       }
     } catch (e) {
       console.error('Admin fetch error', e);
+      setError('Failed to connect to server');
+    } finally {
+      setIsFetching(false);
     }
   };
 
   useEffect(() => {
-    if (adminSecret) fetchAdminData();
-  }, [adminSecret]);
+    fetchAdminData();
+  }, [token]);
 
   if (!isAuthorized) {
     return (
@@ -59,18 +89,26 @@ export default function Admin() {
         <ShieldCheck className="w-16 h-16 text-zinc-700 mb-4" />
         <h2 className="text-2xl font-bold mb-6">Admin Authorization</h2>
         <div className="w-full max-w-md space-y-4">
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-xl text-sm flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 shrink-0" />
+              {error}
+            </div>
+          )}
           <input 
             type="password" 
             placeholder="Enter Admin Secret"
             className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-3 px-4 focus:outline-none focus:border-emerald-500"
             value={adminSecret}
             onChange={(e) => setAdminSecret(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && fetchAdminData()}
           />
           <button 
             onClick={fetchAdminData}
-            className="w-full bg-emerald-500 text-black font-bold py-3 rounded-xl"
+            disabled={isFetching}
+            className="w-full bg-emerald-500 text-black font-bold py-3 rounded-xl hover:bg-emerald-400 transition-colors disabled:opacity-50"
           >
-            Authorize
+            {isFetching ? 'Authorizing...' : 'Authorize'}
           </button>
         </div>
       </div>

@@ -5,6 +5,7 @@ import {
   Zap, 
   TrendingUp, 
   Shield, 
+  AlertCircle,
   Cpu, 
   Wallet as WalletIcon, 
   Activity, 
@@ -41,8 +42,19 @@ function AppContent() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [signals, setSignals] = useState<Signal[]>([]);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const t = (key: string) => LANGS[lang][key] || key;
+
+  const handleSignIn = async () => {
+    setAuthError(null);
+    try {
+      await signInWithGoogle();
+    } catch (error: any) {
+      console.error('Sign in failed:', error);
+      setAuthError(error.message || 'Authentication failed. Please check your browser settings or try again.');
+    }
+  };
 
   useEffect(() => {
     if (user && token) {
@@ -82,8 +94,15 @@ function AppContent() {
           <h1 className="text-3xl font-black mb-2 tracking-tight">NEXARB</h1>
           <p className="text-zinc-400 mb-8">{t('welcome_desc') || 'Advanced HFT Arbitrage Platform'}</p>
           
+          {authError && (
+            <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-sm flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 shrink-0" />
+              <span className="text-left">{authError}</span>
+            </div>
+          )}
+
           <button 
-            onClick={signInWithGoogle}
+            onClick={handleSignIn}
             className="w-full bg-white text-black font-bold py-4 rounded-2xl flex items-center justify-center gap-3 hover:bg-zinc-200 transition-colors"
           >
             <LogIn className="w-5 h-5" />
@@ -94,14 +113,46 @@ function AppContent() {
     );
   }
 
+  const handleExecuteTrade = async (signal: Signal) => {
+    if (!token) return;
+    try {
+      const res = await fetch('/api/v1/trades', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          symbol: signal.sym,
+          amount: 100, // Default amount for now
+          spread: signal.spread,
+          buyExchange: signal.bx,
+          sellExchange: signal.sx,
+          type: signal.type,
+          mode: 'demo'
+        })
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        alert(`Trade executed! New balance: $${data.newBalance.toFixed(2)}`);
+      } else {
+        const err = await res.json();
+        alert(`Execution failed: ${err.error}`);
+      }
+    } catch (e) {
+      alert('Network error during execution');
+    }
+  };
+
   const renderContent = () => {
     switch (activeTab) {
-      case 'signals': return <Scanner signals={signals} loading={loading} onExecute={(s) => console.log('Executing', s)} />;
+      case 'signals': return <Scanner signals={signals} loading={loading} onExecute={handleExecuteTrade} />;
       case 'wallet': return <Wallet />;
       case 'strategies': return <Strategies />;
       case 'profile': return <Profile />;
       case 'admin': return <Admin />;
-      default: return <Scanner signals={signals} loading={loading} onExecute={(s) => console.log('Executing', s)} />;
+      default: return <Scanner signals={signals} loading={loading} onExecute={handleExecuteTrade} />;
     }
   };
 

@@ -1,1 +1,201 @@
 @import "tailwindcss";
+
+/* ─── Global Reset & Base ─────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+:root {
+  /* Core palette */
+  --cyan: #00d4ff;
+  --green: #00ff88;
+  --purple: #aa55ff;
+  --amber: #ffaa00;
+  --red: #ff3355;
+
+  /* Surfaces */
+  --bg-0: #030407;
+  --bg-1: #06080f;
+  --bg-2: #0b1018;
+  --bg-3: #111622;
+
+  /* Borders */
+  --border-subtle: rgba(255,255,255,0.04);
+  --border-default: rgba(255,255,255,0.07);
+  --border-emphasis: rgba(255,255,255,0.12);
+
+  /* Typography */
+  --font-sans: 'DM Sans', 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  background: var(--bg-0);
+  color: #e8eaf0;
+  font-family: var(--font-sans);
+  line-height: 1.5;
+  overflow-x: hidden;
+  min-height: 100dvh;
+}
+
+/* ─── Scrollbar ───────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.14); }
+
+/* ─── Selection ───────────────────────────────────────────── */
+::selection {
+  background: rgba(0, 212, 255, 0.2);
+  color: white;
+}
+
+/* ─── Focus rings ─────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* ─── Typography ──────────────────────────────────────────── */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+code, pre, .font-mono {
+  font-family: var(--font-mono);
+  letter-spacing: -0.01em;
+}
+
+/* ─── Form elements ───────────────────────────────────────── */
+input, select, textarea {
+  font-family: var(--font-sans);
+  color-scheme: dark;
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 99px;
+  outline: none;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--cyan);
+  border: 2px solid rgba(5,4,8,1);
+  cursor: grab;
+  transition: transform 0.15s;
+}
+
+input[type="range"]::-webkit-slider-thumb:active {
+  cursor: grabbing;
+  transform: scale(1.15);
+}
+
+/* ─── Animations ──────────────────────────────────────────── */
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg,
+    rgba(255,255,255,0.04) 0%,
+    rgba(255,255,255,0.08) 40%,
+    rgba(255,255,255,0.04) 80%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease infinite;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.fade-up {
+  animation: fadeUp 0.4s ease both;
+}
+
+@keyframes glowPulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+}
+
+.glow-pulse {
+  animation: glowPulse 2s ease infinite;
+}
+
+/* ─── Utility classes ─────────────────────────────────────── */
+.gradient-cyan {
+  background: linear-gradient(135deg, var(--cyan), #0099cc);
+}
+
+.gradient-text-cyan {
+  background: linear-gradient(135deg, var(--cyan), #66e0ff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-text-purple {
+  background: linear-gradient(135deg, var(--purple), #cc88ff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.card-glass {
+  background: rgba(11, 16, 24, 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+.surface {
+  background: rgba(24, 28, 40, 0.4);
+  border: 1px solid rgba(255,255,255,0.05);
+}
+
+/* ─── Page-level bg ───────────────────────────────────────── */
+#root {
+  min-height: 100dvh;
+  isolation: isolate;
+}
+
+/* ─── Mobile enhancements ─────────────────────────────────── */
+@media (max-width: 640px) {
+  html { font-size: 15px; }
+}
+
+/* ─── Hover states ────────────────────────────────────────── */
+.interactive {
+  transition: transform 0.15s, opacity 0.15s;
+  cursor: pointer;
+}
+
+.interactive:active {
+  transform: scale(0.97);
+}
+
+/* ─── Number display ──────────────────────────────────────── */
+.tabular {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}

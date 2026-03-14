@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { 
   Wallet as WalletIcon, 
@@ -11,8 +11,27 @@ import {
   PieChart,
   ChevronRight
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function Wallet() {
+  const { token } = useAuth();
+  const [userData, setUserData] = useState<any>(null);
+
+  useEffect(() => {
+    if (token) {
+      fetch('/api/v1/account', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      .then(res => res.json())
+      .then(data => setUserData(data))
+      .catch(err => console.error('Error fetching account:', err));
+    }
+  }, [token]);
+
+  if (!userData) return <div className="flex justify-center p-20"><div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>;
+
+  const totalBalance = userData.balance + userData.demo_balance;
+
   return (
     <div className="space-y-8 pb-20">
       {/* Balance Hero */}
@@ -26,20 +45,20 @@ export default function Wallet() {
               Total Portfolio Balance
             </div>
             <div className="flex items-baseline gap-4">
-              <h2 className="text-5xl md:text-7xl font-black tracking-tighter">$42,850.24</h2>
+              <h2 className="text-5xl md:text-7xl font-black tracking-tighter">${totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h2>
               <div className="flex items-center gap-1 text-emerald-400 font-bold text-lg">
                 <TrendingUp className="w-5 h-5" />
-                +12.4%
+                +{(userData.profit / (userData.balance || 1) * 100).toFixed(1)}%
               </div>
             </div>
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span className="text-sm font-bold text-zinc-400">Real: $12,450</span>
+                <span className="text-sm font-bold text-zinc-400">Real: ${userData.balance.toLocaleString()}</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-blue-500" />
-                <span className="text-sm font-bold text-zinc-400">Demo: $30,400</span>
+                <span className="text-sm font-bold text-zinc-400">Demo: ${userData.demo_balance.toLocaleString()}</span>
               </div>
             </div>
           </div>

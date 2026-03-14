@@ -1,10 +1,28 @@
 import { Request, Response, NextFunction } from 'express';
 import admin from 'firebase-admin';
+import fs from 'fs';
+import path from 'path';
+
+// Load config for project ID
+let projectId = process.env.VITE_FIREBASE_PROJECT_ID;
+
+try {
+  const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
+  if (fs.existsSync(configPath)) {
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    projectId = projectId || config.projectId;
+  }
+} catch (e) {
+  console.error('Error loading firebase-applet-config.json in auth.ts:', e);
+}
 
 // Initialize Firebase Admin if not already initialized
 if (admin.apps.length === 0) {
+  if (!projectId) {
+    console.warn('⚠️ No Firebase Project ID found. Auth verification may fail.');
+  }
   admin.initializeApp({
-    projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+    projectId: projectId,
   });
 }
 

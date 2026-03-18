@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root { --tg-viewport-height: 100vh; }
+  html { height: 100%; background: #0a0a0f; }
+  body { height: 100%; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; -webkit-font-smoothing: antialiased; }
+  #root { height: 100%; }
+}
+
+@layer utilities {
+  .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  input[type='range']::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #4d9fff; cursor: pointer; border: 2px solid #0a0a0f; }
+  input[type='range']::-webkit-slider-runnable-track { height: 4px; background: #2a2a3a; border-radius: 2px; }
+}

@@ -16,10 +16,11 @@ class Settings(BaseSettings):
     TELEGRAM_BOT_TOKEN: str = ""
 
     ALLOWED_ORIGINS: List[str] = [
-        "https://nexarb-scanner.vercel.app",
-        "http://localhost:5173",
-        "http://localhost:3000",
-    ]
+    "https://nexarb-scanner.vercel.app",
+    "https://nexarb-scanner-ribb97gqs-shepintolik4-3840s-projects.vercel.app",
+    "http://localhost:5173",
+    "http://localhost:3000",
+]
 
     CEX_CACHE_TTL: int = 30
     DEX_CACHE_TTL: int = 20

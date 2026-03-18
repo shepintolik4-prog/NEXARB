@@ -12,18 +12,17 @@ from typing import Optional
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
 from fastapi.middleware.cors import CORSMiddleware
 
+# Исправленные импорты согласно структуре папок
 from app.config import settings
-from app.routers import scanner, futures, dex, alerts, users
-from app.tasks.scheduler import create_scheduler, get_scheduler
+from app.routers import scanner, futures, dex, alerts, users, payments, subscriptions, trading, referrals
+from app.tasks.scheduler import create_scheduler
 from app.services.cex_scanner import close_all_exchanges
-from app.routers import payments, subscriptions, trading, referrals
 
 logging.basicConfig(
     level=logging.DEBUG if settings.DEBUG else logging.INFO,
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
 )
 logger = logging.getLogger(__name__)
-
 
 class ConnectionManager:
     def __init__(self):
@@ -59,9 +58,7 @@ class ConnectionManager:
     def count(self):
         return len(self.active)
 
-
 ws_manager = ConnectionManager()
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -73,7 +70,6 @@ async def lifespan(app: FastAPI):
     broadcast_task.cancel()
     scheduler.shutdown(wait=False)
     await close_all_exchanges()
-
 
 async def _ws_broadcast_loop():
     from app.services.cex_scanner import run_cex_scan
@@ -99,7 +95,6 @@ async def _ws_broadcast_loop():
         except Exception as e:
             logger.error(f"WS broadcast error: {e}")
 
-
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
@@ -115,16 +110,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(scanner.router)
-app.include_router(futures.router)
-app.include_router(dex.router)
-app.include_router(alerts.router)
-app.include_router(users.router)
-app.include_router(payments.router)
-app.include_router(subscriptions.router)
-app.include_router(trading.router)
-app.include_router(referrals.router)
-
+# Подключение всех роутеров с префиксами для чистоты API
+app.include_router(scanner.router, prefix="/api/scanner", tags=["Scanner"])
+app.include_router(futures.router, prefix="/api/futures", tags=["Futures"])
+app.include_router(dex.router, prefix="/api/dex", tags=["DEX"])
+app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])
+app.include_router(users.router, prefix="/api/users", tags=["Users"])
+app.include_router(payments.router, prefix="/api/payments", tags=["Payments"])
+app.include_router(subscriptions.router, prefix="/api/subscriptions", tags=["Subscriptions"])
+app.include_router(trading.router, prefix="/api/trading", tags=["Trading"])
+app.include_router(referrals.router, prefix="/api/referrals", tags=["Referrals"])
 
 @app.get("/")
 async def root():
@@ -136,25 +131,9 @@ async def root():
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
-
 @app.get("/health")
 async def health():
     return {"status": "ok"}
-
-
-@app.get("/api/stats")
-async def stats():
-    from app.services.cache import cex_cache, dex_cache, futures_cache, ticker_cache
-    return {
-        "ws_connections": ws_manager.count,
-        "cache": {
-            "cex": cex_cache.stats(),
-            "dex": dex_cache.stats(),
-            "futures": futures_cache.stats(),
-            "ticker": ticker_cache.stats(),
-        },
-    }
-
 
 @app.websocket("/ws/{telegram_id}")
 async def websocket_endpoint(websocket: WebSocket, telegram_id: str):
@@ -174,18 +153,6 @@ async def websocket_endpoint(websocket: WebSocket, telegram_id: str):
                         "type": "pong",
                         "timestamp": datetime.now(timezone.utc).isoformat(),
                     })
-                elif msg.get("type") == "subscribe_scan":
-                    from app.services.cex_scanner import run_cex_scan
-                    results, exchanges, _ = await run_cex_scan(
-                        min_spread_pct=msg.get("min_spread", settings.MIN_SPREAD_PCT),
-                        limit=30,
-                    )
-                    await ws_manager.send(telegram_id, {
-                        "type": "spread_update",
-                        "data": [r.model_dump() for r in results],
-                        "scanned_exchanges": exchanges,
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                    })
             except json.JSONDecodeError:
                 pass
     except WebSocketDisconnect:
@@ -193,7 +160,6 @@ async def websocket_endpoint(websocket: WebSocket, telegram_id: str):
     except Exception as e:
         logger.error(f"WS error for {telegram_id}: {e}")
         ws_manager.disconnect(telegram_id)
-
 
 if __name__ == "__main__":
     import uvicorn

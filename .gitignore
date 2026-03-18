@@ -1,0 +1,8 @@
+Set-Content -Path .gitignore -Value "node_modules/
+dist/
+.vercel/
+__pycache__/
+*.pyc
+.env
+.venv/
+venv/"

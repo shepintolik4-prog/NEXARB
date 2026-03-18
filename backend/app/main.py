@@ -13,16 +13,17 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import scanner, futures, dex, alerts, users, payments, subscriptions, trading, referrals
-from app.tasks.scheduler import create_scheduler
+from app.routers import scanner, futures, dex, alerts, users
+from app.tasks.scheduler import create_scheduler, get_scheduler
 from app.services.cex_scanner import close_all_exchanges
+from app.routers import payments, subscriptions, trading, referrals
 
-# Настройка логирования
 logging.basicConfig(
     level=logging.DEBUG if settings.DEBUG else logging.INFO,
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
 )
 logger = logging.getLogger(__name__)
+
 
 class ConnectionManager:
     def __init__(self):
@@ -58,33 +59,29 @@ class ConnectionManager:
     def count(self):
         return len(self.active)
 
+
 ws_manager = ConnectionManager()
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("NEXARB Scanner starting up...")
-    # Инициализация планировщика задач
     scheduler = create_scheduler()
     scheduler.start()
-    # Запуск фонового вещания через WebSocket
     broadcast_task = asyncio.create_task(_ws_broadcast_loop())
-    
     yield
-    
-    logger.info("NEXARB Scanner shutting down...")
     broadcast_task.cancel()
     scheduler.shutdown(wait=False)
     await close_all_exchanges()
 
+
 async def _ws_broadcast_loop():
-    """Фоновая задача для рассылки обновлений всем подключенным клиентам"""
     from app.services.cex_scanner import run_cex_scan
     while True:
         try:
-            await asyncio.sleep(15) # Интервал обновления
+            await asyncio.sleep(15)
             if ws_manager.count == 0:
                 continue
-                
             results, exchanges, _ = await run_cex_scan(
                 min_spread_pct=settings.MIN_SPREAD_PCT,
                 min_volume_24h=settings.MIN_VOLUME_24H,
@@ -102,6 +99,7 @@ async def _ws_broadcast_loop():
         except Exception as e:
             logger.error(f"WS broadcast error: {e}")
 
+
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
@@ -109,7 +107,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Настройка CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
@@ -118,16 +115,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Подключение роутеров
-app.include_router(scanner.router, prefix="/api/scanner", tags=["Scanner"])
-app.include_router(futures.router, prefix="/api/futures", tags=["Futures"])
-app.include_router(dex.router, prefix="/api/dex", tags=["DEX"])
-app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])
-app.include_router(users.router, prefix="/api/users", tags=["Users"])
-app.include_router(payments.router, prefix="/api/payments", tags=["Payments"])
-app.include_router(subscriptions.router, prefix="/api/subscriptions", tags=["Subscriptions"])
-app.include_router(trading.router, prefix="/api/trading", tags=["Trading"])
-app.include_router(referrals.router, prefix="/api/referrals", tags=["Referrals"])
+app.include_router(scanner.router)
+app.include_router(futures.router)
+app.include_router(dex.router)
+app.include_router(alerts.router)
+app.include_router(users.router)
+app.include_router(payments.router)
+app.include_router(subscriptions.router)
+app.include_router(trading.router)
+app.include_router(referrals.router)
+
 
 @app.get("/")
 async def root():
@@ -139,9 +136,11 @@ async def root():
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
 
 @app.get("/api/stats")
 async def stats():
@@ -155,6 +154,7 @@ async def stats():
             "ticker": ticker_cache.stats(),
         },
     }
+
 
 @app.websocket("/ws/{telegram_id}")
 async def websocket_endpoint(websocket: WebSocket, telegram_id: str):
@@ -193,6 +193,7 @@ async def websocket_endpoint(websocket: WebSocket, telegram_id: str):
     except Exception as e:
         logger.error(f"WS error for {telegram_id}: {e}")
         ws_manager.disconnect(telegram_id)
+
 
 if __name__ == "__main__":
     import uvicorn

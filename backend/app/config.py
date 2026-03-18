@@ -40,22 +40,17 @@ class Settings(BaseSettings):
 
     # ── Scanner Settings ──────────────────────────────────────────────────
     # Exchanges to scan without API keys (public endpoints only)
-    DEFAULT_CEX_EXCHANGES: list[str] = [
-        "binance", "okx", "bybit", "kucoin", "gateio",
-        "mexc", "htx", "bitget", "coinbase", "kraken",
-        "cryptocom", "bitfinex", "poloniex", "phemex",
-        "bingx", "lbank", "xt",
-    ]
+DEFAULT_CEX_EXCHANGES: list[str] = [
+    "binance", "okx", "bybit", "kucoin", "gateio",
+    "mexc", "htx", "bitget",
+]
 
     # Top symbols to scan by default
-    DEFAULT_SYMBOLS: list[str] = [
-        "BTC/USDT", "ETH/USDT", "BNB/USDT", "XRP/USDT",
-        "SOL/USDT", "ADA/USDT", "DOGE/USDT", "AVAX/USDT",
-        "MATIC/USDT", "DOT/USDT", "LINK/USDT", "UNI/USDT",
-        "LTC/USDT", "TON/USDT", "SUI/USDT", "APT/USDT",
-        "NEAR/USDT", "ARB/USDT", "OP/USDT", "INJ/USDT",
-        "TRX/USDT", "ATOM/USDT", "FIL/USDT", "ICP/USDT",
-    ]
+DEFAULT_SYMBOLS: list[str] = [
+    "BTC/USDT", "ETH/USDT", "BNB/USDT", "XRP/USDT",
+    "SOL/USDT", "DOGE/USDT", "AVAX/USDT", "MATIC/USDT",
+    "LINK/USDT", "UNI/USDT", "LTC/USDT", "TON/USDT",
+]
 
     # Minimum spread % to include in results
     MIN_SPREAD_PCT: float = 0.3
@@ -64,7 +59,7 @@ class Settings(BaseSettings):
     MIN_VOLUME_24H: float = 50_000.0
 
     # How many concurrent exchange requests
-    MAX_CONCURRENT_EXCHANGES: int = 8
+    MAX_CONCURRENT_EXCHANGES: int = 3
 
     # Max results per scan response
     MAX_SCAN_RESULTS: int = 100

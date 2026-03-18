@@ -100,6 +100,7 @@ async def _ws_broadcast_loop():
             logger.error(f"WS broadcast error: {e}")
 
 
+# 1. Инициализация приложения
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
@@ -107,7 +108,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Вот измененный блок CORS:
+# 2. СНАЧАЛА CORS (Middleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -120,6 +121,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 3. ПОТОМ РОУТЫ
 app.include_router(scanner.router)
 app.include_router(futures.router)
 app.include_router(dex.router)

@@ -107,9 +107,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Вот измененный блок CORS:
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_origins=[
+        "https://nexarb-scanner.vercel.app",
+        "http://localhost:5173",
+        "http://localhost:3000"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -16,7 +16,7 @@ import FuturesPage  from './components/Futures/FuturesPage'
 import DexPage      from './components/DEX/DexPage'
 import TradingPage  from './components/Trading/TradingPage'
 import ReferralPage from './components/Referral/ReferralPage'
-import PlansPage    from './components/Plans/PlansPage'
+import PlansPage    from './components/Subscription/PlansPage'
 import AlertsPage   from './components/Alerts/AlertsPage'
 import SettingsPage from './components/Settings/SettingsPage'
 

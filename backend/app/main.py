@@ -16,6 +16,7 @@ from app.config import settings
 from app.routers import scanner, futures, dex, alerts, users
 from app.tasks.scheduler import create_scheduler, get_scheduler
 from app.services.cex_scanner import close_all_exchanges
+from app.routers import payments, subscriptions, trading, referrals
 
 logging.basicConfig(
     level=logging.DEBUG if settings.DEBUG else logging.INFO,
@@ -119,6 +120,10 @@ app.include_router(futures.router)
 app.include_router(dex.router)
 app.include_router(alerts.router)
 app.include_router(users.router)
+app.include_router(payments.router)
+app.include_router(subscriptions.router)
+app.include_router(trading.router)
+app.include_router(referrals.router)
 
 
 @app.get("/")

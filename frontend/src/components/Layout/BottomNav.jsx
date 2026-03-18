@@ -1,12 +1,14 @@
 import { useStore } from '../../store/useStore'
 import { WebApp } from '../../telegram'
-import { BarChart2, TrendingUp, Layers, Bell, Settings } from 'lucide-react'
+import { BarChart2, TrendingUp, Layers, Bell, Settings, Repeat, Users } from 'lucide-react'
 import clsx from 'clsx'
 
 const TABS = [
   { id: 'scanner',  label: 'CEX',      Icon: BarChart2   },
   { id: 'futures',  label: 'Futures',  Icon: TrendingUp  },
   { id: 'dex',      label: 'DEX',      Icon: Layers      },
+  { id: 'trading',  label: 'Trading',  Icon: Repeat      }, // Новая вкладка
+  { id: 'referral', label: 'Referral', Icon: Users       }, // Новая вкладка
   { id: 'alerts',   label: 'Alerts',   Icon: Bell        },
   { id: 'settings', label: 'Settings', Icon: Settings    },
 ]
@@ -33,7 +35,7 @@ export default function BottomNav() {
               key={id}
               onClick={() => handleTab(id)}
               className={clsx(
-                'relative flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all duration-150 min-w-[52px]',
+                'relative flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all duration-150 min-w-[48px]',
                 isActive
                   ? 'text-accent-blue'
                   : 'text-text-muted active:text-text-primary'

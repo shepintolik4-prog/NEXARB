@@ -108,8 +108,10 @@ export const useStore = create((set, get) => ({
   // ── WebSocket live data ────────────────────────────────────────────────────
   wsConnected: false,
   wsLastUpdate: null,
+  subscription: null,
   setWsConnected: (v) => set({ wsConnected: v }),
   setWsLastUpdate: (d) => set({ wsLastUpdate: d }),
+  setSubscription: (s) => set({ subscription: s }),
 
   // Merge live WS results into CEX results (only if newer and WS is source)
   mergeLiveCexResults: (results) => {

@@ -14,6 +14,9 @@ import BottomNav from './components/Layout/BottomNav'
 import ScannerPage  from './components/Scanner/ScannerPage'
 import FuturesPage  from './components/Futures/FuturesPage'
 import DexPage      from './components/DEX/DexPage'
+import TradingPage  from './components/Trading/TradingPage'
+import ReferralPage from './components/Referral/ReferralPage'
+import PlansPage    from './components/Plans/PlansPage'
 import AlertsPage   from './components/Alerts/AlertsPage'
 import SettingsPage from './components/Settings/SettingsPage'
 
@@ -33,6 +36,9 @@ function AppContent() {
           {activeTab === 'scanner'  && <ScannerPage  />}
           {activeTab === 'futures'  && <FuturesPage  />}
           {activeTab === 'dex'      && <DexPage      />}
+          {activeTab === 'trading'  && <TradingPage  />}
+          {activeTab === 'referral' && <ReferralPage />}
+          {activeTab === 'plans'    && <PlansPage    />}
           {activeTab === 'alerts'   && <AlertsPage   />}
           {activeTab === 'settings' && <SettingsPage />}
         </div>

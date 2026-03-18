@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     SUPABASE_URL: str = ""
     SUPABASE_SERVICE_KEY: str = ""
     SUPABASE_ANON_KEY: str = ""
+    CRYPTOBOT_TOKEN: str = ""
 
     TELEGRAM_BOT_TOKEN: str = ""
 
